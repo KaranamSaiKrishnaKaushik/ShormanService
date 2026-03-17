@@ -20,8 +20,13 @@ public class CartController : ControllerBase
         _logger = logger;
     }
 
-    private Guid GetUserId() =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private Guid GetUserId()
+    {
+        var value = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(value) || !Guid.TryParse(value, out var id))
+            throw new UnauthorizedAccessException("Invalid user token.");
+        return id;
+    }
 
     [HttpGet]
     [ProducesResponseType(typeof(CartDto), StatusCodes.Status200OK)]

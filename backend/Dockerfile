@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-COPY ShormanService.sln .
+COPY ShormanService.slnx .
 COPY ShormanService.Domain/ShormanService.Domain.csproj ShormanService.Domain/
 COPY ShormanService.Application/ShormanService.Application.csproj ShormanService.Application/
 COPY ShormanService.Infrastructure/ShormanService.Infrastructure.csproj ShormanService.Infrastructure/
