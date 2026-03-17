@@ -81,7 +81,8 @@ public class CartService : ICartService
             await _cartRepository.UpdateAsync(cart);
         }
 
-        var updatedCart = await _cartRepository.GetByUserIdAsync(userId) ?? new Cart { UserId = userId };
+        var updatedCart = await _cartRepository.GetByUserIdAsync(userId)
+            ?? throw new InvalidOperationException("Cart unexpectedly not found after update.");
         return MapCartToDto(updatedCart);
     }
 
@@ -95,7 +96,8 @@ public class CartService : ICartService
 
         await _cartRepository.DeleteCartItemAsync(cartItemId);
 
-        var updatedCart = await _cartRepository.GetByUserIdAsync(userId) ?? new Cart { UserId = userId };
+        var updatedCart = await _cartRepository.GetByUserIdAsync(userId)
+            ?? throw new InvalidOperationException("Cart unexpectedly not found after item removal.");
         return MapCartToDto(updatedCart);
     }
 

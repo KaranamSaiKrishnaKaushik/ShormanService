@@ -7,7 +7,7 @@ COPY ShormanService.Application/ShormanService.Application.csproj ShormanService
 COPY ShormanService.Infrastructure/ShormanService.Infrastructure.csproj ShormanService.Infrastructure/
 COPY ShormanService.API/ShormanService.API.csproj ShormanService.API/
 
-RUN dotnet restore
+RUN dotnet restore ShormanService.slnx
 
 COPY . .
 RUN dotnet publish ShormanService.API/ShormanService.API.csproj -c Release -o /app/publish

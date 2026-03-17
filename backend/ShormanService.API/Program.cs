@@ -124,7 +124,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "Database seeding skipped (database may not be available).");
+        logger.LogWarning(ex, "Database seeding skipped ({ExceptionType}). Ensure MySQL is running and the connection string is correct.", ex.GetType().Name);
     }
 }
 
