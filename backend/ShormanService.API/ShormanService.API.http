@@ -1,0 +1,6 @@
+@ShormanService.API_HostAddress = http://localhost:5082
+
+GET {{ShormanService.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
