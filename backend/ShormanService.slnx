@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="ShormanService.API/ShormanService.API.csproj" />
-  <Project Path="ShormanService.Application/ShormanService.Application.csproj" />
-  <Project Path="ShormanService.Domain/ShormanService.Domain.csproj" />
-  <Project Path="ShormanService.Infrastructure/ShormanService.Infrastructure.csproj" />
-</Solution>

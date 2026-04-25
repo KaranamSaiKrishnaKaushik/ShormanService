@@ -24,12 +24,17 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
 @Component({
   selector: 'app-products',
   standalone: true,
-  imports: [FormsModule, NgFor, NgIf, NgClass, CurrencyPipe, AsyncPipe, LoadingSpinnerComponent],
+  imports: [FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe, LoadingSpinnerComponent],
   template: `
     <div class="products-page">
       <!-- Header with search -->
       <div class="page-header">
         <div class="header-inner">
+          <button class="mobile-filter-btn" (click)="toggleMobileFilters()">
+            <span class="filter-icon">☰</span>
+            Filters
+            <span class="filter-badge" *ngIf="activeFiltersCount > 0">{{ activeFiltersCount }}</span>
+          </button>
           <div class="search-bar">
             <span class="search-icon">🔍</span>
             <input
@@ -62,18 +67,26 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
       </div>
 
       <div class="products-layout">
+        <!-- Mobile Filter Overlay -->
+        <div class="mobile-filter-overlay" *ngIf="mobileFiltersOpen" (click)="closeMobileFilters()"></div>
+
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" [class.mobile-open]="mobileFiltersOpen">
+          <div class="mobile-filter-header">
+            <h3>Filters</h3>
+            <button class="close-btn" (click)="closeMobileFilters()">✕</button>
+          </div>
+
           <div class="sidebar-section">
             <h3 class="sidebar-title">Categories</h3>
             <div class="category-list">
               <label class="category-item" [class.active]="activeCategory === 'all'">
-                <input type="radio" name="category" value="all" [(ngModel)]="activeCategory" (change)="applyFilters()" />
+                <input type="radio" name="category" value="all" [(ngModel)]="activeCategory" (change)="applyFilters(); closeMobileFilters()" />
                 <span class="cat-icon">🛍️</span>
                 <span class="cat-name">All Products</span>
               </label>
               <label *ngFor="let cat of categories" class="category-item" [class.active]="activeCategory === cat.slug">
-                <input type="radio" name="category" [value]="cat.slug" [(ngModel)]="activeCategory" (change)="applyFilters()" />
+                <input type="radio" name="category" [value]="cat.slug" [(ngModel)]="activeCategory" (change)="applyFilters(); closeMobileFilters()" />
                 <span class="cat-icon">{{ cat.icon }}</span>
                 <span class="cat-name">{{ cat.name }}</span>
               </label>
@@ -134,6 +147,13 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
           </div>
         </main>
       </div>
+
+      <!-- Mobile Cart Button -->
+      <button class="mobile-cart-btn" (click)="cartService.openCart()" *ngIf="(cartService.cart$ | async)?.itemCount as count">
+        <span class="cart-icon">🛒</span>
+        <span class="cart-text">Cart</span>
+        <span class="cart-badge">{{ count }}</span>
+      </button>
     </div>
 
     <!-- Cart Sidebar Overlay -->
@@ -149,12 +169,43 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
       padding: 1rem 0;
       position: sticky;
       top: 64px;
-      z-index: 100;
+      z-index: 900;
     }
     .header-inner {
       max-width: 1200px;
       margin: 0 auto;
       padding: 0 1rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .mobile-filter-btn {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      background: #2E7D32;
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #fff;
+      position: relative;
+      box-shadow: 0 2px 4px rgba(46, 125, 50, 0.3);
+      transition: background 0.2s;
+    }
+    .mobile-filter-btn:hover {
+      background: #1B5E20;
+    }
+    .filter-icon { font-size: 1.1rem; }
+    .filter-badge {
+      background: #fff;
+      color: #2E7D32;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 10px;
+      font-weight: 700;
     }
     .search-bar {
       display: flex;
@@ -186,6 +237,9 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
       background: #fff;
       border-bottom: 1px solid #eee;
       padding: 0.75rem 0;
+      position: sticky;
+      top: 128px;
+      z-index: 850;
     }
     .tabs-inner {
       max-width: 1200px;
@@ -222,13 +276,42 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
 
     /* Sidebar */
     .sidebar { }
+    .mobile-filter-header {
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #eee;
+      background: #fff;
+    }
+    .mobile-filter-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .mobile-filter-header .close-btn {
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      cursor: pointer;
+      color: #999;
+      padding: 0;
+      line-height: 1;
+    }
+    .mobile-filter-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 150;
+    }
     .sidebar-section {
       background: #fff;
       border-radius: 12px;
       padding: 1.25rem;
       box-shadow: 0 1px 4px rgba(0,0,0,0.06);
       position: sticky;
-      top: 140px;
+      top: 190px;
     }
     .sidebar-title {
       font-size: 0.85rem;
@@ -237,8 +320,15 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
       text-transform: uppercase;
       letter-spacing: 1px;
       margin: 0 0 1rem;
+      padding-top: 0;
     }
-    .category-list { display: flex; flex-direction: column; gap: 0.25rem; }
+    .category-list { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 0.25rem;
+      padding: 0;
+      margin: 0;
+    }
     .category-item {
       display: flex;
       align-items: center;
@@ -249,6 +339,8 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
       transition: background 0.15s;
       font-size: 0.9rem;
       color: #555;
+      visibility: visible;
+      opacity: 1;
     }
     .category-item input[type="radio"] { display: none; }
     .category-item:hover { background: #F3F4F6; }
@@ -424,14 +516,120 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
       z-index: 200;
     }
 
+    /* Mobile Cart Button */
+    .mobile-cart-btn {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #2E7D32;
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      padding: 0.85rem 1.25rem;
+      box-shadow: 0 4px 12px rgba(46, 125, 50, 0.4);
+      cursor: pointer;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 0.95rem;
+      z-index: 100;
+      transition: all 0.2s;
+    }
+    .mobile-cart-btn:hover {
+      background: #1B5E20;
+      transform: scale(1.05);
+    }
+    .mobile-cart-btn:active {
+      transform: scale(0.95);
+    }
+    .cart-icon { font-size: 1.2rem; }
+    .cart-badge {
+      background: #fff;
+      color: #2E7D32;
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 12px;
+      font-weight: 800;
+      min-width: 20px;
+      text-align: center;
+    }
+
     /* Responsive */
     @media (max-width: 960px) {
       .products-layout { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
+      
+      /* Show mobile filter button */
+      .mobile-filter-btn { display: flex; }
+      
+      /* Make sidebar a slide-in panel */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 280px;
+        max-width: 85vw;
+        background: #fff;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow: hidden;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+        display: flex;
+        flex-direction: column;
+      }
+      .sidebar.mobile-open {
+        transform: translateX(0);
+      }
+      .mobile-filter-overlay {
+        display: block;
+      }
+      .mobile-filter-header {
+        display: flex;
+        position: relative;
+        top: auto;
+        z-index: 1;
+        background: #fff;
+        flex-shrink: 0;
+        border-bottom: 2px solid #E5E7EB;
+      }
+      .sidebar-section {
+        position: relative;
+        box-shadow: none;
+        border-radius: 0;
+        padding: 1.25rem;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        min-height: 0;
+      }
+      .sidebar-title {
+        margin-top: 0;
+        padding-top: 0;
+      }
+      .category-list {
+        padding: 0;
+        margin: 0;
+      }
+      .category-item:first-child {
+        margin-top: 0;
+      }
+      
+      /* Show mobile cart button */
+      .mobile-cart-btn { display: flex; }
+      
       .product-grid { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 500px) {
       .product-grid { grid-template-columns: 1fr; }
+      .search-bar { flex: 1; }
+      .mobile-cart-btn {
+        bottom: 15px;
+        right: 15px;
+        padding: 0.75rem 1rem;
+        font-size: 0.85rem;
+      }
     }
   `]
 })
@@ -448,6 +646,7 @@ export class ProductsComponent implements OnInit {
   activeCategory = 'all';
   searchQuery = '';
   loading = true;
+  mobileFiltersOpen = false;
 
   cartOpen$ = this.cartService.isOpen$;
 
@@ -460,8 +659,19 @@ export class ProductsComponent implements OnInit {
 
   private placeholderColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4'];
 
+  get activeFiltersCount(): number {
+    let count = 0;
+    if (this.activeSupermarket !== 'all') count++;
+    if (this.activeCategory !== 'all') count++;
+    if (this.searchQuery.trim()) count++;
+    return count;
+  }
+
   ngOnInit(): void {
-    this.productService.getCategories().subscribe(cats => this.categories = cats);
+    this.productService.getCategories().subscribe(cats => {
+      this.categories = cats;
+      console.log('Categories loaded:', cats);
+    });
     this.productService.getProducts().subscribe(products => {
       this.allProducts = products;
       this.filteredProducts = products;
@@ -498,6 +708,23 @@ export class ProductsComponent implements OnInit {
     this.activeSupermarket = 'all';
     this.activeCategory = 'all';
     this.filteredProducts = [...this.allProducts];
+  }
+
+  toggleMobileFilters(): void {
+    this.mobileFiltersOpen = !this.mobileFiltersOpen;
+    if (this.mobileFiltersOpen) {
+      // Only need to scroll the sidebar-section now
+      setTimeout(() => {
+        const sidebarSection = document.querySelector('.sidebar-section') as HTMLElement;
+        if (sidebarSection) {
+          sidebarSection.scrollTop = 0;
+        }
+      }, 50);
+    }
+  }
+
+  closeMobileFilters(): void {
+    this.mobileFiltersOpen = false;
   }
 
   getQuantity(productId: number): number {

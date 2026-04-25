@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { NgFor, NgIf, CurrencyPipe, DatePipe } from '@angular/common';
 import { OrderService } from '../../core/services/order.service';
 import { Order } from '../../core/models/order.model';
@@ -50,9 +50,24 @@ import { Order } from '../../core/models/order.model';
 })
 export class OrdersComponent implements OnInit {
   private orderService = inject(OrderService);
+  private cdr = inject(ChangeDetectorRef);
   orders: Order[] = [];
   loading = true;
   ngOnInit() {
-    this.orderService.getOrders().subscribe({ next: o => { this.orders = o; this.loading = false; }, error: () => { this.loading = false; } });
+    console.log('OrdersComponent ngOnInit called');
+    this.orderService.getOrders().subscribe({ 
+      next: o => { 
+        console.log('Orders received:', o);
+        this.orders = o; 
+        this.loading = false;
+        console.log('Orders loading set to false, triggering change detection');
+        this.cdr.detectChanges();
+      }, 
+      error: (err) => { 
+        console.error('Failed to load orders:', err);
+        this.loading = false;
+        this.cdr.detectChanges();
+      } 
+    });
   }
 }

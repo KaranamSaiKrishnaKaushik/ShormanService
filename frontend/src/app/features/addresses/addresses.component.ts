@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { NgFor, NgIf } from '@angular/common';
 import { AddressService } from '../../core/services/address.service';
@@ -11,96 +11,1021 @@ import { Address } from '../../core/models/address.model';
   template: `
     <div class="addr-page">
       <div class="container">
-        <h1>My Addresses</h1>
-        <div *ngIf="loading" class="loading">Loading…</div>
-        <div class="addr-list">
-          <div *ngFor="let addr of addresses" class="addr-card" [class.default]="addr.isDefault">
-            <div class="addr-top">
-              <strong>{{ addr.label || 'Address' }}</strong>
-              <span class="default-tag" *ngIf="addr.isDefault">Default</span>
+        <div class="page-header-section">
+          <h1>My Addresses</h1>
+          <p class="subtitle">Manage your delivery addresses</p>
+        </div>
+
+        <!-- Loading State -->
+        <div *ngIf="loading" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading addresses...</p>
+        </div>
+
+        <!-- Error State -->
+        <div *ngIf="error && !loading" class="error-state">
+          <span class="error-icon">⚠️</span>
+          <p>{{ error }}</p>
+          <button class="btn-retry" (click)="loadAddresses()">Retry</button>
+        </div>
+
+        <!-- Address List -->
+        <div *ngIf="!loading && !error" class="content-wrapper">
+          <!-- Empty State -->
+          <div *ngIf="addresses.length === 0" class="empty-state">
+            <div class="empty-icon">📍</div>
+            <h3>No addresses yet</h3>
+            <p>Add your first delivery address to get started</p>
+            <button class="btn-primary" (click)="startAdd()">+ Add Address</button>
+          </div>
+
+          <!-- Address Cards -->
+          <div *ngIf="addresses.length > 0" class="addr-list">
+            <div class="list-header">
+              <h2>Saved Addresses</h2>
+              <button class="btn-add-new" (click)="startAdd()" *ngIf="!showForm">+ Add New</button>
             </div>
-            <div class="addr-text">{{ addr.street }} {{ addr.houseNumber }}, {{ addr.postalCode }} {{ addr.city }}, {{ addr.country }}</div>
-            <div class="addr-actions">
-              <button *ngIf="!addr.isDefault" (click)="setDefault(addr.id)" class="btn-default">Set Default</button>
-              <button (click)="delete(addr.id)" class="btn-delete">Delete</button>
+
+            <div *ngFor="let addr of addresses" class="addr-card" 
+                 [class.default]="addr.isDefault"
+                 [class.editing]="editingId === addr.id">
+              
+              <div class="addr-card-inner">
+                <!-- Radio for Default Selection -->
+                <div class="addr-radio">
+                  <input 
+                    type="radio" 
+                    [id]="'addr-' + addr.id"
+                    name="defaultAddress"
+                    [checked]="addr.isDefault"
+                    (change)="setDefault(addr.id)"
+                  />
+                  <label [for]="'addr-' + addr.id"></label>
+                </div>
+
+                <!-- Address Content -->
+                <div class="addr-content" (click)="!addr.isDefault && setDefault(addr.id)">
+                  <div class="addr-header">
+                    <div class="addr-label-row">
+                      <strong class="addr-label">{{ addr.label || 'Address' }}</strong>
+                      <span class="default-badge" *ngIf="addr.isDefault">
+                        <span class="badge-icon">✓</span>
+                        Default
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div class="addr-details">
+                    <p class="addr-line">{{ addr.street }} {{ addr.houseNumber }}</p>
+                    <p class="addr-line">{{ addr.postalCode }} {{ addr.city }}</p>
+                    <p class="addr-line">{{ addr.country }}</p>
+                  </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="addr-actions">
+                  <button 
+                    class="btn-icon btn-edit" 
+                    (click)="startEdit(addr)"
+                    title="Edit address">
+                    ✏️
+                  </button>
+                  <button 
+                    class="btn-icon btn-delete" 
+                    (click)="confirmDelete(addr)"
+                    [disabled]="addresses.length === 1"
+                    [title]="addresses.length === 1 ? 'Cannot delete last address' : 'Delete address'">
+                    🗑️
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
+
+          <!-- Add/Edit Form -->
+          <div class="form-section" *ngIf="showForm">
+            <div class="form-header">
+              <h3>{{ editingId ? 'Edit Address' : 'Add New Address' }}</h3>
+              <button class="btn-close" (click)="cancelForm()">✕</button>
+            </div>
+
+            <form [formGroup]="form" (ngSubmit)="save()" class="addr-form">
+              <!-- Label -->
+              <div class="form-group">
+                <label class="form-label">
+                  Address Label
+                  <span class="optional">(optional)</span>
+                </label>
+                <input 
+                  type="text"
+                  formControlName="label" 
+                  class="form-control" 
+                  placeholder="e.g., Home, Work, Mom's house"
+                />
+                <small class="form-hint">Give this address a memorable name</small>
+              </div>
+
+              <!-- Street and House Number -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">
+                    Street <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="text"
+                    formControlName="street" 
+                    class="form-control"
+                    [class.invalid]="form.get('street')?.invalid && form.get('street')?.touched"
+                    placeholder="Street name"
+                  />
+                  <div class="error-msg" *ngIf="form.get('street')?.invalid && form.get('street')?.touched">
+                    Street is required
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">
+                    House No. <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="text"
+                    formControlName="houseNumber" 
+                    class="form-control"
+                    [class.invalid]="form.get('houseNumber')?.invalid && form.get('houseNumber')?.touched"
+                    placeholder="123"
+                  />
+                  <div class="error-msg" *ngIf="form.get('houseNumber')?.invalid && form.get('houseNumber')?.touched">
+                    House number is required
+                  </div>
+                </div>
+              </div>
+
+              <!-- Postal Code and City -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">
+                    Postal Code <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="text"
+                    formControlName="postalCode" 
+                    class="form-control"
+                    [class.invalid]="form.get('postalCode')?.invalid && form.get('postalCode')?.touched"
+                    placeholder="10115"
+                    maxlength="5"
+                  />
+                  <div class="error-msg" *ngIf="form.get('postalCode')?.invalid && form.get('postalCode')?.touched">
+                    <span *ngIf="form.get('postalCode')?.hasError('required')">Postal code is required</span>
+                    <span *ngIf="form.get('postalCode')?.hasError('pattern')">Must be 5 digits</span>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">
+                    City <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="text"
+                    formControlName="city" 
+                    class="form-control"
+                    [class.invalid]="form.get('city')?.invalid && form.get('city')?.touched"
+                    placeholder="Berlin"
+                  />
+                  <div class="error-msg" *ngIf="form.get('city')?.invalid && form.get('city')?.touched">
+                    City is required
+                  </div>
+                </div>
+              </div>
+
+              <!-- Country -->
+              <div class="form-group">
+                <label class="form-label">
+                  Country <span class="required">*</span>
+                </label>
+                <select 
+                  formControlName="country" 
+                  class="form-control">
+                  <option value="Germany">Germany</option>
+                  <option value="Austria">Austria</option>
+                  <option value="Switzerland">Switzerland</option>
+                </select>
+              </div>
+
+              <!-- Default Checkbox -->
+              <div class="form-group-check">
+                <label class="checkbox-label">
+                  <input type="checkbox" formControlName="isDefault" />
+                  <span class="checkmark"></span>
+                  <span class="checkbox-text">Set as default delivery address</span>
+                </label>
+              </div>
+
+              <!-- Form Actions -->
+              <div class="form-actions">
+                <button type="button" class="btn-secondary" (click)="cancelForm()">
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  class="btn-primary" 
+                  [disabled]="form.invalid || saving">
+                  <span *ngIf="!saving">{{ editingId ? 'Update Address' : 'Save Address' }}</span>
+                  <span *ngIf="saving">Saving...</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-        <div class="add-section">
-          <button class="btn-toggle" (click)="showForm = !showForm">{{ showForm ? '✕ Cancel' : '+ Add Address' }}</button>
-          <form *ngIf="showForm" [formGroup]="form" (ngSubmit)="save()" class="addr-form">
-            <div class="form-row">
-              <div class="fg"><label>Label</label><input formControlName="label" class="fc" placeholder="Home" /></div>
-              <div class="fg"><label>Postal Code *</label><input formControlName="postalCode" class="fc" /></div>
-            </div>
-            <div class="form-row">
-              <div class="fg"><label>Street *</label><input formControlName="street" class="fc" /></div>
-              <div class="fg"><label>House No. *</label><input formControlName="houseNumber" class="fc" /></div>
-            </div>
-            <div class="form-row">
-              <div class="fg"><label>City *</label><input formControlName="city" class="fc" /></div>
-              <div class="fg"><label>Country *</label><input formControlName="country" class="fc" /></div>
-            </div>
-            <div class="fg-check"><label><input type="checkbox" formControlName="isDefault" /> Set as default</label></div>
-            <button type="submit" class="btn-save" [disabled]="saving">{{ saving ? 'Saving…' : 'Save Address' }}</button>
-          </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" *ngIf="deleteConfirm" (click)="deleteConfirm = null">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-icon">🗑️</div>
+        <h3>Delete Address?</h3>
+        <p>Are you sure you want to delete <strong>{{ deleteConfirm?.label || 'this address' }}</strong>?</p>
+        <p class="modal-address">{{ deleteConfirm?.street }} {{ deleteConfirm?.houseNumber }}, {{ deleteConfirm?.city }}</p>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="deleteConfirm = null">Cancel</button>
+          <button class="btn-danger" (click)="deleteAddress()">Delete</button>
         </div>
       </div>
     </div>
   `,
   styles: [`
-    .addr-page { background: #F9FAFB; min-height: calc(100vh - 128px); padding: 2rem 0; }
-    .container { max-width: 800px; margin: 0 auto; padding: 0 1rem; }
-    h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 1.5rem; }
-    .loading { color: #999; text-align: center; padding: 3rem; }
-    .addr-list { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
-    .addr-card { background: #fff; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.07); border: 2px solid transparent; }
-    .addr-card.default { border-color: #2E7D32; }
-    .addr-top { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
-    .default-tag { background: #E8F5E9; color: #2E7D32; font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 20px; font-weight: 600; }
-    .addr-text { font-size: 0.9rem; color: #555; margin-bottom: 0.75rem; }
-    .addr-actions { display: flex; gap: 0.5rem; }
-    .btn-default { background: #E8F5E9; color: #2E7D32; border: none; padding: 0.35rem 0.85rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 600; }
-    .btn-delete { background: #FFEBEE; color: #C62828; border: none; padding: 0.35rem 0.85rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 600; }
-    .btn-toggle { background: none; border: 1.5px dashed #2E7D32; color: #2E7D32; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-weight: 600; margin-bottom: 1rem; }
-    .addr-form { background: #fff; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    .fg { margin-bottom: 1rem; }
-    .fg label { display: block; font-size: 0.85rem; font-weight: 600; color: #555; margin-bottom: 0.3rem; }
-    .fc { width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #ddd; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box; }
-    .fc:focus { outline: none; border-color: #2E7D32; }
-    .fg-check { margin-bottom: 1rem; font-size: 0.88rem; color: #555; }
-    .btn-save { background: #2E7D32; color: #fff; border: none; padding: 0.65rem 1.5rem; border-radius: 8px; font-weight: 700; cursor: pointer; }
-    .btn-save:disabled { opacity: 0.6; }
-    @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+    /* Page Layout */
+    .addr-page {
+      background: #F9FAFB;
+      min-height: calc(100vh - 128px);
+      padding: 2rem 0 4rem;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    /* Page Header */
+    .page-header-section {
+      margin-bottom: 2rem;
+    }
+    .page-header-section h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #1a1a1a;
+      margin: 0 0 0.5rem;
+    }
+    .subtitle {
+      color: #6B7280;
+      font-size: 1rem;
+      margin: 0;
+    }
+
+    /* Loading State */
+    .loading-state {
+      text-align: center;
+      padding: 4rem 2rem;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto 1rem;
+      border: 3px solid #E5E7EB;
+      border-top-color: #2E7D32;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .loading-state p {
+      color: #6B7280;
+      font-size: 0.95rem;
+    }
+
+    /* Error State */
+    .error-state {
+      text-align: center;
+      padding: 3rem 2rem;
+      background: #FEE2E2;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+    }
+    .error-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    .error-state p {
+      color: #991B1B;
+      margin-bottom: 1rem;
+    }
+    .btn-retry {
+      background: #DC2626;
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .empty-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+    .empty-state h3 {
+      font-size: 1.5rem;
+      color: #1a1a1a;
+      margin: 0 0 0.5rem;
+    }
+    .empty-state p {
+      color: #6B7280;
+      margin: 0 0 1.5rem;
+    }
+
+    /* Address List */
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .list-header h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin: 0;
+    }
+    .btn-add-new {
+      background: #2E7D32;
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-add-new:hover {
+      background: #1B5E20;
+    }
+
+    .addr-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    /* Address Card */
+    .addr-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border: 2px solid #E5E7EB;
+      transition: all 0.2s;
+      overflow: hidden;
+    }
+    .addr-card.default {
+      border-color: #2E7D32;
+      box-shadow: 0 2px 8px rgba(46, 125, 50, 0.15);
+    }
+    .addr-card.editing {
+      border-color: #FF6F00;
+    }
+    .addr-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .addr-card-inner {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 1rem;
+      padding: 1.25rem;
+      align-items: start;
+    }
+
+    /* Radio Button */
+    .addr-radio {
+      position: relative;
+      padding-top: 0.2rem;
+    }
+    .addr-radio input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .addr-radio label {
+      display: block;
+      width: 24px;
+      height: 24px;
+      border: 2px solid #D1D5DB;
+      border-radius: 50%;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .addr-radio input[type="radio"]:checked + label {
+      border-color: #2E7D32;
+      background: #2E7D32;
+    }
+    .addr-radio input[type="radio"]:checked + label::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      border-radius: 50%;
+    }
+    .addr-radio label:hover {
+      border-color: #2E7D32;
+    }
+
+    /* Address Content */
+    .addr-content {
+      flex: 1;
+      cursor: pointer;
+      min-width: 0;
+    }
+    .addr-header {
+      margin-bottom: 0.75rem;
+    }
+    .addr-label-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .addr-label {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .default-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: #E8F5E9;
+      color: #2E7D32;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .badge-icon {
+      font-size: 0.9rem;
+    }
+
+    .addr-details {
+      color: #4B5563;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    .addr-line {
+      margin: 0 0 0.25rem;
+    }
+    .addr-line:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Action Buttons */
+    .addr-actions {
+      display: flex;
+      gap: 0.5rem;
+      padding-top: 0.2rem;
+    }
+    .btn-icon {
+      background: none;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition:all 0.2s;
+    }
+    .btn-edit {
+      background: #FEF3C7;
+    }
+    .btn-edit:hover {
+      background: #FDE047;
+    }
+    .btn-delete {
+      background: #FEE2E2;
+    }
+    .btn-delete:hover:not(:disabled) {
+      background: #FCA5A5;
+    }
+    .btn-delete:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Form Section */
+    .form-section {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      margin-top: 1.5rem;
+      border: 2px solid #2E7D32;
+    }
+    .form-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #E5E7EB;
+    }
+    .form-header h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin: 0;
+    }
+    .btn-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: #9CA3AF;
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .btn-close:hover {
+      background: #F3F4F6;
+      color: #1a1a1a;
+    }
+
+    /* Form Styles */
+    .addr-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .form-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .required {
+      color: #DC2626;
+      font-weight: 700;
+    }
+    .optional {
+      color: #9CA3AF;
+      font-weight: 400;
+      font-size: 0.85rem;
+    }
+    .form-control {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid #E5E7EB;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: all 0.2s;
+      box-sizing: border-box;
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: #2E7D32;
+      box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+    }
+    .form-control.invalid {
+      border-color: #DC2626;
+    }
+    .form-control.invalid:focus {
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+    }
+    .form-hint {
+      font-size: 0.8rem;
+      color: #9CA3AF;
+      margin-top: 0.3rem;
+    }
+    .error-msg {
+      color: #DC2626;
+      font-size: 0.82rem;
+      margin-top: 0.4rem;
+      font-weight: 500;
+    }
+
+    /* Checkbox */
+    .form-group-check {
+      margin: 0.5rem 0;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      position: relative;
+      padding-left: 32px;
+    }
+    .checkbox-label input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .checkmark {
+      position: absolute;
+      left: 0;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #D1D5DB;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .checkbox-label input[type="checkbox"]:checked ~ .checkmark {
+      background: #2E7D32;
+      border-color: #2E7D32;
+    }
+    .checkbox-label input[type="checkbox"]:checked ~ .checkmark::after {
+      content: '';
+      position: absolute;
+      left: 6px;
+      top: 2px;
+      width: 5px;
+      height: 10px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+    .checkbox-text {
+      font-size: 0.95rem;
+      color: #374151;
+      font-weight: 500;
+    }
+
+    /* Form Actions */
+    .form-actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+      margin-top: 0.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid #E5E7EB;
+    }
+    .btn-primary {
+      background: #2E7D32;
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: #1B5E20;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+    }
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: #fff;
+      color: #374151;
+      border: 2px solid #E5E7EB;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: #F9FAFB;
+      border-color: #D1D5DB;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 1rem;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-content {
+      background: #fff;
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    .modal-icon {
+      font-size: 3rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .modal-content h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      text-align: center;
+      margin: 0 0 1rem;
+      color: #1a1a1a;
+    }
+    .modal-content p {
+      text-align: center;
+      color: #6B7280;
+      margin: 0 0 0.5rem;
+    }
+    .modal-address {
+      font-size: 0.9rem;
+      color: #9CA3AF;
+      font-style: italic;
+      margin-bottom: 1.5rem;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+    .btn-danger {
+      background: #DC2626;
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-danger:hover {
+      background: #B91C1C;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .addr-page {
+        padding: 1.5rem 0 3rem;
+      }
+      .page-header-section h1 {
+        font-size: 1.5rem;
+      }
+      .list-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+      .btn-add-new {
+        width: 100%;
+      }
+      .addr-card-inner {
+        grid-template-columns: auto 1fr;
+        gap: 0.75rem;
+      }
+      .addr-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+        padding-top: 0.75rem;
+        border-top: 1px solid #F3F4F6;
+        margin-top: 0.75rem;
+      }
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+      .form-actions {
+        flex-direction: column-reverse;
+      }
+      .form-actions button {
+        width: 100%;
+      }
+    }
   `]
 })
 export class AddressesComponent implements OnInit {
   private fb = inject(FormBuilder);
   private addressService = inject(AddressService);
+  private cdr = inject(ChangeDetectorRef);
+  
   addresses: Address[] = [];
   loading = true;
+  error: string | null = null;
   showForm = false;
   saving = false;
+  editingId: number | null = null;
+  deleteConfirm: Address | null = null;
+  
   form = this.fb.nonNullable.group({
-    label: [''], street: ['', Validators.required], houseNumber: ['', Validators.required],
-    postalCode: ['', Validators.required], city: ['', Validators.required], country: ['Germany'], isDefault: [false]
+    label: [''],
+    street: ['', [Validators.required, Validators.minLength(2)]],
+    houseNumber: ['', [Validators.required]],
+    postalCode: ['', [Validators.required, Validators.pattern(/^\d{5}$/)]],
+    city: ['', [Validators.required, Validators.minLength(2)]],
+    country: ['Germany', Validators.required],
+    isDefault: [false]
   });
+
   ngOnInit() {
-    this.addressService.getAddresses().subscribe({ next: a => { this.addresses = a; this.loading = false; }, error: () => { this.loading = false; } });
+    console.log('AddressesComponent ngOnInit called');
+    this.loadAddresses();
   }
-  setDefault(id: number) {
-    this.addressService.setDefault(id).subscribe(() => this.addresses = this.addresses.map(a => ({ ...a, isDefault: a.id === id })));
+
+  loadAddresses() {
+    console.log('loadAddresses called, setting loading to true');
+    this.loading = true;
+    this.error = null;
+    
+    this.addressService.getAddresses().subscribe({
+      next: (addresses) => {
+        console.log('Addresses received:', addresses);
+        this.addresses = addresses;
+        this.loading = false;
+        console.log('Loading set to false, triggering change detection');
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to load addresses:', err);
+        this.error = 'Failed to load addresses. Please try again.';
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
-  delete(id: number) {
-    this.addressService.deleteAddress(id).subscribe(() => this.addresses = this.addresses.filter(a => a.id !== id));
+
+  startAdd() {
+    this.editingId = null;
+    this.showForm = true;
+    this.form.reset({ country: 'Germany', isDefault: false });
   }
+
+  startEdit(address: Address) {
+    this.editingId = address.id;
+    this.showForm = true;
+    this.form.patchValue({
+      label: address.label || '',
+      street: address.street,
+      houseNumber: address.houseNumber,
+      postalCode: address.postalCode,
+      city: address.city,
+      country: address.country,
+      isDefault: address.isDefault
+    });
+    
+    // Scroll to form
+    setTimeout(() => {
+      document.querySelector('.form-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  cancelForm() {
+    this.showForm = false;
+    this.editingId = null;
+    this.form.reset({ country: 'Germany', isDefault: false });
+  }
+
   save() {
-    if (this.form.invalid) return;
+    if (this.form.invalid) {
+      // Mark all fields as touched to show validation errors
+      Object.keys(this.form.controls).forEach(key => {
+        this.form.get(key)?.markAsTouched();
+      });
+      return;
+    }
+
     this.saving = true;
-    this.addressService.addAddress(this.form.getRawValue()).subscribe({
-      next: a => { this.addresses.push(a); this.showForm = false; this.saving = false; this.form.reset({ country: 'Germany' }); },
-      error: () => { this.saving = false; }
+    const formValue = this.form.getRawValue();
+
+    const operation = this.editingId
+      ? this.addressService.updateAddress(this.editingId, formValue)
+      : this.addressService.addAddress(formValue);
+
+    operation.subscribe({
+      next: (address) => {
+        if (this.editingId) {
+          // Update existing
+          const index = this.addresses.findIndex(a => a.id === this.editingId);
+          if (index !== -1) {
+            this.addresses[index] = address;
+            
+            // If updated address is default, unset others
+            if (address.isDefault) {
+              this.addresses = this.addresses.map(a => 
+                a.id === address.id ? a : { ...a, isDefault: false }
+              );
+            }
+          }
+        } else {
+          // Add new
+          this.addresses.push(address);
+          
+          // If new address is default, unset others
+          if (address.isDefault) {
+            this.addresses = this.addresses.map(a => 
+              a.id === address.id ? a : { ...a, isDefault: false }
+            );
+          }
+        }
+        
+        this.showForm = false;
+        this.editingId = null;
+        this.saving = false;
+        this.form.reset({ country: 'Germany', isDefault: false });
+      },
+      error: (err) => {
+        console.error('Failed to save address:', err);
+        this.error = 'Failed to save address. Please try again.';
+        this.saving = false;
+      }
+    });
+  }
+
+  setDefault(id: number) {
+    this.addressService.setDefault(id).subscribe({
+      next: () => {
+        this.addresses = this.addresses.map(a => ({
+          ...a,
+          isDefault: a.id === id
+        }));
+      },
+      error: (err) => {
+        console.error('Failed to set default address:', err);
+        this.error = 'Failed to set default address. Please try again.';
+      }
+    });
+  }
+
+  confirmDelete(address: Address) {
+    this.deleteConfirm = address;
+  }
+
+  deleteAddress() {
+    if (!this.deleteConfirm) return;
+    
+    const id = this.deleteConfirm.id;
+    this.deleteConfirm = null;
+
+    this.addressService.deleteAddress(id).subscribe({
+      next: () => {
+        this.addresses = this.addresses.filter(a => a.id !== id);
+        
+        // If no addresses left, hide form
+        if (this.addresses.length === 0) {
+          this.showForm = false;
+        }
+      },
+      error: (err) => {
+        console.error('Failed to delete address:', err);
+        this.error = 'Failed to delete address. Please try again.';
+      }
     });
   }
 }

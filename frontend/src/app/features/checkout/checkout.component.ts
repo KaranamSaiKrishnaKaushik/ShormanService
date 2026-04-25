@@ -1,6 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { NgFor, NgIf, CurrencyPipe, AsyncPipe } from '@angular/common';
 import { CartService } from '../../core/services/cart.service';
 import { OrderService } from '../../core/services/order.service';
@@ -25,7 +25,7 @@ const PAYMENT_OPTIONS: PaymentOption[] = [
 @Component({
   selector: 'app-checkout',
   standalone: true,
-    imports: [ReactiveFormsModule, FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe, RouterLink],
+    imports: [ReactiveFormsModule, FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe],
   template: `
     <div class="checkout-page">
       <div class="checkout-container">

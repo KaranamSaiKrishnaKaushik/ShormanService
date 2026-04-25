@@ -18,7 +18,7 @@ import { CartSidebarComponent } from './features/cart/cart-sidebar.component';
   `,
   styles: [`
     :host { display: flex; flex-direction: column; min-height: 100vh; }
-    main { flex: 1; }
+    main { flex: 1; padding-top: 64px; }
   `]
 })
 export class App {}

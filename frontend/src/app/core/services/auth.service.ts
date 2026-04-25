@@ -1,14 +1,37 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, tap, of, delay, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { User, AuthResponse, LoginRequest, RegisterRequest } from '../models/user.model';
+
+// Mock user database for development
+const MOCK_USERS: Array<User & { password: string }> = [
+  {
+    id: 1,
+    email: 'demo@shorman.com',
+    password: 'demo123',
+    firstName: 'Demo',
+    lastName: 'User',
+    phone: '+49 123 456789'
+  },
+  {
+    id: 2,
+    email: 'test@test.com',
+    password: 'test123',
+    firstName: 'Test',
+    lastName: 'User',
+    phone: '+49 987 654321'
+  }
+];
+
+let nextUserId = 3;
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private useMock = true; // ⚙️ SET TO FALSE WHEN BACKEND IS READY
 
   private readonly TOKEN_KEY = 'shorman_token';
   private readonly USER_KEY = 'shorman_user';
@@ -37,16 +60,71 @@ export class AuthService {
   }
 
   get isLoggedIn(): boolean {
-    return this.isLoggedInSubject.value;
+    const value = this.isLoggedInSubject.value;
+    console.log('AuthService.isLoggedIn getter called, returning:', value);
+    return value;
   }
 
   login(req: LoginRequest): Observable<AuthResponse> {
+    if (this.useMock) {
+      // Find user by email
+      const user = MOCK_USERS.find(u => u.email === req.email);
+      
+      if (!user || user.password !== req.password) {
+        return throwError(() => new Error('Invalid email or password'));
+      }
+
+      // Create mock auth response
+      const { password, ...userWithoutPassword } = user;
+      const mockResponse: AuthResponse = {
+        token: `mock-token-${Date.now()}`,
+        user: userWithoutPassword
+      };
+
+      return of(mockResponse).pipe(
+        delay(500), // Simulate network delay
+        tap(res => this.handleAuth(res))
+      );
+    }
+
     return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/login`, req).pipe(
       tap(res => this.handleAuth(res))
     );
   }
 
   register(req: RegisterRequest): Observable<AuthResponse> {
+    if (this.useMock) {
+      // Check if user already exists
+      const existingUser = MOCK_USERS.find(u => u.email === req.email);
+      if (existingUser) {
+        return throwError(() => new Error('Email already registered'));
+      }
+
+      // Create new user
+      const newUser = {
+        id: nextUserId++,
+        email: req.email,
+        password: req.password,
+        firstName: req.firstName,
+        lastName: req.lastName,
+        phone: req.phone
+      };
+
+      MOCK_USERS.push(newUser);
+
+      // Create mock auth response
+      const { password, ...userWithoutPassword } = newUser;
+      const mockResponse: AuthResponse = {
+        token: `mock-token-${Date.now()}`,
+        user: userWithoutPassword
+      };
+
+      return of(mockResponse).pipe(
+        delay(500), // Simulate network delay
+        tap(res => this.handleAuth(res))
+      );
+    }
+
     return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/register`, req).pipe(
       tap(res => this.handleAuth(res))
     );
