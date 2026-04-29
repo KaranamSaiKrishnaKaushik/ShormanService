@@ -1,0 +1,137 @@
+<div class="products-page">
+  <!-- Header with search -->
+  <div class="page-header">
+    <div class="header-inner">
+      <button class="mobile-filter-btn" (click)="toggleMobileFilters()">
+        <span class="filter-icon">☰</span>
+        Filters
+        <span class="filter-badge" *ngIf="activeFiltersCount > 0">{{ activeFiltersCount }}</span>
+      </button>
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          (ngModelChange)="onSearchChange($event)"
+          placeholder="Search products…"
+          class="search-input"
+        />
+        <button *ngIf="searchQuery" class="search-clear" (click)="searchQuery = ''; applyFilters()">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supermarket Tabs -->
+  <div class="supermarket-tabs">
+    <div class="tabs-inner">
+      <button
+        *ngFor="let tab of supermarketTabs"
+        class="sm-tab"
+        [class.active]="activeSupermarket === tab.slug"
+        [style.background]="activeSupermarket === tab.slug ? tab.bgColor : '#fff'"
+        [style.color]="activeSupermarket === tab.slug ? tab.color : '#333'"
+        [style.border-color]="tab.bgColor"
+        (click)="setSupermarket(tab.slug)"
+      >
+        {{ tab.name }}
+      </button>
+    </div>
+  </div>
+
+  <div class="products-layout">
+    <!-- Mobile Filter Overlay -->
+    <div class="mobile-filter-overlay" *ngIf="mobileFiltersOpen" (click)="closeMobileFilters()"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" [class.mobile-open]="mobileFiltersOpen">
+      <div class="mobile-filter-header">
+        <h3>Filters</h3>
+        <button class="close-btn" (click)="closeMobileFilters()">✕</button>
+      </div>
+
+      <div class="sidebar-section">
+        <h3 class="sidebar-title">Categories</h3>
+        <div class="category-list">
+          <label class="category-item" [class.active]="activeCategory === 'all'">
+            <input type="radio" name="category" value="all" [(ngModel)]="activeCategory"
+              (change)="applyFilters(); closeMobileFilters()" />
+            <span class="cat-icon">🛍️</span>
+            <span class="cat-name">All Products</span>
+          </label>
+          <label *ngFor="let cat of categories" class="category-item" [class.active]="activeCategory === cat.slug">
+            <input type="radio" name="category" [value]="cat.slug" [(ngModel)]="activeCategory"
+              (change)="applyFilters(); closeMobileFilters()" />
+            <span class="cat-icon">{{ cat.icon }}</span>
+            <span class="cat-name">{{ cat.name }}</span>
+          </label>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="products-main">
+      <div class="results-header">
+        <span class="results-count">
+          <strong>{{ filteredProducts.length }}</strong>
+          product{{ filteredProducts.length !== 1 ? 's' : '' }} found
+        </span>
+      </div>
+
+      <app-loading-spinner *ngIf="loading"></app-loading-spinner>
+
+      <div *ngIf="!loading && filteredProducts.length === 0" class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>No products found</h3>
+        <p>Try adjusting your search or filters</p>
+        <button class="btn-reset" (click)="resetFilters()">Reset Filters</button>
+      </div>
+
+      <div class="product-grid" *ngIf="!loading && filteredProducts.length > 0">
+        <div *ngFor="let product of filteredProducts" class="product-card">
+          <!-- Product Image -->
+          <div class="product-image">
+            <img *ngIf="product.imageUrl" [src]="product.imageUrl" [alt]="product.name" loading="lazy" />
+            <div *ngIf="!product.imageUrl" class="image-placeholder"
+              [style.background]="getPlaceholderColor(product.supermarketId)">
+              {{ product.name.charAt(0).toUpperCase() }}
+            </div>
+            <div class="sm-badge" [style.background]="getSupermarketColor(product.supermarketId)">
+              {{ product.supermarket?.name }}
+            </div>
+          </div>
+
+          <!-- Product Info -->
+          <div class="product-info">
+            <div class="product-category">{{ product.category?.name }}</div>
+            <h4 class="product-name">{{ product.name }}</h4>
+            <div class="product-unit" *ngIf="product.unit">{{ product.unit }}</div>
+
+            <div class="product-footer">
+              <div class="product-price">{{ product.price | currency:'EUR':'symbol':'1.2-2' }}</div>
+
+              <div class="cart-controls" *ngIf="getQuantity(product.id) > 0; else addBtn">
+                <button class="qty-btn minus" (click)="decreaseQty(product)">−</button>
+                <span class="qty-value">{{ getQuantity(product.id) }}</span>
+                <button class="qty-btn plus" (click)="increaseQty(product)">+</button>
+              </div>
+              <ng-template #addBtn>
+                <button class="btn-add" (click)="addToCart(product)">+ Add</button>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Cart Button -->
+  <button class="mobile-cart-btn" (click)="cartService.openCart()"
+    *ngIf="(cartService.cart$ | async)?.itemCount as count">
+    <span class="cart-icon">🛒</span>
+    <span class="cart-text">Cart</span>
+    <span class="cart-badge">{{ count }}</span>
+  </button>
+</div>
+
+<!-- Cart Sidebar Overlay -->
+<div class="cart-overlay" *ngIf="cartOpen$ | async" (click)="cartService.closeCart()"></div>

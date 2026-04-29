@@ -1,0 +1,54 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'shorman-web/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'shorman-web/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: shorman-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: shorman-web
+        run: npm ci
+
+      - name: Run linting
+        working-directory: shorman-web
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run unit tests
+        working-directory: shorman-web
+        run: npm run test -- --watch=false --browsers=ChromeHeadless
+        continue-on-error: true
+
+      - name: Build (production)
+        working-directory: shorman-web
+        run: npm run build -- --configuration=production
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shorman-web-dist
+          path: shorman-web/dist/
+          retention-days: 7

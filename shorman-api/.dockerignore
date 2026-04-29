@@ -1,0 +1,12 @@
+.git/
+.idea/
+.vs/
+**/bin/
+**/obj/
+artifacts/
+ShormanServicesBackend/*.db
+ShormanServicesBackend/*.db-shm
+ShormanServicesBackend/*.db-wal
+*.user
+*.suo
+*.DotSettings.user

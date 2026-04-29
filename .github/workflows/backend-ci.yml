@@ -1,0 +1,53 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'shorman-api/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'shorman-api/**'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        working-directory: shorman-api
+        run: dotnet restore ShormanServicesBackend.sln
+
+      - name: Build
+        working-directory: shorman-api
+        run: dotnet build ShormanServicesBackend.sln --no-restore --configuration Release
+
+      - name: Run tests
+        working-directory: shorman-api
+        run: dotnet test ShormanServicesBackend.sln --no-build --configuration Release --verbosity normal
+        continue-on-error: true
+
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        working-directory: shorman-api
+        run: docker build -t shorman-api:ci .

@@ -1,28 +1,87 @@
-# Angular specific
-/dist/
-/out-tsc/
-/tmp/
-/coverage/
-/e2e/test-output/
-/.angular/
-.angular/
+### ========================
+### Angular / Node (Frontend)
+### ========================
+datafeedService/
 
-# Node modules and dependency files
-/node_modules/
-/package-lock.json
-/yarn.lock
+shorman-web/dist/
+shorman-web/out-tsc/
+shorman-web/coverage/
+shorman-web/e2e/test-output/
+shorman-web/.angular/
+shorman-web/node_modules/
+shorman-web/*.tsbuildinfo
 
-# Environment files
-/.env
+# Keep package-lock.json for reproducible builds
+# shorman-web/package-lock.json  <-- intentionally tracked
 
-# Angular CLI and build artefacts
-/.angular-cli.json
-/.ng/
+### ========================
+### .NET / C# (Backend)
+### ========================
+# Build output
+shorman-api/**/bin/
+shorman-api/**/obj/
+shorman-api/artifacts/
 
-# TypeScript cache
-*.tsbuildinfo
+# Local backend database files
+shorman-api/ShormanServicesBackend/*.db
+shorman-api/ShormanServicesBackend/*.db-shm
+shorman-api/ShormanServicesBackend/*.db-wal
+shorman-api/ShormanServicesBackend/appsettings.Local.json
+shorman-api/ShormanServicesBackend/appsettings.Development.Local.json
+!shorman-api/ShormanServicesBackend/appsettings.Local.example.json
+!shorman-api/ShormanServicesBackend/appsettings.Development.Local.example.json
 
-# Logs
+# Visual Studio / Rider user files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+*.DotSettings.user
+
+# NuGet packages
+shorman-api/**/packages/
+shorman-api/**/*.nupkg
+shorman-api/**/*.snupkg
+shorman-api/project.lock.json
+
+### ========================
+### Logs
+### ========================
+*.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+### ========================
+### Environment / Secrets
+### ========================
+.env
+.env.local
+.env.*.local
+shorman-api/.env
+!.env.example
+
+### ========================
+### OS / IDE
+### ========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.vscode/launch.json
+.docker/
+
+### ========================
+### Docker
+### ========================
+# Don't ignore Dockerfile or docker-compose.yml (they should be tracked)
+
+### ========================
+### TypeScript cache
+### ========================
+*.tsbuildinfo

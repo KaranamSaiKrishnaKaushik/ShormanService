@@ -1,0 +1,28 @@
+services:
+  shorman-api:
+    build:
+      context: ./shorman-api
+      dockerfile: Dockerfile
+    container_name: shorman-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      Database__Provider: SqlServer
+      ConnectionStrings__ApiConnection: ${API_CONNECTION_STRING:?Set API_CONNECTION_STRING in your local .env file}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in your local .env file}
+      Cors__AllowedOrigins__0: http://localhost:4200
+      Cors__AllowedOrigins__1: https://localhost:4200
+    ports:
+      - "5000:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  shorman-web:
+    build:
+      context: ./shorman-web
+      dockerfile: Dockerfile
+    container_name: shorman-web
+    depends_on:
+      - shorman-api
+    ports:
+      - "4200:80"

@@ -1,0 +1,64 @@
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">🛒</div>
+      <h1>Create Account</h1>
+      <p>Join Shorman for fresh grocery delivery</p>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="form-row">
+        <div class="form-group">
+          <label>First Name</label>
+          <input type="text" formControlName="firstName" placeholder="John" class="form-control"
+            [class.is-invalid]="form.get('firstName')?.invalid && form.get('firstName')?.touched" />
+          <div class="invalid-feedback" *ngIf="form.get('firstName')?.invalid && form.get('firstName')?.touched">Required</div>
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          <input type="text" formControlName="lastName" placeholder="Doe" class="form-control"
+            [class.is-invalid]="form.get('lastName')?.invalid && form.get('lastName')?.touched" />
+          <div class="invalid-feedback" *ngIf="form.get('lastName')?.invalid && form.get('lastName')?.touched">Required</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" formControlName="email" placeholder="john@example.com" class="form-control"
+          [class.is-invalid]="form.get('email')?.invalid && form.get('email')?.touched" />
+        <div class="invalid-feedback" *ngIf="form.get('email')?.invalid && form.get('email')?.touched">Valid email is required</div>
+      </div>
+
+      <div class="form-group">
+        <label>Phone (optional)</label>
+        <input type="tel" formControlName="phone" placeholder="+49 123 456789" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <div class="input-wrapper">
+          <input [type]="showPwd ? 'text' : 'password'" formControlName="password" placeholder="Min. 6 characters" class="form-control"
+            [class.is-invalid]="form.get('password')?.invalid && form.get('password')?.touched" />
+          <button type="button" class="toggle-pwd" (click)="showPwd = !showPwd">
+            {{ showPwd ? '🙈' : '👁️' }}
+          </button>
+        </div>
+        <div class="invalid-feedback" *ngIf="form.get('password')?.invalid && form.get('password')?.touched">
+          Password must be at least 6 characters
+        </div>
+      </div>
+
+      <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+      <div class="success-msg" *ngIf="successMsg">{{ successMsg }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading">
+        <span *ngIf="loading" class="btn-spinner"></span>
+        {{ loading ? 'Creating account…' : 'Create Account' }}
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a routerLink="/login">Sign in</a>
+    </div>
+  </div>
+</div>
