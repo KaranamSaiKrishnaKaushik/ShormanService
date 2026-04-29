@@ -1,0 +1,63 @@
+<ng-container *ngIf="cartService.isOpen$ | async">
+  <!-- Overlay -->
+  <div class="overlay" (click)="cartService.closeCart()"></div>
+
+  <!-- Sidebar -->
+  <aside class="cart-sidebar">
+    <div class="cart-header">
+      <h2>Your Cart</h2>
+      <span class="item-count" *ngIf="(cartService.cart$ | async)?.itemCount as cnt">
+        {{ cnt }} item{{ cnt !== 1 ? 's' : '' }}
+      </span>
+      <button class="close-btn" (click)="cartService.closeCart()">✕</button>
+    </div>
+
+    <ng-container *ngIf="cartService.cart$ | async as cart">
+      <div class="cart-empty" *ngIf="cart.items.length === 0">
+        <div class="empty-icon">🛒</div>
+        <p>Your cart is empty</p>
+        <a routerLink="/products" class="btn-shop" (click)="cartService.closeCart()">Start Shopping</a>
+      </div>
+
+      <div class="cart-items" *ngIf="cart.items.length > 0">
+        <div *ngFor="let item of cart.items; trackBy: trackItem" class="cart-item">
+          <div class="item-image">
+            <img *ngIf="item.product.imageUrl" [src]="item.product.imageUrl" [alt]="item.product.name" />
+            <div *ngIf="!item.product.imageUrl" class="item-placeholder">
+              {{ item.product.name.charAt(0) }}
+            </div>
+          </div>
+
+          <div class="item-details">
+            <div class="item-name">{{ item.product.name }}</div>
+            <div class="item-sm">{{ item.product.supermarket?.name }}</div>
+            <div class="item-price">{{ item.product.price | currency:'EUR':'symbol':'1.2-2' }}</div>
+          </div>
+
+          <div class="item-controls">
+            <div class="qty-row">
+              <button class="qty-btn minus" (click)="decrease(item)">−</button>
+              <span class="qty">{{ item.quantity }}</span>
+              <button class="qty-btn plus" (click)="increase(item)">+</button>
+            </div>
+            <div class="item-total">{{ item.product.price * item.quantity | currency:'EUR':'symbol':'1.2-2' }}</div>
+            <button class="remove-btn" (click)="remove(item)" title="Remove">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cart-footer" *ngIf="cart.items.length > 0">
+        <div class="subtotal">
+          <span>Subtotal</span>
+          <strong>{{ cart.total | currency:'EUR':'symbol':'1.2-2' }}</strong>
+        </div>
+        <div class="delivery-note">🚚 Delivery fee calculated at checkout</div>
+
+        <button class="btn-checkout" (click)="goToCheckout()">
+          Proceed to Checkout →
+        </button>
+        <button class="btn-clear" (click)="cartService.clearCart()">Clear Cart</button>
+      </div>
+    </ng-container>
+  </aside>
+</ng-container>

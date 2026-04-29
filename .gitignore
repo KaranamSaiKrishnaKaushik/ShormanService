@@ -1,23 +1,35 @@
 ### ========================
 ### Angular / Node (Frontend)
 ### ========================
-frontend/dist/
-frontend/out-tsc/
-frontend/coverage/
-frontend/e2e/test-output/
-frontend/.angular/
-frontend/node_modules/
-frontend/*.tsbuildinfo
+datafeedService/
+
+shorman-web/dist/
+shorman-web/out-tsc/
+shorman-web/coverage/
+shorman-web/e2e/test-output/
+shorman-web/.angular/
+shorman-web/node_modules/
+shorman-web/*.tsbuildinfo
 
 # Keep package-lock.json for reproducible builds
-# frontend/package-lock.json  <-- intentionally tracked
+# shorman-web/package-lock.json  <-- intentionally tracked
 
 ### ========================
 ### .NET / C# (Backend)
 ### ========================
 # Build output
-backend/**/bin/
-backend/**/obj/
+shorman-api/**/bin/
+shorman-api/**/obj/
+shorman-api/artifacts/
+
+# Local backend database files
+shorman-api/ShormanServicesBackend/*.db
+shorman-api/ShormanServicesBackend/*.db-shm
+shorman-api/ShormanServicesBackend/*.db-wal
+shorman-api/ShormanServicesBackend/appsettings.Local.json
+shorman-api/ShormanServicesBackend/appsettings.Development.Local.json
+!shorman-api/ShormanServicesBackend/appsettings.Local.example.json
+!shorman-api/ShormanServicesBackend/appsettings.Development.Local.example.json
 
 # Visual Studio / Rider user files
 *.user
@@ -29,10 +41,10 @@ backend/**/obj/
 *.DotSettings.user
 
 # NuGet packages
-backend/**/packages/
-backend/**/*.nupkg
-backend/**/*.snupkg
-backend/project.lock.json
+shorman-api/**/packages/
+shorman-api/**/*.nupkg
+shorman-api/**/*.snupkg
+shorman-api/project.lock.json
 
 ### ========================
 ### Logs
@@ -49,8 +61,8 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
-backend/.env
-!backend/.env.example
+shorman-api/.env
+!.env.example
 
 ### ========================
 ### OS / IDE
@@ -62,6 +74,7 @@ Thumbs.db
 *~
 .vscode/settings.json
 .vscode/launch.json
+.docker/
 
 ### ========================
 ### Docker

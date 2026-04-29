@@ -4,12 +4,12 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'backend/**'
+      - 'shorman-api/**'
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'backend/**'
+      - 'shorman-api/**'
       - '.github/workflows/backend-ci.yml'
 
 jobs:
@@ -27,16 +27,16 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        working-directory: backend
-        run: dotnet restore ShormanService.slnx
+        working-directory: shorman-api
+        run: dotnet restore ShormanServicesBackend.sln
 
       - name: Build
-        working-directory: backend
-        run: dotnet build ShormanService.slnx --no-restore --configuration Release
+        working-directory: shorman-api
+        run: dotnet build ShormanServicesBackend.sln --no-restore --configuration Release
 
       - name: Run tests
-        working-directory: backend
-        run: dotnet test ShormanService.slnx --no-build --configuration Release --verbosity normal
+        working-directory: shorman-api
+        run: dotnet test ShormanServicesBackend.sln --no-build --configuration Release --verbosity normal
         continue-on-error: true
 
   docker-build:
@@ -49,5 +49,5 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Docker image
-        working-directory: backend
+        working-directory: shorman-api
         run: docker build -t shorman-api:ci .

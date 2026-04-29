@@ -28,9 +28,9 @@ backend/
 └── docker-compose.yml
 ```
 
-### Frontend (Angular 18 Standalone)
+### Frontend (Angular Standalone)
 ```
-frontend/src/app/
+shorman-web/src/app/
 ├── core/
 │   ├── models/                     # TypeScript interfaces
 │   ├── services/                   # HTTP API services
@@ -57,14 +57,13 @@ frontend/src/app/
 ### Quick Start with Docker Compose
 
 ```bash
-# Start backend + MySQL
-cd backend
-docker-compose up -d
+# Copy safe local env template and fill in secrets
+cp .env.example .env
 
-# Start frontend
-cd frontend
-npm install
-npm start
+# Start frontend + backend containers
+docker compose up -d --build
+
+# App will be available on http://localhost:4200
 ```
 
 Visit `http://localhost:4200`
@@ -75,19 +74,20 @@ Visit `http://localhost:4200`
 
 1. Configure database:
 ```bash
-cp backend/.env.example backend/.env
-# Edit .env with your MySQL credentials
+cp shorman-api/ShormanServicesBackend/appsettings.Local.example.json shorman-api/ShormanServicesBackend/appsettings.Local.json
+cp shorman-api/ShormanServicesBackend/appsettings.Development.Local.example.json shorman-api/ShormanServicesBackend/appsettings.Development.Local.json
+# Edit the local file you use for your startup flow with your database connection and JWT signing key
 ```
 
 2. Apply migrations:
 ```bash
-cd backend
-dotnet ef database update --project ShormanService.Infrastructure --startup-project ShormanService.API
+cd shorman-api
+dotnet build ShormanServicesBackend.sln
 ```
 
 3. Run the API:
 ```bash
-cd backend/ShormanService.API
+cd shorman-api/ShormanServicesBackend
 dotnet run
 # API runs at http://localhost:5000
 # Swagger UI at http://localhost:5000/swagger
@@ -97,7 +97,7 @@ dotnet run
 #### Frontend
 
 ```bash
-cd frontend
+cd shorman-web
 npm install
 npm start
 # App runs at http://localhost:4200
@@ -148,20 +148,21 @@ npm start
 ## Environment Configuration
 
 ### Backend
-- `backend/appsettings.json` - base configuration
-- `backend/appsettings.Development.json` - dev overrides
-- `backend/appsettings.Production.json` - prod overrides
+- `shorman-api/ShormanServicesBackend/appsettings.json` - base configuration
+- `shorman-api/ShormanServicesBackend/appsettings.Development.json` - dev overrides
+- `shorman-api/ShormanServicesBackend/appsettings.Local.json` - local secrets override for any environment (gitignored)
+- `shorman-api/ShormanServicesBackend/appsettings.Development.Local.json` - local secrets override for development only (gitignored)
 - Environment variables override appsettings in production
 
 **Critical env vars for production:**
 ```
-ConnectionStrings__DefaultConnection=<your-connection-string>
-JwtSettings__SecretKey=<min-32-char-secret>
+API_CONNECTION_STRING=<your-connection-string>
+JWT_SIGNING_KEY=<min-32-char-secret>
 ```
 
 ### Frontend
-- `frontend/src/environments/environment.ts` - development
-- `frontend/src/environments/environment.production.ts` - production
+- `shorman-web/src/environments/environment.ts` - development
+- `shorman-web/src/environments/environment.production.ts` - production
 
 ## CI/CD
 
@@ -172,6 +173,7 @@ GitHub Actions workflows in `.github/workflows/`:
 ## Security Notes
 
 - Never commit `.env` files (they are gitignored)
+- Keep `API_CONNECTION_STRING`, `JWT_SIGNING_KEY`, and any future tokens only in local `.env`, GitHub secrets, or Azure app settings
 - JWT secret key must be at least 32 characters in production
 - Use environment variables for all secrets in production/Azure
 - CORS is configured for localhost in development; update for production domains

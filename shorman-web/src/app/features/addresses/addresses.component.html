@@ -1,0 +1,241 @@
+<div class="addr-page">
+  <div class="container">
+    <div class="page-header-section">
+      <h1>My Addresses</h1>
+      <p class="subtitle">Manage your delivery addresses</p>
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading addresses...</p>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="error && !loading" class="error-state">
+      <span class="error-icon">⚠️</span>
+      <p>{{ error }}</p>
+      <button class="btn-retry" (click)="loadAddresses()">Retry</button>
+    </div>
+
+    <!-- Address List -->
+    <div *ngIf="!loading && !error" class="content-wrapper">
+      <!-- Empty State -->
+      <div *ngIf="addresses.length === 0" class="empty-state">
+        <div class="empty-icon">📍</div>
+        <h3>No addresses yet</h3>
+        <p>Add your first delivery address to get started</p>
+        <button class="btn-primary" (click)="startAdd()">+ Add Address</button>
+      </div>
+
+      <!-- Address Cards -->
+      <div *ngIf="addresses.length > 0" class="addr-list">
+        <div class="list-header">
+          <h2>Saved Addresses</h2>
+          <button class="btn-add-new" (click)="startAdd()" *ngIf="!showForm">+ Add New</button>
+        </div>
+
+        <div *ngFor="let addr of addresses" class="addr-card"
+             [class.default]="addr.isDefault"
+             [class.editing]="editingId === addr.id">
+
+          <div class="addr-card-inner">
+            <!-- Radio for Default Selection -->
+            <div class="addr-radio">
+              <input
+                type="radio"
+                [id]="'addr-' + addr.id"
+                name="defaultAddress"
+                [checked]="addr.isDefault"
+                (change)="setDefault(addr.id)"
+              />
+              <label [for]="'addr-' + addr.id"></label>
+            </div>
+
+            <!-- Address Content -->
+            <div class="addr-content" (click)="!addr.isDefault && setDefault(addr.id)">
+              <div class="addr-header">
+                <div class="addr-label-row">
+                  <strong class="addr-label">{{ addr.label || 'Address' }}</strong>
+                  <span class="default-badge" *ngIf="addr.isDefault">
+                    <span class="badge-icon">✓</span>
+                    Default
+                  </span>
+                </div>
+              </div>
+
+              <div class="addr-details">
+                <p class="addr-line">{{ addr.street }} {{ addr.houseNumber }}</p>
+                <p class="addr-line">{{ addr.postalCode }} {{ addr.city }}</p>
+                <p class="addr-line">{{ addr.country }}</p>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="addr-actions">
+              <button
+                class="btn-icon btn-edit"
+                (click)="startEdit(addr)"
+                title="Edit address">
+                ✏️
+              </button>
+              <button
+                class="btn-icon btn-delete"
+                (click)="confirmDelete(addr)"
+                [disabled]="addresses.length === 1"
+                [title]="addresses.length === 1 ? 'Cannot delete last address' : 'Delete address'">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add/Edit Form -->
+      <div class="form-section" *ngIf="showForm">
+        <div class="form-header">
+          <h3>{{ editingId ? 'Edit Address' : 'Add New Address' }}</h3>
+          <button class="btn-close" (click)="cancelForm()">✕</button>
+        </div>
+
+        <form [formGroup]="form" (ngSubmit)="save()" class="addr-form">
+          <!-- Label -->
+          <div class="form-group">
+            <label class="form-label">
+              Address Label
+              <span class="optional">(optional)</span>
+            </label>
+            <input
+              type="text"
+              formControlName="label"
+              class="form-control"
+              placeholder="e.g., Home, Work, Mom's house"
+            />
+            <small class="form-hint">Give this address a memorable name</small>
+          </div>
+
+          <!-- Street and House Number -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">
+                Street <span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="street"
+                class="form-control"
+                [class.invalid]="form.get('street')?.invalid && form.get('street')?.touched"
+                placeholder="Street name"
+              />
+              <div class="error-msg" *ngIf="form.get('street')?.invalid && form.get('street')?.touched">
+                Street is required
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">
+                House No. <span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="houseNumber"
+                class="form-control"
+                [class.invalid]="form.get('houseNumber')?.invalid && form.get('houseNumber')?.touched"
+                placeholder="123"
+              />
+              <div class="error-msg" *ngIf="form.get('houseNumber')?.invalid && form.get('houseNumber')?.touched">
+                House number is required
+              </div>
+            </div>
+          </div>
+
+          <!-- Postal Code and City -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">
+                Postal Code <span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="postalCode"
+                class="form-control"
+                [class.invalid]="form.get('postalCode')?.invalid && form.get('postalCode')?.touched"
+                placeholder="10115"
+                maxlength="5"
+              />
+              <div class="error-msg" *ngIf="form.get('postalCode')?.invalid && form.get('postalCode')?.touched">
+                <span *ngIf="form.get('postalCode')?.hasError('required')">Postal code is required</span>
+                <span *ngIf="form.get('postalCode')?.hasError('pattern')">Must be 5 digits</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">
+                City <span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="city"
+                class="form-control"
+                [class.invalid]="form.get('city')?.invalid && form.get('city')?.touched"
+                placeholder="Berlin"
+              />
+              <div class="error-msg" *ngIf="form.get('city')?.invalid && form.get('city')?.touched">
+                City is required
+              </div>
+            </div>
+          </div>
+
+          <!-- Country -->
+          <div class="form-group">
+            <label class="form-label">
+              Country <span class="required">*</span>
+            </label>
+            <select formControlName="country" class="form-control">
+              <option value="Germany">Germany</option>
+              <option value="Austria">Austria</option>
+              <option value="Switzerland">Switzerland</option>
+            </select>
+          </div>
+
+          <!-- Default Checkbox -->
+          <div class="form-group-check">
+            <label class="checkbox-label">
+              <input type="checkbox" formControlName="isDefault" />
+              <span class="checkmark"></span>
+              <span class="checkbox-text">Set as default delivery address</span>
+            </label>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" (click)="cancelForm()">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="btn-primary"
+              [disabled]="form.invalid || saving">
+              <span *ngIf="!saving">{{ editingId ? 'Update Address' : 'Save Address' }}</span>
+              <span *ngIf="saving">Saving...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" *ngIf="deleteConfirm" (click)="deleteConfirm = null">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-icon">🗑️</div>
+    <h3>Delete Address?</h3>
+    <p>Are you sure you want to delete <strong>{{ deleteConfirm.label || 'this address' }}</strong>?</p>
+    <p class="modal-address">{{ deleteConfirm.street }} {{ deleteConfirm.houseNumber }}, {{ deleteConfirm.city }}</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" (click)="deleteConfirm = null">Cancel</button>
+      <button class="btn-danger" (click)="deleteAddress()">Delete</button>
+    </div>
+  </div>
+</div>
