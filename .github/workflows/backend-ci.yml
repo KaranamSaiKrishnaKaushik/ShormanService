@@ -1,0 +1,93 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ develop ]
+    paths:
+      - 'shorman-api/**'
+      - '.github/workflows/backend-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE != '' && vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}
+  BACKEND_IMAGE_NAME: shorman-api
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('shorman-api/**/*.csproj', 'shorman-api/**/*.props', 'shorman-api/**/*.targets', 'shorman-api/global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        working-directory: shorman-api
+        run: dotnet restore ShormanServicesBackend.sln
+
+      - name: Build
+        working-directory: shorman-api
+        run: dotnet build ShormanServicesBackend.sln --no-restore --configuration Release
+
+      - name: Run tests
+        working-directory: shorman-api
+        run: dotnet test ShormanServicesBackend.sln --no-build --configuration Release --verbosity normal
+        continue-on-error: true
+
+  docker-build-and-push:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Generate Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/${{ env.BACKEND_IMAGE_NAME }}
+          tags: |
+            type=raw,value=develop
+            type=sha,prefix=develop-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./shorman-api
+          file: ./shorman-api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=shorman-api
+          cache-to: type=gha,mode=max,scope=shorman-api

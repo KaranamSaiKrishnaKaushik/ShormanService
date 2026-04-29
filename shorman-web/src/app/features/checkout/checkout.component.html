@@ -1,0 +1,162 @@
+<div class="checkout-page">
+  <div class="checkout-container">
+    <h1 class="page-title">Checkout</h1>
+
+    <div class="checkout-layout">
+      <!-- Left: Form -->
+      <div class="checkout-form">
+
+        <!-- Step 1: Delivery Address -->
+        <div class="section-card">
+          <h2 class="section-title">
+            <span class="step-num">1</span>
+            Delivery Address
+          </h2>
+
+          <div class="address-list" *ngIf="addresses.length > 0">
+            <label *ngFor="let addr of addresses" class="address-option"
+              [class.selected]="selectedAddressId === addr.id">
+              <input type="radio" name="address" [value]="addr.id" [(ngModel)]="selectedAddressId" />
+              <div class="addr-content">
+                <div class="addr-label">
+                  {{ addr.label || 'Address' }}
+                  <span class="default-tag" *ngIf="addr.isDefault">Default</span>
+                </div>
+                <div class="addr-text">
+                  {{ addr.street }} {{ addr.houseNumber }}, {{ addr.postalCode }} {{ addr.city }}
+                </div>
+                <div class="delivery-check" *ngIf="deliveryChecks[addr.postalCode] as check">
+                  <span [class.eligible]="check.eligible" [class.ineligible]="!check.eligible">
+                    {{ check.eligible ? '✅ ' : '❌ ' }}{{ check.message }}
+                    <span *ngIf="check.eligible"> (Fee: {{ check.deliveryFee | currency:'EUR' }})</span>
+                  </span>
+                </div>
+                <button type="button" class="btn-check-delivery"
+                  *ngIf="!deliveryChecks[addr.postalCode]"
+                  (click)="checkDelivery(addr.postalCode)">
+                  Check delivery
+                </button>
+              </div>
+            </label>
+          </div>
+
+          <div class="no-addresses" *ngIf="addresses.length === 0 && !loadingAddresses">
+            <p>No addresses saved yet.</p>
+          </div>
+
+          <!-- Add new address toggle -->
+          <div class="add-address-toggle">
+            <button type="button" class="btn-add-addr" (click)="showAddressForm = !showAddressForm">
+              {{ showAddressForm ? '✕ Cancel' : '+ Add New Address' }}
+            </button>
+          </div>
+
+          <!-- Inline address form -->
+          <div class="address-form-inline" *ngIf="showAddressForm">
+            <form [formGroup]="addressForm" (ngSubmit)="saveAddress()">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label>Label (e.g. Home)</label>
+                  <input type="text" formControlName="label" placeholder="Home" class="form-control" />
+                </div>
+                <div class="form-group">
+                  <label>Postal Code *</label>
+                  <input type="text" formControlName="postalCode" placeholder="10115" class="form-control" />
+                </div>
+              </div>
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label>Street *</label>
+                  <input type="text" formControlName="street" placeholder="Main Street" class="form-control" />
+                </div>
+                <div class="form-group">
+                  <label>House Number *</label>
+                  <input type="text" formControlName="houseNumber" placeholder="12A" class="form-control" />
+                </div>
+              </div>
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label>City *</label>
+                  <input type="text" formControlName="city" placeholder="Berlin" class="form-control" />
+                </div>
+                <div class="form-group">
+                  <label>Country *</label>
+                  <input type="text" formControlName="country" placeholder="Germany" class="form-control" />
+                </div>
+              </div>
+              <button type="submit" class="btn-save-addr" [disabled]="savingAddress">
+                {{ savingAddress ? 'Saving…' : 'Save Address' }}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Step 2: Payment Method -->
+        <div class="section-card">
+          <h2 class="section-title">
+            <span class="step-num">2</span>
+            Payment Method
+          </h2>
+
+          <div class="payment-options">
+            <label *ngFor="let opt of paymentOptions" class="payment-option"
+              [class.selected]="selectedPayment === opt.value">
+              <input type="radio" name="payment" [value]="opt.value" [(ngModel)]="selectedPayment" />
+              <span class="pay-icon">{{ opt.icon }}</span>
+              <div class="pay-details">
+                <div class="pay-label">{{ opt.label }}</div>
+                <div class="pay-desc">{{ opt.desc }}</div>
+              </div>
+              <span class="pay-check" *ngIf="selectedPayment === opt.value">✓</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Order Summary -->
+      <div class="order-summary">
+        <div class="summary-card">
+          <h2 class="section-title" style="margin-bottom:1rem">Order Summary</h2>
+
+          <ng-container *ngIf="cartService.cart$ | async as cart">
+            <div class="summary-items">
+              <div *ngFor="let item of cart.items" class="summary-item">
+                <span class="sum-name">{{ item.product.name }} × {{ item.quantity }}</span>
+                <span class="sum-price">
+                  {{ item.product.price * item.quantity | currency:'EUR':'symbol':'1.2-2' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="summary-divider"></div>
+            <div class="summary-row">
+              <span>Subtotal</span>
+              <span>{{ cart.total | currency:'EUR':'symbol':'1.2-2' }}</span>
+            </div>
+            <div class="summary-row">
+              <span>Delivery Fee</span>
+              <span>{{ deliveryFee | currency:'EUR':'symbol':'1.2-2' }}</span>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-row total">
+              <strong>Total</strong>
+              <strong>{{ cart.total + deliveryFee | currency:'EUR':'symbol':'1.2-2' }}</strong>
+            </div>
+
+            <div class="error-msg" *ngIf="orderError">{{ orderError }}</div>
+            <div class="success-msg" *ngIf="orderSuccess">{{ orderSuccess }}</div>
+
+            <button class="btn-place-order"
+              [disabled]="placing || cart.items.length === 0 || !selectedAddressId"
+              (click)="placeOrder(cart)">
+              <span *ngIf="placing" class="btn-spinner"></span>
+              {{ placing ? 'Placing Order…' : 'Place Order' }}
+            </button>
+
+            <p class="secure-note">🔒 Your payment is secured</p>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
