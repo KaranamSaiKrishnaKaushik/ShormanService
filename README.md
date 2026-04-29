@@ -167,8 +167,26 @@ JWT_SIGNING_KEY=<min-32-char-secret>
 ## CI/CD
 
 GitHub Actions workflows in `.github/workflows/`:
-- `backend-ci.yml` - runs on backend changes: restore, build, test, docker build
-- `frontend-ci.yml` - runs on frontend changes: install, lint, test, production build
+- `backend-ci.yml` - runs on pushes to `develop` for backend changes: restore, build, test, Docker build and push with GitHub Actions cache
+- `frontend-ci.yml` - runs on pushes to `develop` for frontend changes: install, lint, test, production build, Docker build and push with GitHub Actions cache
+
+### GitHub Actions Setup
+
+Configure these repository secrets before enabling Docker pushes:
+
+- `DOCKERHUB_USERNAME` - your Docker Hub username
+- `DOCKERHUB_TOKEN` - a Docker Hub access token with push access
+
+Optional repository variable:
+
+- `DOCKERHUB_NAMESPACE` - overrides the namespace/organization used for image tags; if omitted, the workflows use `DOCKERHUB_USERNAME`
+
+Published image tags on `develop` pushes:
+
+- backend: `<namespace>/shorman-api:develop` and `<namespace>/shorman-api:develop-<commit-sha>`
+- frontend: `<namespace>/shorman-web:develop` and `<namespace>/shorman-web:develop-<commit-sha>`
+
+The Docker jobs use `docker/build-push-action` with GitHub Actions layer caching (`cache-from/cache-to: type=gha`) so repeat builds on `develop` stay fast unless Dockerfile inputs change.
 
 ## Security Notes
 
