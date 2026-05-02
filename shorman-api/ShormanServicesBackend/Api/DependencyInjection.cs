@@ -14,18 +14,39 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-        var connectionString = configuration.GetConnectionString("ApiConnection")
+        var connectionString =
+            configuration.GetConnectionString("ApiConnection")
             ?? configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("No database connection string found. Configure 'ConnectionStrings:ApiConnection' in appsettings.json.");
+            ?? throw new InvalidOperationException(
+                "No database connection string found. Configure ConnectionStrings__DefaultConnection or ConnectionStrings__ApiConnection.");
 
-        var provider = configuration["Database:Provider"] ?? "SqlServer";
+        var provider = configuration["Database:Provider"];
+
+        if (string.IsNullOrWhiteSpace(provider))
+        {
+            provider = connectionString.Contains("mysql.database.azure.com", StringComparison.OrdinalIgnoreCase)
+                       || connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase)
+                ? "MySql"
+                : "SqlServer";
+        }
 
         services.AddDbContext<ApiDbContext>(options =>
         {
             if (provider.Equals("MySql", StringComparison.OrdinalIgnoreCase))
-                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
-            else
+            {
+                options.UseMySql(
+                    connectionString,
+                    ServerVersion.AutoDetect(connectionString)
+                );
+            }
+            else if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+            {
                 options.UseSqlServer(connectionString);
+            }
+            else
+            {
+                throw new InvalidOperationException($"Unsupported database provider: {provider}");
+            }
         });
 
         services.AddMediatR(typeof(DependencyInjection).Assembly);
