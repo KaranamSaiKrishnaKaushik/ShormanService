@@ -36,7 +36,8 @@ public static class DependencyInjection
             {
                 options.UseMySql(
                     connectionString,
-                    ServerVersion.AutoDetect(connectionString)
+                    new MySqlServerVersion(new Version(8, 0, 0))
+                    //ServerVersion.AutoDetect(connectionString)
                 );
             }
             else if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
