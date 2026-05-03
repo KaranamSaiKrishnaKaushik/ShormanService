@@ -6,13 +6,13 @@ var dbProvider = builder.Configuration["Database:Provider"];
 var defaultConn = builder.Configuration.GetConnectionString("DefaultConnection");
 var apiConn = builder.Configuration.GetConnectionString("ApiConnection");
 
-Console.WriteLine($"Database Provider: {dbProvider ?? "<null>"}");
-Console.WriteLine($"DefaultConnection exists: {!string.IsNullOrWhiteSpace(defaultConn)}");
-Console.WriteLine($"ApiConnection exists: {!string.IsNullOrWhiteSpace(apiConn)}");
-
 builder.Configuration
     .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.Local.json", optional: true, reloadOnChange: true);
+
+Console.WriteLine($"Database Provider: {dbProvider ?? "<null>"}");
+Console.WriteLine($"DefaultConnection exists: {!string.IsNullOrWhiteSpace(defaultConn)}");
+Console.WriteLine($"ApiConnection exists: {!string.IsNullOrWhiteSpace(apiConn)}");
 
 var allowedOrigins = builder.Configuration
                          .GetSection("Cors:AllowedOrigins")
