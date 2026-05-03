@@ -14,11 +14,15 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-        var connectionString =
-            configuration.GetConnectionString("ApiConnection")
-            ?? configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException(
-                "No database connection string found. Configure ConnectionStrings__DefaultConnection or ConnectionStrings__ApiConnection.");
+        var apiConnection = configuration.GetConnectionString("ApiConnection");
+        var defaultConnection = configuration.GetConnectionString("DefaultConnection");
+
+        var connectionString = !string.IsNullOrWhiteSpace(apiConnection)
+            ? apiConnection
+            : !string.IsNullOrWhiteSpace(defaultConnection)
+                ? defaultConnection
+                : throw new InvalidOperationException(
+                    "No database connection string found. Configure ConnectionStrings__DefaultConnection or ConnectionStrings__ApiConnection.");
 
         var provider = configuration["Database:Provider"];
 
