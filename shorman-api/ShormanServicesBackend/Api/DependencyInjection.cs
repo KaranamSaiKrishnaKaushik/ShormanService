@@ -13,7 +13,9 @@ public static class DependencyInjection
     public static IServiceCollection AddApi(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<Auth0Options>(configuration.GetSection(Auth0Options.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+        var auth0Options = configuration.GetSection(Auth0Options.SectionName).Get<Auth0Options>() ?? new Auth0Options();
         var apiConnection = configuration.GetConnectionString("ApiConnection");
         var defaultConnection = configuration.GetConnectionString("DefaultConnection");
 
@@ -57,8 +59,12 @@ public static class DependencyInjection
         services.AddMediatR(typeof(DependencyInjection).Assembly);
         services.AddScoped<JwtTokenService>();
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+        services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = AuthSchemes.AppJwt;
+                options.DefaultChallengeScheme = AuthSchemes.AppJwt;
+            })
+            .AddJwtBearer(AuthSchemes.AppJwt, options =>
             {
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -69,6 +75,17 @@ public static class DependencyInjection
                     ValidIssuer = jwtOptions.Issuer,
                     ValidAudience = jwtOptions.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey))
+                };
+            })
+            .AddJwtBearer(AuthSchemes.Auth0, options =>
+            {
+                options.Authority = $"https://{auth0Options.Domain.Trim().TrimEnd('/')}";
+                options.Audience = auth0Options.Audience;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidAudience = auth0Options.Audience,
+                    NameClaimType = "name"
                 };
             });
 

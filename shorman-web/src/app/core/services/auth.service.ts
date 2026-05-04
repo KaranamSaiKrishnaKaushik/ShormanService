@@ -1,6 +1,7 @@
+import { Auth0Client, createAuth0Client } from '@auth0/auth0-spa-js';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, of, delay, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, delay, firstValueFrom, of, tap, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { User, AuthResponse, LoginRequest, RegisterRequest } from '../models/user.model';
@@ -32,6 +33,9 @@ export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
   private useMock = environment.useMockAuth;
+  private auth0Enabled = !!environment.auth0?.domain && !!environment.auth0?.clientId && !!environment.auth0?.audience;
+  private auth0ClientPromise?: Promise<Auth0Client>;
+  private initializationPromise: Promise<void>;
 
   private readonly TOKEN_KEY = 'shorman_token';
   private readonly USER_KEY = 'shorman_user';
@@ -41,6 +45,10 @@ export class AuthService {
 
   private isLoggedInSubject = new BehaviorSubject<boolean>(!!this.loadToken());
   isLoggedIn$ = this.isLoggedInSubject.asObservable();
+
+  constructor() {
+    this.initializationPromise = this.initializeAuth();
+  }
 
   private loadToken(): string | null {
     return localStorage.getItem(this.TOKEN_KEY);
@@ -60,9 +68,65 @@ export class AuthService {
   }
 
   get isLoggedIn(): boolean {
-    const value = this.isLoggedInSubject.value;
-    console.log('AuthService.isLoggedIn getter called, returning:', value);
-    return value;
+    return this.isLoggedInSubject.value;
+  }
+
+  async ensureReady(): Promise<void> {
+    await this.initializationPromise;
+  }
+
+  async canActivateProtectedRoute(returnUrl: string): Promise<boolean> {
+    if (this.isLoggedIn) {
+      return true;
+    }
+
+    await this.ensureReady();
+
+    if (this.isLoggedIn) {
+      return true;
+    }
+
+    if (this.auth0Enabled) {
+      await this.startLogin(returnUrl);
+    } else {
+      await this.router.navigate(['/login'], { queryParams: { returnUrl } });
+    }
+
+    return false;
+  }
+
+  async startLogin(returnUrl = '/products'): Promise<void> {
+    if (!this.auth0Enabled) {
+      await this.router.navigate(['/login'], { queryParams: { returnUrl } });
+      return;
+    }
+
+    const client = await this.getAuth0Client();
+    await client.loginWithRedirect({
+      appState: { target: returnUrl },
+      authorizationParams: {
+        audience: environment.auth0.audience,
+        scope: 'openid profile email',
+        prompt: 'login'
+      }
+    });
+  }
+
+  async startSignup(returnUrl = '/products'): Promise<void> {
+    if (!this.auth0Enabled) {
+      await this.router.navigate(['/register'], { queryParams: { returnUrl } });
+      return;
+    }
+
+    const client = await this.getAuth0Client();
+    await client.loginWithRedirect({
+      appState: { target: returnUrl },
+      authorizationParams: {
+        audience: environment.auth0.audience,
+        scope: 'openid profile email',
+        screen_hint: 'signup'
+      }
+    });
   }
 
   login(req: LoginRequest): Observable<AuthResponse> {
@@ -138,10 +202,117 @@ export class AuthService {
   }
 
   logout(): void {
+    this.clearLocalAuthState();
+
+    if (this.auth0Enabled) {
+      void this.logoutFromAuth0();
+      return;
+    }
+
+    void this.router.navigate(['/login']);
+  }
+
+  private async initializeAuth(): Promise<void> {
+    if (!this.auth0Enabled) {
+      return;
+    }
+
+    try {
+      const client = await this.getAuth0Client();
+      const searchParams = new URLSearchParams(window.location.search);
+
+      if (searchParams.has('code') && searchParams.has('state')) {
+        const callbackResult = await client.handleRedirectCallback();
+        await this.exchangeAuth0Token(client);
+
+        const target =
+          typeof callbackResult.appState?.target === 'string' && callbackResult.appState.target.length > 0
+            ? callbackResult.appState.target
+            : '/products';
+
+        await this.router.navigateByUrl(target);
+        return;
+      }
+
+      if (await client.isAuthenticated()) {
+        if (!this.isLoggedIn) {
+          await this.exchangeAuth0Token(client);
+        }
+      }
+    } catch (error) {
+      console.error('Auth0 initialization failed.', error);
+      this.clearLocalAuthState();
+    }
+  }
+
+  private getAuth0Client(): Promise<Auth0Client> {
+    if (!this.auth0ClientPromise) {
+      this.auth0ClientPromise = createAuth0Client({
+        domain: environment.auth0.domain,
+        clientId: environment.auth0.clientId,
+        authorizationParams: {
+          redirect_uri: `${window.location.origin}/login`,
+          audience: environment.auth0.audience,
+          scope: 'openid profile email'
+        },
+        cacheLocation: 'localstorage'
+      });
+    }
+
+    return this.auth0ClientPromise;
+  }
+
+  private async exchangeAuth0Token(client: Auth0Client): Promise<void> {
+    const accessToken = await client.getTokenSilently({
+      authorizationParams: {
+        audience: environment.auth0.audience,
+        scope: 'openid profile email'
+      }
+    });
+
+    const profile = await client.getUser();
+
+    if (!profile?.email) {
+      throw new Error('The Auth0 profile did not include an email address.');
+    }
+
+    const authResponse = await firstValueFrom(
+      this.http.post<AuthResponse>(
+        `${environment.apiUrl}/auth/exchange`,
+        {
+          email: profile.email,
+          firstName: profile.given_name ?? profile.name?.split(' ')[0] ?? null,
+          lastName: profile.family_name ?? null
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
+      )
+    );
+
+    this.handleAuth(authResponse);
+  }
+
+  private async logoutFromAuth0(): Promise<void> {
+    try {
+      const client = await this.getAuth0Client();
+      await client.logout({
+        logoutParams: {
+          returnTo: `${window.location.origin}`
+        }
+      });
+    } catch (error) {
+      console.error('Auth0 logout failed.', error);
+      await this.router.navigate(['/login']);
+    }
+  }
+
+  private clearLocalAuthState(): void {
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
     this.currentUserSubject.next(null);
     this.isLoggedInSubject.next(false);
-    this.router.navigate(['/login']);
   }
 }

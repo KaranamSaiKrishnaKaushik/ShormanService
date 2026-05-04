@@ -4,6 +4,7 @@ public record UserDto(int Id, string Email, string FirstName, string LastName, s
 public record AuthResponse(string Token, UserDto User);
 public record LoginRequest(string Email, string Password);
 public record RegisterRequest(string FirstName, string LastName, string Email, string Password, string? Phone);
+public record Auth0ExchangeRequest(string Email, string? FirstName, string? LastName);
 
 public record AddressDto(int Id, int UserId, string? Label, string Street, string HouseNumber, string PostalCode, string City, string Country, bool IsDefault);
 public record CreateAddressRequest(string? Label, string Street, string HouseNumber, string PostalCode, string City, string Country, bool IsDefault = false);

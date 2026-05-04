@@ -3,7 +3,7 @@ import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'products', pathMatch: 'full' },
-  { path: 'products', loadComponent: () => import('./features/products/products.component').then(m => m.ProductsComponent) },
+  { path: 'products', loadComponent: () => import('./features/products/products.component').then(m => m.ProductsComponent), canActivate: [authGuard] },
   { path: 'login', loadComponent: () => import('./features/auth/login.component').then(m => m.LoginComponent) },
   { path: 'register', loadComponent: () => import('./features/auth/register.component').then(m => m.RegisterComponent) },
   { path: 'cart', loadComponent: () => import('./features/cart/cart-sidebar.component').then(m => m.CartSidebarComponent) },
