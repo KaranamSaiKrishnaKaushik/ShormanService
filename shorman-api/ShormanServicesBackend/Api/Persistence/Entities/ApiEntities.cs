@@ -13,6 +13,24 @@ public class ApiUser
     public ICollection<ApiAddress> Addresses { get; set; } = [];
     public ICollection<ApiCart> Carts { get; set; } = [];
     public ICollection<ApiOrder> Orders { get; set; } = [];
+    public ICollection<ApiUserRole> UserRoles { get; set; } = [];
+}
+
+public class ApiRole
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+
+    public ICollection<ApiUserRole> UserRoles { get; set; } = [];
+}
+
+public class ApiUserRole
+{
+    public int UserId { get; set; }
+    public int RoleId { get; set; }
+
+    public ApiUser User { get; set; } = null!;
+    public ApiRole Role { get; set; } = null!;
 }
 
 public class ApiAddress

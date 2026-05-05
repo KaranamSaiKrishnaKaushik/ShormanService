@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using ShormanServicesBackend.Api.Contracts;
 using ShormanServicesBackend.Api.Persistence;
 using ShormanServicesBackend.Api.Persistence.Entities;
@@ -15,7 +16,10 @@ public class LoginCommandHandler(ApiDbContext dbContext, JwtTokenService jwtToke
 {
     public async Task<AuthResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Email == request.Request.Email.Trim().ToLowerInvariant(), cancellationToken)
+        var user = await dbContext.Users
+            .Include(x => x.UserRoles)
+            .ThenInclude(x => x.Role)
+            .SingleOrDefaultAsync(x => x.Email == request.Request.Email.Trim().ToLowerInvariant(), cancellationToken)
             ?? throw new InvalidOperationException("Invalid email or password.");
 
         if (string.IsNullOrWhiteSpace(user.PasswordHash))
@@ -33,9 +37,14 @@ public class LoginCommandHandler(ApiDbContext dbContext, JwtTokenService jwtToke
 
     internal static AuthResponse ToAuthResponse(ApiUser user, JwtTokenService jwtTokenService)
     {
+        var roles = user.UserRoles
+            .Select(x => x.Role.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         return new AuthResponse(
             jwtTokenService.CreateToken(user),
-            new UserDto(user.Id, user.Email, user.FirstName, user.LastName, user.Phone, user.CreatedAtUtc.ToString("O")));
+            new UserDto(user.Id, user.Email, user.FirstName, user.LastName, user.Phone, user.CreatedAtUtc.ToString("O"), roles));
     }
 }
 
@@ -61,12 +70,15 @@ public class RegisterCommandHandler(ApiDbContext dbContext, JwtTokenService jwtT
 
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await AuthFeatureShared.AssignSingleRoleAsync(dbContext, user.Id, RoleNames.Customer, cancellationToken);
+
+        user = await AuthFeatureShared.LoadUserWithRolesAsync(dbContext, user.Id, cancellationToken);
 
         return LoginCommandHandler.ToAuthResponse(user, jwtTokenService);
     }
 }
 
-public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService jwtTokenService) : IRequestHandler<Auth0ExchangeCommand, AuthResponse>
+public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService jwtTokenService, IConfiguration configuration) : IRequestHandler<Auth0ExchangeCommand, AuthResponse>
 {
     public async Task<AuthResponse> Handle(Auth0ExchangeCommand request, CancellationToken cancellationToken)
     {
@@ -107,7 +119,79 @@ public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        var bootstrapSuperAdminEmails = configuration
+            .GetSection("RoleBootstrap:SuperAdminEmails")
+            .Get<string[]>()?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim().ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            ?? [];
+
+        var desiredRole = bootstrapSuperAdminEmails.Contains(email)
+            ? RoleNames.SuperAdmin
+            : RoleNames.Customer;
+
+        await AuthFeatureShared.AssignRoleIfMissingOrDifferentAsync(dbContext, user.Id, desiredRole, cancellationToken);
+
+        user = await AuthFeatureShared.LoadUserWithRolesAsync(dbContext, user.Id, cancellationToken);
 
         return LoginCommandHandler.ToAuthResponse(user, jwtTokenService);
     }
+}
+
+internal static class AuthFeatureShared
+{
+    public static async Task AssignDefaultRoleIfMissingAsync(ApiDbContext dbContext, int userId, CancellationToken cancellationToken)
+    {
+        var hasRole = await dbContext.UserRoles.AnyAsync(x => x.UserId == userId, cancellationToken);
+        if (hasRole)
+        {
+            return;
+        }
+
+        await AssignSingleRoleAsync(dbContext, userId, RoleNames.Customer, cancellationToken);
+    }
+
+    public static async Task AssignRoleIfMissingOrDifferentAsync(ApiDbContext dbContext, int userId, string roleName, CancellationToken cancellationToken)
+    {
+        var currentRoleNames = await dbContext.UserRoles
+            .Where(x => x.UserId == userId)
+            .Select(x => x.Role.Name)
+            .ToArrayAsync(cancellationToken);
+
+        if (currentRoleNames.Length == 1 && string.Equals(currentRoleNames[0], roleName, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        await AssignSingleRoleAsync(dbContext, userId, roleName, cancellationToken);
+    }
+
+    public static async Task AssignSingleRoleAsync(ApiDbContext dbContext, int userId, string roleName, CancellationToken cancellationToken)
+    {
+        var roleId = await dbContext.Roles
+            .Where(x => x.Name == roleName)
+            .Select(x => x.Id)
+            .SingleAsync(cancellationToken);
+
+        var existingRoles = await dbContext.UserRoles.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        if (existingRoles.Count > 0)
+        {
+            dbContext.UserRoles.RemoveRange(existingRoles);
+        }
+
+        dbContext.UserRoles.Add(new ApiUserRole
+        {
+            UserId = userId,
+            RoleId = roleId
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public static Task<ApiUser> LoadUserWithRolesAsync(ApiDbContext dbContext, int userId, CancellationToken cancellationToken) =>
+        dbContext.Users
+            .Include(x => x.UserRoles)
+            .ThenInclude(x => x.Role)
+            .SingleAsync(x => x.Id == userId, cancellationToken);
 }

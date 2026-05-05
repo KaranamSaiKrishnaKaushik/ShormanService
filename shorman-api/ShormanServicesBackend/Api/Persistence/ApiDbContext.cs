@@ -6,6 +6,8 @@ namespace ShormanServicesBackend.Api.Persistence;
 public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(options)
 {
     public DbSet<ApiUser> Users => Set<ApiUser>();
+    public DbSet<ApiRole> Roles => Set<ApiRole>();
+    public DbSet<ApiUserRole> UserRoles => Set<ApiUserRole>();
     public DbSet<ApiAddress> Addresses => Set<ApiAddress>();
     public DbSet<ApiCategory> Categories => Set<ApiCategory>();
     public DbSet<ApiSupermarket> Supermarkets => Set<ApiSupermarket>();
@@ -27,6 +29,22 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Phone).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<ApiRole>(entity =>
+        {
+            entity.ToTable("roles");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.Name).IsUnique();
+            entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+        });
+
+        modelBuilder.Entity<ApiUserRole>(entity =>
+        {
+            entity.ToTable("user_roles");
+            entity.HasKey(x => new { x.UserId, x.RoleId });
+            entity.HasOne(x => x.User).WithMany(x => x.UserRoles).HasForeignKey(x => x.UserId);
+            entity.HasOne(x => x.Role).WithMany(x => x.UserRoles).HasForeignKey(x => x.RoleId);
         });
 
         modelBuilder.Entity<ApiAddress>(entity =>

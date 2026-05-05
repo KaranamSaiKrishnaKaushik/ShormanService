@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { NgIf } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
@@ -16,19 +16,38 @@ export class LoginComponent {
   private route = inject(ActivatedRoute);
 
   loading = false;
-  errorMsg = '';
+
+  async ngOnInit(): Promise<void> {
+    await this.auth.ensureReady();
+
+    if (this.auth.isLoggedIn) {
+      await this.auth.redirectAfterLogin(this.returnUrl);
+    }
+  }
+
+  get errorMsg(): string {
+    return this.auth.authError ?? '';
+  }
+
+  get returnUrl(): string {
+    return this.route.snapshot.queryParams['returnUrl'] || '/products';
+  }
 
   submit(): void {
     this.loading = true;
-    this.errorMsg = '';
-    const ret = this.route.snapshot.queryParams['returnUrl'] || '/products';
-    void this.auth.startLogin(ret).catch(() => {
-      this.errorMsg = 'Unable to start Auth0 sign-in.';
+    void this.auth.startGoogleLogin(this.returnUrl).catch(() => {
       this.loading = false;
     });
   }
 
   loginWithGoogle(): void {
     this.submit();
+  }
+
+  signup(): void {
+    this.loading = true;
+    void this.auth.startSignup(this.returnUrl).catch(() => {
+      this.loading = false;
+    });
   }
 }

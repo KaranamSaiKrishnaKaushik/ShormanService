@@ -4,12 +4,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShormanServicesBackend.Api.Contracts;
 using ShormanServicesBackend.Api.Features;
+using ShormanServicesBackend.Api.Security;
 
 namespace ShormanServicesBackend.Controllers;
 
 [ApiController]
 [Route("api/cart")]
-[Authorize]
+[Authorize(Roles = $"{RoleNames.SuperAdmin},{RoleNames.Admin},{RoleNames.Customer}")]
 public class CartController(IMediator mediator) : ControllerBase
 {
     [HttpGet]
