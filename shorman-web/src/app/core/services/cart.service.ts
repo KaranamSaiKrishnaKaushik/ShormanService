@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, catchError, map, of } from 'rxjs';
+import { BehaviorSubject, Observable, catchError, firstValueFrom, map, of } from 'rxjs';
 import { Cart, CartItem } from '../models/cart.model';
 import { Product } from '../models/product.model';
 import { environment } from '../../../environments/environment';
@@ -33,6 +33,7 @@ interface ApiCartResponse {
 export class CartService {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
+  private readonly guestCartKey = 'shorman_guest_cart';
 
   private cartSubject = new BehaviorSubject<Cart>(createEmptyCart());
   cart$ = this.cartSubject.asObservable();
@@ -43,11 +44,11 @@ export class CartService {
   constructor() {
     this.auth.currentUser$.subscribe(user => {
       if (user) {
-        this.refreshCart();
+        void this.syncAuthenticatedCart();
         return;
       }
 
-      this.cartSubject.next(createEmptyCart());
+      this.setCart(this.loadGuestCart());
       this.closeCart();
     });
   }
@@ -75,9 +76,94 @@ export class CartService {
     this.cartSubject.next(cart);
   }
 
+  private calculateCart(items: CartItem[]): Cart {
+    return {
+      items,
+      total: items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
+      itemCount: items.reduce((sum, item) => sum + item.quantity, 0)
+    };
+  }
+
+  private loadGuestCart(): Cart {
+    const raw = localStorage.getItem(this.guestCartKey);
+    if (!raw) {
+      return createEmptyCart();
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<Cart>;
+      const items = Array.isArray(parsed.items)
+        ? parsed.items.filter((item): item is CartItem =>
+            !!item &&
+            typeof item.productId === 'number' &&
+            typeof item.quantity === 'number' &&
+            item.quantity > 0 &&
+            !!item.product &&
+            typeof item.product.id === 'number' &&
+            typeof item.product.price === 'number')
+        : [];
+
+      return this.calculateCart(items.map(item => ({
+        productId: item.productId,
+        product: item.product,
+        quantity: item.quantity
+      })));
+    } catch {
+      localStorage.removeItem(this.guestCartKey);
+      return createEmptyCart();
+    }
+  }
+
+  private persistGuestCart(cart: Cart): void {
+    if (cart.items.length === 0) {
+      localStorage.removeItem(this.guestCartKey);
+      return;
+    }
+
+    localStorage.setItem(this.guestCartKey, JSON.stringify(cart));
+  }
+
+  private setGuestCartItems(items: CartItem[]): void {
+    const normalizedItems = items
+      .filter(item => item.quantity > 0)
+      .map(item => ({
+        productId: item.productId,
+        product: item.product,
+        quantity: item.quantity
+      }));
+
+    const cart = this.calculateCart(normalizedItems);
+    this.persistGuestCart(cart);
+    this.setCart(cart);
+  }
+
+  private async syncAuthenticatedCart(): Promise<void> {
+    const guestCart = this.loadGuestCart();
+
+    if (guestCart.items.length > 0) {
+      try {
+        for (const item of guestCart.items) {
+          await firstValueFrom(
+            this.http.post<ApiCartResponse>(`${environment.apiUrl}/cart/items`, {
+              productId: item.productId,
+              quantity: item.quantity
+            })
+          );
+        }
+
+        localStorage.removeItem(this.guestCartKey);
+      } catch {
+        this.setCart(guestCart);
+        return;
+      }
+    }
+
+    this.refreshCart();
+  }
+
   private requestCart(): Observable<Cart> {
     if (!this.auth.currentUser) {
-      return of(createEmptyCart());
+      return of(this.loadGuestCart());
     }
 
     return this.http.get<ApiCartResponse>(`${environment.apiUrl}/cart`).pipe(
@@ -96,7 +182,20 @@ export class CartService {
   }
 
   addToCart(product: Product, quantity = 1): void {
-    if (!this.auth.currentUser || quantity <= 0) {
+    if (quantity <= 0) {
+      return;
+    }
+
+    if (!this.auth.currentUser) {
+      const existingItem = this.cart.items.find(item => item.productId === product.id);
+      const updatedItems = existingItem
+        ? this.cart.items.map(item =>
+            item.productId === product.id
+              ? { ...item, quantity: item.quantity + quantity }
+              : item)
+        : [...this.cart.items, { productId: product.id, product, quantity }];
+
+      this.setGuestCartItems(updatedItems);
       return;
     }
 
@@ -108,6 +207,14 @@ export class CartService {
 
   updateItem(productId: number, quantity: number): void {
     if (!this.auth.currentUser) {
+      const updatedItems = quantity <= 0
+        ? this.cart.items.filter(item => item.productId !== productId)
+        : this.cart.items.map(item =>
+            item.productId === productId
+              ? { ...item, quantity }
+              : item);
+
+      this.setGuestCartItems(updatedItems);
       return;
     }
 
@@ -124,6 +231,7 @@ export class CartService {
 
   removeItem(productId: number): void {
     if (!this.auth.currentUser) {
+      this.setGuestCartItems(this.cart.items.filter(item => item.productId !== productId));
       return;
     }
 
@@ -140,6 +248,7 @@ export class CartService {
 
   clearCart(): void {
     if (!this.auth.currentUser) {
+      localStorage.removeItem(this.guestCartKey);
       this.setCart(createEmptyCart());
       return;
     }

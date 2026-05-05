@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ShormanServicesBackend.Api.Persistence.Entities;
+using ShormanServicesBackend.Api.Security;
 
 namespace ShormanServicesBackend.Api.Persistence;
 
@@ -7,6 +8,8 @@ public static class ApiSeeder
 {
     public static async Task SeedAsync(ApiDbContext dbContext)
     {
+        await SeedRolesAsync(dbContext);
+
         // ── 1. Categories ──────────────────────────────────────────────────────
         if (!await dbContext.Categories.AnyAsync())
         {
@@ -41,23 +44,43 @@ public static class ApiSeeder
                 {
                     Email        = "demo@shorman.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("demo123"),
-                    FirstName    = "Demo",
-                    LastName     = "User",
+                    FirstName    = "Super",
+                    LastName     = "Admin",
                     Phone        = "+49 123 456789",
+                    CreatedAtUtc = DateTime.UtcNow
+                },
+                new ApiUser
+                {
+                    Email        = "admin@shorman.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                    FirstName    = "Admin",
+                    LastName     = "User",
+                    Phone        = "+49 222 333444",
                     CreatedAtUtc = DateTime.UtcNow
                 },
                 new ApiUser
                 {
                     Email        = "test@test.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("test123"),
-                    FirstName    = "Test",
+                    FirstName    = "Customer",
                     LastName     = "User",
                     Phone        = "+49 987 654321",
+                    CreatedAtUtc = DateTime.UtcNow
+                },
+                new ApiUser
+                {
+                    Email        = "rider@shorman.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("rider123"),
+                    FirstName    = "Rider",
+                    LastName     = "User",
+                    Phone        = "+49 555 123456",
                     CreatedAtUtc = DateTime.UtcNow
                 }
             );
             await dbContext.SaveChangesAsync();
         }
+
+        await SeedUserRoleAssignmentsAsync(dbContext);
 
         // ── 4. Products (resolve category/supermarket IDs from DB) ────────────
         if (!await dbContext.Products.AnyAsync())
@@ -146,5 +169,72 @@ public static class ApiSeeder
             );
             await dbContext.SaveChangesAsync();
         }
+    }
+
+    private static async Task SeedRolesAsync(ApiDbContext dbContext)
+    {
+        var existingRoles = await dbContext.Roles.Select(x => x.Name).ToListAsync();
+        var missingRoles = RoleNames.All
+            .Where(role => existingRoles.All(existing => !string.Equals(existing, role, StringComparison.OrdinalIgnoreCase)))
+            .Select(role => new ApiRole { Name = role })
+            .ToList();
+
+        if (missingRoles.Count == 0)
+        {
+            return;
+        }
+
+        dbContext.Roles.AddRange(missingRoles);
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedUserRoleAssignmentsAsync(ApiDbContext dbContext)
+    {
+        var users = await dbContext.Users
+            .ToDictionaryAsync(x => x.Email, StringComparer.OrdinalIgnoreCase);
+
+        var roles = await dbContext.Roles
+            .ToDictionaryAsync(x => x.Name, StringComparer.OrdinalIgnoreCase);
+
+        await EnsureSingleRoleAsync(dbContext, users, roles, "demo@shorman.com", RoleNames.SuperAdmin);
+        await EnsureSingleRoleAsync(dbContext, users, roles, "admin@shorman.com", RoleNames.Admin);
+        await EnsureSingleRoleAsync(dbContext, users, roles, "test@test.com", RoleNames.Customer);
+        await EnsureSingleRoleAsync(dbContext, users, roles, "rider@shorman.com", RoleNames.Rider);
+    }
+
+    private static async Task EnsureSingleRoleAsync(
+        ApiDbContext dbContext,
+        IReadOnlyDictionary<string, ApiUser> users,
+        IReadOnlyDictionary<string, ApiRole> roles,
+        string email,
+        string roleName)
+    {
+        if (!users.TryGetValue(email, out var user) || !roles.TryGetValue(roleName, out var role))
+        {
+            return;
+        }
+
+        var existingAssignments = await dbContext.UserRoles
+            .Where(x => x.UserId == user.Id)
+            .ToListAsync();
+
+        var alreadyAssigned = existingAssignments.Any(x => x.RoleId == role.Id);
+        if (alreadyAssigned && existingAssignments.Count == 1)
+        {
+            return;
+        }
+
+        if (existingAssignments.Count > 0)
+        {
+            dbContext.UserRoles.RemoveRange(existingAssignments);
+        }
+
+        dbContext.UserRoles.Add(new ApiUserRole
+        {
+            UserId = user.Id,
+            RoleId = role.Id
+        });
+
+        await dbContext.SaveChangesAsync();
     }
 }
