@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using System.Globalization;
 using ShormanServicesBackend.Api.Contracts;
 using ShormanServicesBackend.Api.Persistence;
 using ShormanServicesBackend.Api.Persistence.Entities;
@@ -119,13 +120,7 @@ public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        var bootstrapSuperAdminEmails = configuration
-            .GetSection("RoleBootstrap:SuperAdminEmails")
-            .Get<string[]>()?
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim().ToLowerInvariant())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase)
-            ?? [];
+        var bootstrapSuperAdminEmails = AuthFeatureShared.GetBootstrapSuperAdminEmails(configuration);
 
         var desiredRole = bootstrapSuperAdminEmails.Contains(email)
             ? RoleNames.SuperAdmin
@@ -141,6 +136,24 @@ public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService
 
 internal static class AuthFeatureShared
 {
+    public static HashSet<string> GetBootstrapSuperAdminEmails(IConfiguration configuration)
+    {
+        var fromArraySection = configuration
+            .GetSection("RoleBootstrap:SuperAdminEmails")
+            .Get<string[]>()
+            ?? [];
+
+        var fromScalarValue = configuration["RoleBootstrap:SuperAdminEmails"]
+            ?.Split([',', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            ?? [];
+
+        return fromArraySection
+            .Concat(fromScalarValue)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim().ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     public static async Task AssignDefaultRoleIfMissingAsync(ApiDbContext dbContext, int userId, CancellationToken cancellationToken)
     {
         var hasRole = await dbContext.UserRoles.AnyAsync(x => x.UserId == userId, cancellationToken);
