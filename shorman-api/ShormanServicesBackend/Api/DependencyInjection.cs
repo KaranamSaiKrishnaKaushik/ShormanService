@@ -168,6 +168,18 @@ public static class DependencyInjection
         );
         """,
         """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_IsAvailable_Name' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_IsAvailable_Name ON products (IsAvailable, Name);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_CategoryId' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_CategoryId ON products (CategoryId);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_SupermarketId' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_SupermarketId ON products (SupermarketId);
+        """,
+        """
         IF OBJECT_ID('carts', 'U') IS NULL
         CREATE TABLE carts (
             Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
@@ -256,6 +268,16 @@ public static class DependencyInjection
         );
         """,
         """
+        IF OBJECT_ID('role_menu_permissions', 'U') IS NULL
+        CREATE TABLE role_menu_permissions (
+            RoleId INT NOT NULL,
+            MenuKey NVARCHAR(100) NOT NULL,
+            IsEnabled BIT NOT NULL DEFAULT 1,
+            CONSTRAINT PK_role_menu_permissions PRIMARY KEY (RoleId, MenuKey),
+            CONSTRAINT FK_role_menu_permissions_Role FOREIGN KEY (RoleId) REFERENCES roles(Id) ON DELETE CASCADE
+        );
+        """,
+        """
         IF OBJECT_ID('refresh_tokens', 'U') IS NULL
         CREATE TABLE refresh_tokens (
             Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
@@ -266,73 +288,6 @@ public static class DependencyInjection
             RevokedAtUtc DATETIME2 NULL,
             CONSTRAINT UQ_refresh_tokens_Token UNIQUE (Token),
             CONSTRAINT FK_refresh_tokens_User FOREIGN KEY (UserId) REFERENCES users(Id) ON DELETE CASCADE
-        );
-        """,
-        """
-        IF OBJECT_ID('stores', 'U') IS NULL
-        CREATE TABLE stores (
-            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-            SupermarketId INT NOT NULL,
-            Name NVARCHAR(150) NOT NULL,
-            AddressStreet NVARCHAR(150) NOT NULL,
-            AddressHouseNumber NVARCHAR(30) NOT NULL,
-            AddressPostalCode NVARCHAR(20) NOT NULL,
-            AddressCity NVARCHAR(100) NOT NULL,
-            AddressCountry NVARCHAR(100) NOT NULL,
-            Latitude DECIMAL(9,6) NULL,
-            Longitude DECIMAL(9,6) NULL,
-            Phone NVARCHAR(50) NULL,
-            IsActive BIT NOT NULL DEFAULT 1,
-            CONSTRAINT FK_stores_Supermarket FOREIGN KEY (SupermarketId) REFERENCES supermarkets(Id)
-        );
-        """,
-        """
-        IF OBJECT_ID('store_hours', 'U') IS NULL
-        CREATE TABLE store_hours (
-            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-            StoreId INT NOT NULL,
-            DayOfWeek TINYINT NOT NULL,
-            OpenTime TIME NULL,
-            CloseTime TIME NULL,
-            IsClosed BIT NOT NULL DEFAULT 0,
-            CONSTRAINT FK_store_hours_Store FOREIGN KEY (StoreId) REFERENCES stores(Id) ON DELETE CASCADE
-        );
-        """,
-        """
-        IF OBJECT_ID('store_delivery_zones', 'U') IS NULL
-        CREATE TABLE store_delivery_zones (
-            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-            StoreId INT NOT NULL,
-            PostalCode NVARCHAR(20) NOT NULL,
-            DeliveryFee DECIMAL(10,2) NOT NULL DEFAULT 0,
-            MinOrderAmount DECIMAL(10,2) NOT NULL DEFAULT 0,
-            EstimatedMinutes INT NULL,
-            CONSTRAINT FK_store_delivery_zones_Store FOREIGN KEY (StoreId) REFERENCES stores(Id) ON DELETE CASCADE,
-            CONSTRAINT UQ_store_delivery_zones UNIQUE (StoreId, PostalCode)
-        );
-        """,
-        """
-        IF OBJECT_ID('store_products', 'U') IS NULL
-        CREATE TABLE store_products (
-            StoreId INT NOT NULL,
-            ProductId INT NOT NULL,
-            Price DECIMAL(10,2) NULL,
-            Stock INT NULL,
-            IsAvailable BIT NOT NULL DEFAULT 1,
-            CONSTRAINT PK_store_products PRIMARY KEY (StoreId, ProductId),
-            CONSTRAINT FK_store_products_Store FOREIGN KEY (StoreId) REFERENCES stores(Id) ON DELETE CASCADE,
-            CONSTRAINT FK_store_products_Product FOREIGN KEY (ProductId) REFERENCES products(Id) ON DELETE CASCADE
-        );
-        """,
-        """
-        IF OBJECT_ID('product_images', 'U') IS NULL
-        CREATE TABLE product_images (
-            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-            ProductId INT NOT NULL,
-            Url NVARCHAR(1000) NOT NULL,
-            AltText NVARCHAR(200) NULL,
-            SortOrder INT NOT NULL DEFAULT 0,
-            CONSTRAINT FK_product_images_Product FOREIGN KEY (ProductId) REFERENCES products(Id) ON DELETE CASCADE
         );
         """,
         """
@@ -510,6 +465,15 @@ public static class DependencyInjection
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
         """
+        CREATE TABLE IF NOT EXISTS `role_menu_permissions` (
+            `RoleId` INT NOT NULL,
+            `MenuKey` VARCHAR(100) NOT NULL,
+            `IsEnabled` TINYINT(1) NOT NULL DEFAULT 1,
+            PRIMARY KEY (`RoleId`, `MenuKey`),
+            CONSTRAINT `FK_role_menu_permissions_Role` FOREIGN KEY (`RoleId`) REFERENCES `roles` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        """
         CREATE TABLE IF NOT EXISTS `refresh_tokens` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `UserId` INT NOT NULL,
@@ -519,68 +483,6 @@ public static class DependencyInjection
             `RevokedAtUtc` DATETIME NULL,
             UNIQUE KEY `UQ_refresh_tokens_Token` (`Token`),
             CONSTRAINT `FK_refresh_tokens_User` FOREIGN KEY (`UserId`) REFERENCES `users` (`Id`) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS `stores` (
-            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `SupermarketId` INT NOT NULL,
-            `Name` VARCHAR(150) NOT NULL,
-            `AddressStreet` VARCHAR(150) NOT NULL,
-            `AddressHouseNumber` VARCHAR(30) NOT NULL,
-            `AddressPostalCode` VARCHAR(20) NOT NULL,
-            `AddressCity` VARCHAR(100) NOT NULL,
-            `AddressCountry` VARCHAR(100) NOT NULL,
-            `Latitude` DECIMAL(9,6) NULL,
-            `Longitude` DECIMAL(9,6) NULL,
-            `Phone` VARCHAR(50) NULL,
-            `IsActive` TINYINT(1) NOT NULL DEFAULT 1,
-            CONSTRAINT `FK_stores_Supermarket` FOREIGN KEY (`SupermarketId`) REFERENCES `supermarkets` (`Id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS `store_hours` (
-            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `StoreId` INT NOT NULL,
-            `DayOfWeek` TINYINT NOT NULL,
-            `OpenTime` TIME NULL,
-            `CloseTime` TIME NULL,
-            `IsClosed` TINYINT(1) NOT NULL DEFAULT 0,
-            CONSTRAINT `FK_store_hours_Store` FOREIGN KEY (`StoreId`) REFERENCES `stores` (`Id`) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS `store_delivery_zones` (
-            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `StoreId` INT NOT NULL,
-            `PostalCode` VARCHAR(20) NOT NULL,
-            `DeliveryFee` DECIMAL(10,2) NOT NULL DEFAULT 0,
-            `MinOrderAmount` DECIMAL(10,2) NOT NULL DEFAULT 0,
-            `EstimatedMinutes` INT NULL,
-            CONSTRAINT `FK_store_delivery_zones_Store` FOREIGN KEY (`StoreId`) REFERENCES `stores` (`Id`) ON DELETE CASCADE,
-            UNIQUE KEY `UQ_store_delivery_zones` (`StoreId`, `PostalCode`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS `store_products` (
-            `StoreId` INT NOT NULL,
-            `ProductId` INT NOT NULL,
-            `Price` DECIMAL(10,2) NULL,
-            `Stock` INT NULL,
-            `IsAvailable` TINYINT(1) NOT NULL DEFAULT 1,
-            PRIMARY KEY (`StoreId`, `ProductId`),
-            CONSTRAINT `FK_store_products_Store` FOREIGN KEY (`StoreId`) REFERENCES `stores` (`Id`) ON DELETE CASCADE,
-            CONSTRAINT `FK_store_products_Product` FOREIGN KEY (`ProductId`) REFERENCES `products` (`Id`) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS `product_images` (
-            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `ProductId` INT NOT NULL,
-            `Url` VARCHAR(1000) NOT NULL,
-            `AltText` VARCHAR(200) NULL,
-            `SortOrder` INT NOT NULL DEFAULT 0,
-            CONSTRAINT `FK_product_images_Product` FOREIGN KEY (`ProductId`) REFERENCES `products` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
         """

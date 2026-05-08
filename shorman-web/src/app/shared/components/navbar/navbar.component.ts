@@ -4,6 +4,8 @@ import { AsyncPipe, NgIf } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { AppRole, CUSTOMER_ROLES, RIDER_ROLES } from '../../../core/models/user.model';
+import { MenuPermissionService } from '../../../core/services/menu-permission.service';
+import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.model';
 
 @Component({
   selector: 'app-navbar',
@@ -22,10 +24,11 @@ import { AppRole, CUSTOMER_ROLES, RIDER_ROLES } from '../../../core/models/user.
         <div class="navbar-links">
           <a routerLink="/products" routerLinkActive="active" class="nav-link">Products</a>
           <ng-container *ngIf="auth.isLoggedIn$ | async">
-            <a *ngIf="auth.hasAnyRole(customerRoles)" routerLink="/orders" routerLinkActive="active" class="nav-link">Orders</a>
-            <a *ngIf="auth.hasAnyRole(customerRoles)" routerLink="/addresses" routerLinkActive="active" class="nav-link">Addresses</a>
-            <a *ngIf="auth.hasAnyRole(riderRoles)" routerLink="/rider" routerLinkActive="active" class="nav-link">Rider Dashboard</a>
-            <a *ngIf="auth.hasRole('SuperAdmin')" routerLink="/user-management" routerLinkActive="active" class="nav-link">User Management</a>
+            <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('orders')" routerLink="/orders" routerLinkActive="active" class="nav-link">Orders</a>
+            <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="nav-link">Addresses</a>
+            <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="nav-link">Checkout</a>
+            <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="nav-link">Rider Dashboard</a>
+            <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="nav-link">User Management</a>
           </ng-container>
         </div>
 
@@ -58,10 +61,11 @@ import { AppRole, CUSTOMER_ROLES, RIDER_ROLES } from '../../../core/models/user.
       <div class="mobile-menu" [class.open]="mobileMenuOpen">
         <a routerLink="/products" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Products</a>
         <ng-container *ngIf="auth.isLoggedIn$ | async">
-          <a *ngIf="auth.hasAnyRole(customerRoles)" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Orders</a>
-          <a *ngIf="auth.hasAnyRole(customerRoles)" routerLink="/addresses" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Addresses</a>
-          <a *ngIf="auth.hasAnyRole(riderRoles)" routerLink="/rider" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Rider Dashboard</a>
-          <a *ngIf="auth.hasRole('SuperAdmin')" routerLink="/user-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">User Management</a>
+          <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('orders')" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Orders</a>
+          <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Addresses</a>
+          <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Checkout</a>
+          <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Rider Dashboard</a>
+          <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">User Management</a>
         </ng-container>
       </div>
     </nav>
@@ -283,9 +287,18 @@ import { AppRole, CUSTOMER_ROLES, RIDER_ROLES } from '../../../core/models/user.
 export class NavbarComponent {
   auth = inject(AuthService);
   cartService = inject(CartService);
+  menuPermissions = inject(MenuPermissionService);
   mobileMenuOpen = false;
   customerRoles: AppRole[] = CUSTOMER_ROLES;
   riderRoles: AppRole[] = RIDER_ROLES;
+
+  constructor() {
+    this.auth.currentUser$.subscribe(async user => {
+      if (user) {
+        await this.menuPermissions.ensureLoaded();
+      }
+    });
+  }
 
   toggleMobileMenu() {
     this.mobileMenuOpen = !this.mobileMenuOpen;
@@ -293,5 +306,9 @@ export class NavbarComponent {
 
   closeMobileMenu() {
     this.mobileMenuOpen = false;
+  }
+
+  showUserManagement(): boolean {
+    return this.auth.hasAnyRole(['SuperAdmin', 'Admin']) && this.menuPermissions.hasAnyPermission(USER_MANAGEMENT_MENU_KEYS);
   }
 }

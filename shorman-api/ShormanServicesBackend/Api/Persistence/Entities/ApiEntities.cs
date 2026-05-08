@@ -22,6 +22,16 @@ public class ApiRole
     public string Name { get; set; } = string.Empty;
 
     public ICollection<ApiUserRole> UserRoles { get; set; } = [];
+    public ICollection<ApiRoleMenuPermission> MenuPermissions { get; set; } = [];
+}
+
+public class ApiRoleMenuPermission
+{
+    public int RoleId { get; set; }
+    public string MenuKey { get; set; } = string.Empty;
+    public bool IsEnabled { get; set; }
+
+    public ApiRole Role { get; set; } = null!;
 }
 
 public class ApiUserRole
