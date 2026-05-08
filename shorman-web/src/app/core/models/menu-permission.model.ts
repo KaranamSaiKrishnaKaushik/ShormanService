@@ -1,0 +1,32 @@
+import { AppRole } from './user.model';
+
+export type MenuPermissionKey =
+  | 'products'
+  | 'checkout'
+  | 'orders'
+  | 'addresses'
+  | 'rider-dashboard'
+  | 'user-management.user-list'
+  | 'user-management.role-access'
+  | 'user-management.product-data';
+
+export interface RoleMenuPermission {
+  role: AppRole;
+  menuKey: MenuPermissionKey;
+  isEnabled: boolean;
+}
+
+export interface RoleMenuPermissions {
+  role: AppRole;
+  permissions: RoleMenuPermission[];
+}
+
+export interface CurrentMenuPermissions {
+  enabledMenuKeys: MenuPermissionKey[];
+}
+
+export const USER_MANAGEMENT_MENU_KEYS: MenuPermissionKey[] = [
+  'user-management.user-list',
+  'user-management.role-access',
+  'user-management.product-data'
+];

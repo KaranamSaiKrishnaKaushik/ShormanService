@@ -21,6 +21,59 @@ public static class RoleNames
     public static bool IsValid(string role) => All.Contains(role, StringComparer.OrdinalIgnoreCase);
 }
 
+public static class MenuPermissionKeys
+{
+    public const string Products = "products";
+    public const string Checkout = "checkout";
+    public const string Orders = "orders";
+    public const string Addresses = "addresses";
+    public const string RiderDashboard = "rider-dashboard";
+    public const string UserList = "user-management.user-list";
+    public const string RoleAccess = "user-management.role-access";
+    public const string ProductData = "user-management.product-data";
+
+    public static readonly string[] All =
+    [
+        Products,
+        Checkout,
+        Orders,
+        Addresses,
+        RiderDashboard,
+        UserList,
+        RoleAccess,
+        ProductData
+    ];
+
+    public static bool IsValid(string key) => All.Contains(key, StringComparer.OrdinalIgnoreCase);
+
+    public static IReadOnlyCollection<string> GetDefaultEnabledKeys(string role) =>
+        role switch
+        {
+            RoleNames.SuperAdmin => All,
+            RoleNames.Admin =>
+            [
+                Products,
+                Checkout,
+                Orders,
+                Addresses,
+                ProductData
+            ],
+            RoleNames.Customer =>
+            [
+                Products,
+                Checkout,
+                Orders,
+                Addresses
+            ],
+            RoleNames.Rider =>
+            [
+                Products,
+                RiderDashboard
+            ],
+            _ => Array.Empty<string>()
+        };
+}
+
 public class JwtTokenService(IOptions<JwtOptions> options)
 {
     private readonly JwtOptions jwtOptions = options.Value;

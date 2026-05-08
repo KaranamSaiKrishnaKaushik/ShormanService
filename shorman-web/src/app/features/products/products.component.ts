@@ -29,14 +29,19 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
   styleUrls: ['./products.component.scss']
 })
 export class ProductsComponent implements OnInit {
+  private static readonly PAGE_SIZE = 30;
+
   private productService = inject(ProductService);
   private cdr = inject(ChangeDetectorRef);
   cartService = inject(CartService);
 
   supermarketTabs = SUPERMARKET_TABS;
   categories: Category[] = [];
-  allProducts: Product[] = [];
+  supermarkets: Supermarket[] = [];
   filteredProducts: Product[] = [];
+  totalProducts = 0;
+  currentPage = 1;
+  totalPages = 0;
 
   activeSupermarket = 'all';
   activeCategory = 'all';
@@ -68,41 +73,29 @@ export class ProductsComponent implements OnInit {
       console.log('Backend health check:', isUp ? 'OK' : 'FAILED');
     });
 
+    this.loadSupermarkets();
     this.loadCategories();
-    this.loadProducts();
+    this.loadProducts(true);
   }
 
   setSupermarket(slug: string): void {
     this.activeSupermarket = slug;
-    // Useful for backend breakpoint testing: each supermarket click refreshes categories from API.
-    this.loadCategories();
-    this.loadProducts();
+    this.loadProducts(true);
   }
 
   onSearchChange(_: string): void {
-    this.applyFilters();
+    this.loadProducts(true);
   }
 
   applyFilters(): void {
-    let results = [...this.allProducts];
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase();
-      results = results.filter(p => p.name.toLowerCase().includes(q));
-    }
-    if (this.activeSupermarket !== 'all') {
-      results = results.filter(p => p.supermarket?.slug === this.activeSupermarket);
-    }
-    if (this.activeCategory !== 'all') {
-      results = results.filter(p => p.category?.slug === this.activeCategory);
-    }
-    this.filteredProducts = results;
+    this.loadProducts(true);
   }
 
   resetFilters(): void {
     this.searchQuery = '';
     this.activeSupermarket = 'all';
     this.activeCategory = 'all';
-    this.filteredProducts = [...this.allProducts];
+    this.loadProducts(true);
   }
 
   toggleMobileFilters(): void {
@@ -147,28 +140,101 @@ export class ProductsComponent implements OnInit {
     return this.placeholderColors[(smId - 1) % this.placeholderColors.length] || '#2E7D32';
   }
 
+  changePage(page: number): void {
+    if (this.loading || page < 1 || page > this.totalPages || page === this.currentPage) {
+      return;
+    }
+
+    this.currentPage = page;
+    this.loadProducts(false);
+  }
+
+  get visiblePageNumbers(): number[] {
+    if (this.totalPages <= 1) {
+      return [1];
+    }
+
+    const windowSize = 5;
+    const halfWindow = Math.floor(windowSize / 2);
+    let start = Math.max(1, this.currentPage - halfWindow);
+    let end = Math.min(this.totalPages, start + windowSize - 1);
+
+    if (end - start + 1 < windowSize) {
+      start = Math.max(1, end - windowSize + 1);
+    }
+
+    const pages: number[] = [];
+    for (let page = start; page <= end; page += 1) {
+      pages.push(page);
+    }
+    return pages;
+  }
+
+  private loadSupermarkets(): void {
+    this.productService.getSupermarkets().subscribe(supermarkets => {
+      this.supermarkets = supermarkets;
+      const dynamicTabs = supermarkets.map(supermarket => ({
+        slug: supermarket.slug,
+        name: supermarket.name,
+        color: this.getTabTextColor(supermarket.color),
+        bgColor: supermarket.color || '#2E7D32'
+      }));
+      this.supermarketTabs = [{ slug: 'all', name: 'ALL', color: '#2E7D32', bgColor: '#E8F5E9' }, ...dynamicTabs];
+      this.cdr.detectChanges();
+    });
+  }
+
   private loadCategories(): void {
     this.productService.getCategories().subscribe(cats => {
-      this.categories = cats;
+      this.categories = cats.filter(category => category.slug !== 'imported-products');
       console.log('Categories loaded:', cats);
     });
   }
 
-  private loadProducts(): void {
+  private loadProducts(reset: boolean): void {
+    if (reset) {
+      this.currentPage = 1;
+    }
     this.loading = true;
-    this.productService.getProducts().subscribe({
-      next: (products) => {
-        this.allProducts = Array.isArray(products) ? products : [];
-        this.applyFilters();
+
+    const activeCategoryId = this.activeCategory === 'all'
+      ? undefined
+      : this.categories.find(category => category.slug === this.activeCategory)?.id;
+    const activeSupermarketId = this.activeSupermarket === 'all'
+      ? undefined
+      : this.supermarkets.find(supermarket => supermarket.slug === this.activeSupermarket)?.id;
+
+    this.productService.getProducts({
+      search: this.searchQuery.trim() || undefined,
+      categoryId: activeCategoryId,
+      supermarketId: activeSupermarketId,
+      page: this.currentPage,
+      pageSize: ProductsComponent.PAGE_SIZE
+    }).subscribe({
+      next: (page) => {
+        const items = Array.isArray(page.items) ? page.items : [];
+        this.totalProducts = page.totalCount;
+        this.totalPages = Math.max(1, Math.ceil(this.totalProducts / ProductsComponent.PAGE_SIZE));
+        this.currentPage = page.page;
+        this.filteredProducts = items;
         this.loading = false;
         this.cdr.detectChanges();
       },
       error: () => {
-        this.allProducts = [];
         this.filteredProducts = [];
+        this.totalProducts = 0;
+        this.totalPages = 0;
         this.loading = false;
         this.cdr.detectChanges();
       }
     });
+  }
+
+  private getTabTextColor(backgroundColor?: string): string {
+    if (!backgroundColor) {
+      return '#fff';
+    }
+
+    return backgroundColor.toLowerCase() === '#ffd600' ? '#333' : '#fff';
   }
 }

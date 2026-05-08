@@ -154,11 +154,7 @@ export class AuthService {
       return true;
     }
 
-    if (this.auth0Enabled) {
-      await this.startLogin(returnUrl);
-    } else {
-      await this.router.navigate(['/login'], { queryParams: { returnUrl } });
-    }
+    await this.router.navigate(['/login'], { queryParams: { returnUrl } });
 
     return false;
   }
@@ -307,6 +303,8 @@ export class AuthService {
 
   logout(): void {
     this.clearLocalAuthState();
+    this.authErrorSubject.next(null);
+    sessionStorage.removeItem(this.RETURN_URL_KEY);
 
     if (this.auth0Enabled) {
       void this.logoutFromAuth0();

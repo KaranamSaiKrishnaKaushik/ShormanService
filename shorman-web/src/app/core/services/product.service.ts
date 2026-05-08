@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, map, of } from 'rxjs';
+import { Observable, catchError, map, of, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Product, Category, Supermarket, ProductFilters } from '../models/product.model';
+import { Product, Category, Supermarket, ProductFilters, ProductPage, UpdateProductRequest } from '../models/product.model';
 
 // Mock data for development when backend is not available
 const MOCK_CATEGORIES: Category[] = [
@@ -43,24 +43,35 @@ const MOCK_PRODUCTS: Product[] = [
 @Injectable({ providedIn: 'root' })
 export class ProductService {
   private http = inject(HttpClient);
-  private useMock = false;
+  private useMock = environment.useMockProducts;
 
-  getProducts(filters?: ProductFilters): Observable<Product[]> {
+  getProducts(filters?: ProductFilters): Observable<ProductPage> {
     if (this.useMock) {
-      return of(this.filterMockProducts(filters));
+      const products = this.filterMockProducts(filters);
+      const page = filters?.page ?? 1;
+      const pageSize = filters?.pageSize ?? 30;
+      const start = (page - 1) * pageSize;
+      return of({
+        items: products.slice(start, start + pageSize),
+        totalCount: products.length,
+        page,
+        pageSize
+      });
     }
 
     const params = new URLSearchParams();
     if (filters?.search) params.set('search', filters.search);
     if (filters?.categoryId) params.set('categoryId', String(filters.categoryId));
     if (filters?.supermarketId) params.set('supermarketId', String(filters.supermarketId));
+    params.set('page', String(filters?.page ?? 1));
+    params.set('pageSize', String(filters?.pageSize ?? 30));
 
     const query = params.toString();
     const url = query ? `${environment.apiUrl}/products?${query}` : `${environment.apiUrl}/products`;
 
     return this.http.get<unknown>(url).pipe(
-      map((response) => this.toProductArray(response)),
-      catchError(() => of(this.filterMockProducts(filters)))
+      map((response) => this.toProductPage(response, filters?.page ?? 1, filters?.pageSize ?? 30)),
+      catchError(() => of({ items: [], totalCount: 0, page: filters?.page ?? 1, pageSize: filters?.pageSize ?? 30 }))
     );
   }
 
@@ -70,7 +81,36 @@ export class ProductService {
       return of(p!);
     }
     return this.http.get<Product>(`${environment.apiUrl}/products/${id}`).pipe(
-      catchError(() => of(MOCK_PRODUCTS.find(p => p.id === id)!))
+      catchError((error) => throwError(() => error))
+    );
+  }
+
+  getAdminProducts(filters?: ProductFilters): Observable<ProductPage> {
+    const params = new URLSearchParams();
+    if (filters?.search) params.set('search', filters.search);
+    if (filters?.categoryId) params.set('categoryId', String(filters.categoryId));
+    if (filters?.supermarketId) params.set('supermarketId', String(filters.supermarketId));
+    params.set('page', String(filters?.page ?? 1));
+    params.set('pageSize', String(filters?.pageSize ?? 50));
+
+    const query = params.toString();
+    const url = query ? `${environment.apiUrl}/products/admin?${query}` : `${environment.apiUrl}/products/admin`;
+
+    return this.http.get<unknown>(url).pipe(
+      map((response) => this.toProductPage(response, filters?.page ?? 1, filters?.pageSize ?? 50)),
+      catchError((error) => throwError(() => error))
+    );
+  }
+
+  updateProduct(id: number, request: UpdateProductRequest): Observable<Product> {
+    return this.http.put<Product>(`${environment.apiUrl}/products/${id}`, request).pipe(
+      catchError((error) => throwError(() => error))
+    );
+  }
+
+  deleteProduct(id: number): Observable<void> {
+    return this.http.delete<void>(`${environment.apiUrl}/products/${id}`).pipe(
+      catchError((error) => throwError(() => error))
     );
   }
 
@@ -82,10 +122,6 @@ export class ProductService {
       >(`${environment.apiUrl}/categories`)
       .pipe(
         map(categories => {
-          if (!categories.length) {
-            return [...MOCK_CATEGORIES];
-          }
-
           return categories.map((category, index) => ({
             id: typeof category.id === 'number' ? category.id : index + 1,
             name: category.name,
@@ -93,13 +129,15 @@ export class ProductService {
             icon: category.icon
           }));
         }),
-        catchError(() => of(MOCK_CATEGORIES))
+        catchError(() => of([]))
       );
   }
 
   getSupermarkets(): Observable<Supermarket[]> {
     if (this.useMock) return of(MOCK_SUPERMARKETS);
-    return this.http.get<Supermarket[]>(`${environment.apiUrl}/supermarkets`);
+    return this.http.get<Supermarket[]>(`${environment.apiUrl}/supermarkets`).pipe(
+      catchError(() => of([]))
+    );
   }
 
   pingHealth(): Observable<boolean> {
@@ -144,19 +182,35 @@ export class ProductService {
     return results;
   }
 
-  private toProductArray(response: unknown): Product[] {
+  private toProductPage(response: unknown, fallbackPage: number, fallbackPageSize: number): ProductPage {
     if (Array.isArray(response)) {
-      return response as Product[];
+      return {
+        items: response as Product[],
+        totalCount: response.length,
+        page: fallbackPage,
+        pageSize: fallbackPageSize
+      };
     }
 
     if (response && typeof response === 'object') {
-      const maybeItems = (response as { items?: unknown; data?: unknown; value?: unknown; $values?: unknown });
-      if (Array.isArray(maybeItems.items)) return maybeItems.items as Product[];
-      if (Array.isArray(maybeItems.data)) return maybeItems.data as Product[];
-      if (Array.isArray(maybeItems.value)) return maybeItems.value as Product[];
-      if (Array.isArray(maybeItems.$values)) return maybeItems.$values as Product[];
+      const maybeItems = response as { items?: unknown; data?: unknown; value?: unknown; $values?: unknown; totalCount?: unknown; page?: unknown; pageSize?: unknown };
+      const items = Array.isArray(maybeItems.items)
+        ? maybeItems.items as Product[]
+        : Array.isArray(maybeItems.data)
+          ? maybeItems.data as Product[]
+          : Array.isArray(maybeItems.value)
+            ? maybeItems.value as Product[]
+            : Array.isArray(maybeItems.$values)
+              ? maybeItems.$values as Product[]
+              : [];
+      return {
+        items,
+        totalCount: typeof maybeItems.totalCount === 'number' ? maybeItems.totalCount : items.length,
+        page: typeof maybeItems.page === 'number' ? maybeItems.page : fallbackPage,
+        pageSize: typeof maybeItems.pageSize === 'number' ? maybeItems.pageSize : fallbackPageSize
+      };
     }
 
-    return [];
+    return { items: [], totalCount: 0, page: fallbackPage, pageSize: fallbackPageSize };
   }
 }

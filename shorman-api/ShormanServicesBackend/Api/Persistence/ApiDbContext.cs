@@ -8,6 +8,7 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
     public DbSet<ApiUser> Users => Set<ApiUser>();
     public DbSet<ApiRole> Roles => Set<ApiRole>();
     public DbSet<ApiUserRole> UserRoles => Set<ApiUserRole>();
+    public DbSet<ApiRoleMenuPermission> RoleMenuPermissions => Set<ApiRoleMenuPermission>();
     public DbSet<ApiAddress> Addresses => Set<ApiAddress>();
     public DbSet<ApiCategory> Categories => Set<ApiCategory>();
     public DbSet<ApiSupermarket> Supermarkets => Set<ApiSupermarket>();
@@ -37,6 +38,14 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => x.Name).IsUnique();
             entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+        });
+
+        modelBuilder.Entity<ApiRoleMenuPermission>(entity =>
+        {
+            entity.ToTable("role_menu_permissions");
+            entity.HasKey(x => new { x.RoleId, x.MenuKey });
+            entity.Property(x => x.MenuKey).HasMaxLength(100).IsRequired();
+            entity.HasOne(x => x.Role).WithMany(x => x.MenuPermissions).HasForeignKey(x => x.RoleId);
         });
 
         modelBuilder.Entity<ApiUserRole>(entity =>

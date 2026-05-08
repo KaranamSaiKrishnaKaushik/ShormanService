@@ -181,19 +181,23 @@ export class CartService {
     return item ? item.quantity : 0;
   }
 
+  private buildUpdatedItemsForAdd(product: Product, quantity: number): CartItem[] {
+    const existingItem = this.cart.items.find(item => item.productId === product.id);
+    return existingItem
+      ? this.cart.items.map(item =>
+          item.productId === product.id
+            ? { ...item, quantity: item.quantity + quantity }
+            : item)
+      : [...this.cart.items, { productId: product.id, product, quantity }];
+  }
+
   addToCart(product: Product, quantity = 1): void {
     if (quantity <= 0) {
       return;
     }
 
     if (!this.auth.currentUser) {
-      const existingItem = this.cart.items.find(item => item.productId === product.id);
-      const updatedItems = existingItem
-        ? this.cart.items.map(item =>
-            item.productId === product.id
-              ? { ...item, quantity: item.quantity + quantity }
-              : item)
-        : [...this.cart.items, { productId: product.id, product, quantity }];
+      const updatedItems = this.buildUpdatedItemsForAdd(product, quantity);
 
       this.setGuestCartItems(updatedItems);
       return;
@@ -201,7 +205,11 @@ export class CartService {
 
     this.http.post<ApiCartResponse>(`${environment.apiUrl}/cart/items`, { productId: product.id, quantity }).pipe(
       map(response => this.toCart(response)),
-      catchError(() => of(this.cart))
+      catchError(error => {
+        console.error('Failed to add item to cart API. Falling back to local cart state.', error);
+        this.setGuestCartItems(this.buildUpdatedItemsForAdd(product, quantity));
+        return of(this.cart);
+      })
     ).subscribe(cart => this.setCart(cart));
   }
 

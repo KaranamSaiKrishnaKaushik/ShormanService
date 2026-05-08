@@ -29,4 +29,22 @@ public class AdminUsersController(IMediator mediator) : ControllerBase
             return BadRequest(new { message = exception.Message });
         }
     }
+
+    [HttpGet("menu-permissions")]
+    public Task<IReadOnlyCollection<RoleMenuPermissionsDto>> GetMenuPermissions(CancellationToken cancellationToken) =>
+        mediator.Send(new GetRoleMenuPermissionsQuery(), cancellationToken);
+
+    [HttpPut("menu-permissions/{role}")]
+    public async Task<ActionResult<RoleMenuPermissionsDto>> UpdateMenuPermissions(string role, [FromBody] UpdateRoleMenuPermissionsRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await mediator.Send(new UpdateRoleMenuPermissionsCommand(role, request.EnabledMenuKeys), cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
 }
