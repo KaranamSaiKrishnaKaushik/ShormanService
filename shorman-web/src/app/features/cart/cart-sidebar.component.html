@@ -52,9 +52,12 @@
           <strong>{{ cart.total | currency:'EUR':'symbol':'1.2-2' }}</strong>
         </div>
         <div class="delivery-note">🚚 Delivery fee calculated at checkout</div>
+        <div class="auth-note" *ngIf="!isLoggedIn">
+          Your cart is saved locally. Sign in when you're ready to place the order.
+        </div>
 
         <button class="btn-checkout" (click)="goToCheckout()">
-          Proceed to Checkout →
+          {{ checkoutButtonLabel }}
         </button>
         <button class="btn-clear" (click)="cartService.clearCart()">Clear Cart</button>
       </div>

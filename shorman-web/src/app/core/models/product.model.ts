@@ -28,6 +28,25 @@ export interface Product {
   isAvailable: boolean;
 }
 
+export interface ProductPage {
+  items: Product[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface UpdateProductRequest {
+  name: string;
+  description?: string;
+  price: number;
+  imageUrl?: string;
+  categoryId: number;
+  supermarketId: number;
+  unit?: string;
+  stock?: number;
+  isAvailable: boolean;
+}
+
 export interface ProductFilters {
   search?: string;
   categoryId?: number;

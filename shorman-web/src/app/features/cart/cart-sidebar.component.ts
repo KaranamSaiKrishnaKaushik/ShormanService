@@ -17,6 +17,14 @@ export class CartSidebarComponent {
   private auth = inject(AuthService);
   private router = inject(Router);
 
+  get isLoggedIn(): boolean {
+    return this.auth.isLoggedIn;
+  }
+
+  get checkoutButtonLabel(): string {
+    return this.isLoggedIn ? 'Proceed to Checkout →' : 'Sign In to Checkout →';
+  }
+
   trackItem(_: number, item: CartItem): number {
     return item.productId;
   }
