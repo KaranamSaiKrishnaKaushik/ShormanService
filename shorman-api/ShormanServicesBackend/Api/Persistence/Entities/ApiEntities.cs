@@ -8,11 +8,19 @@ public class ApiUser
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string? Phone { get; set; }
+    public bool IsEmailVerified { get; set; } = true;
+    public string? EmailVerificationCode { get; set; }
+    public DateTime? EmailVerificationExpiresAtUtc { get; set; }
+    public string? PasswordResetCode { get; set; }
+    public DateTime? PasswordResetExpiresAtUtc { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public ICollection<ApiAddress> Addresses { get; set; } = [];
     public ICollection<ApiCart> Carts { get; set; } = [];
     public ICollection<ApiOrder> Orders { get; set; } = [];
+    public ICollection<ApiOrder> AssignedOrders { get; set; } = [];
     public ICollection<ApiUserRole> UserRoles { get; set; } = [];
 }
 
@@ -124,17 +132,28 @@ public class ApiOrder
 {
     public int Id { get; set; }
     public int UserId { get; set; }
-    public string Status { get; set; } = "PENDING";
+    public string? CustomerNameSnapshot { get; set; }
+    public string? CustomerEmailSnapshot { get; set; }
+    public string Status { get; set; } = "AWAITING_PICKUP";
     public string PaymentMethod { get; set; } = string.Empty;
+    public string PaymentStatus { get; set; } = "PENDING";
     public int AddressId { get; set; }
     public decimal Subtotal { get; set; }
     public decimal DeliveryFee { get; set; }
     public decimal Total { get; set; }
+    public int? AssignedRiderId { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAtUtc { get; set; }
+    public DateTime? AcceptedAtUtc { get; set; }
+    public DateTime? PickedUpAtUtc { get; set; }
+    public DateTime? OutForDeliveryAtUtc { get; set; }
+    public DateTime? DeliveredAtUtc { get; set; }
+    public DateTime? CashCollectedAtUtc { get; set; }
+    public DateTime? CompletedAtUtc { get; set; }
 
     public ApiUser User { get; set; } = null!;
     public ApiAddress Address { get; set; } = null!;
+    public ApiUser? AssignedRider { get; set; }
     public ICollection<ApiOrderItem> Items { get; set; } = [];
 }
 
@@ -145,6 +164,7 @@ public class ApiOrderItem
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string? ProductImageUrl { get; set; }
+    public string? SupermarketName { get; set; }
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgFor, NgIf, CurrencyPipe, AsyncPipe } from '@angular/common';
@@ -30,12 +30,15 @@ const PAYMENT_OPTIONS: PaymentOption[] = [
   styleUrls: ['./checkout.component.scss']
 })
 export class CheckoutComponent implements OnInit {
+  private static readonly PLACE_ORDER_TIMEOUT_MS = 20000;
+
   private fb = inject(FormBuilder);
   cartService = inject(CartService);
   private orderService = inject(OrderService);
   private addressService = inject(AddressService);
   private deliveryService = inject(DeliveryService);
   private router = inject(Router);
+  private cdr = inject(ChangeDetectorRef);
 
   paymentOptions = PAYMENT_OPTIONS;
   addresses: Address[] = [];
@@ -49,6 +52,7 @@ export class CheckoutComponent implements OnInit {
   placing = false;
   orderError = '';
   orderSuccess = '';
+  private placeOrderWatchdogId: number | null = null;
 
   addressForm = this.fb.nonNullable.group({
     label: [''],
@@ -63,19 +67,31 @@ export class CheckoutComponent implements OnInit {
   ngOnInit(): void {
     this.addressService.getAddresses().subscribe({
       next: addrs => {
-        this.addresses = addrs;
-        this.loadingAddresses = false;
+        this.addresses = [...addrs];
+        addrs.forEach(addr => this.checkDelivery(addr));
         const def = addrs.find(a => a.isDefault);
         if (def) this.selectedAddressId = def.id;
         else if (addrs.length > 0) this.selectedAddressId = addrs[0].id;
+        this.loadingAddresses = false;
+        this.cdr.detectChanges();
       },
-      error: () => { this.loadingAddresses = false; }
+      error: () => {
+        this.loadingAddresses = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 
-  checkDelivery(postalCode: string): void {
-    this.deliveryService.checkDelivery(postalCode).subscribe(result => {
-      this.deliveryChecks = { ...this.deliveryChecks, [postalCode]: result };
+  checkDelivery(address: Address): void {
+    const key = this.deliveryCheckKey(address.id);
+    this.deliveryService.checkDelivery({
+      postalCode: address.postalCode,
+      city: address.city,
+      street: address.street,
+      houseNumber: address.houseNumber,
+      country: address.country
+    }).subscribe(result => {
+      this.deliveryChecks = { ...this.deliveryChecks, [key]: result };
       if (result.eligible && result.deliveryFee !== undefined) {
         this.deliveryFee = result.deliveryFee;
       }
@@ -87,34 +103,74 @@ export class CheckoutComponent implements OnInit {
     this.savingAddress = true;
     this.addressService.addAddress(this.addressForm.getRawValue()).subscribe({
       next: (addr) => {
-        this.addresses.push(addr);
+        this.addresses = [...this.addresses, addr];
         this.selectedAddressId = addr.id;
+        this.checkDelivery(addr);
         this.showAddressForm = false;
         this.savingAddress = false;
         this.addressForm.reset({ country: 'Germany' });
+        this.cdr.detectChanges();
       },
-      error: () => { this.savingAddress = false; }
+      error: () => {
+        this.savingAddress = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 
   placeOrder(cart: { items: { productId: number; quantity: number }[]; total: number }): void {
     if (!this.selectedAddressId || cart.items.length === 0) return;
+
+    this.clearPlaceOrderWatchdog();
     this.placing = true;
     this.orderError = '';
+    this.placeOrderWatchdogId = window.setTimeout(() => {
+      if (!this.placing) {
+        return;
+      }
+
+      this.placing = false;
+      this.orderError = 'Placing the order is taking too long. Check whether the backend is reachable, then try again.';
+    }, CheckoutComponent.PLACE_ORDER_TIMEOUT_MS);
+
     this.orderService.createOrder({
       addressId: this.selectedAddressId,
       paymentMethod: this.selectedPayment,
       items: cart.items.map(i => ({ productId: i.productId, quantity: i.quantity }))
     }).subscribe({
       next: (order) => {
+        this.clearPlaceOrderWatchdog();
         this.cartService.clearCart();
         this.placing = false;
         this.router.navigate(['/orders']);
       },
       error: (err) => {
-        this.orderError = err?.error?.message || 'Failed to place order. Please try again.';
+        this.clearPlaceOrderWatchdog();
+        this.orderError = err?.name === 'TimeoutError'
+          ? 'Placing the order took too long. Check whether the backend is still starting or unavailable, then try again.'
+          : err?.error?.message || 'Failed to place order. Please try again.';
         this.placing = false;
       }
     });
+  }
+
+  deliveryCheckKey(addressId: number): string {
+    return `address-${addressId}`;
+  }
+
+  selectedAddressEligible(): boolean {
+    if (!this.selectedAddressId) {
+      return false;
+    }
+
+    const check = this.deliveryChecks[this.deliveryCheckKey(this.selectedAddressId)];
+    return check?.eligible !== false;
+  }
+
+  private clearPlaceOrderWatchdog(): void {
+    if (this.placeOrderWatchdogId !== null) {
+      window.clearTimeout(this.placeOrderWatchdogId);
+      this.placeOrderWatchdogId = null;
+    }
   }
 }

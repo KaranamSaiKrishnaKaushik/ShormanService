@@ -48,6 +48,7 @@ public static class ApiSeeder
                     FirstName    = "Super",
                     LastName     = "Admin",
                     Phone        = "+49 123 456789",
+                    IsEmailVerified = true,
                     CreatedAtUtc = DateTime.UtcNow
                 },
                 new ApiUser
@@ -57,6 +58,7 @@ public static class ApiSeeder
                     FirstName    = "Admin",
                     LastName     = "User",
                     Phone        = "+49 222 333444",
+                    IsEmailVerified = true,
                     CreatedAtUtc = DateTime.UtcNow
                 },
                 new ApiUser
@@ -66,6 +68,7 @@ public static class ApiSeeder
                     FirstName    = "Customer",
                     LastName     = "User",
                     Phone        = "+49 987 654321",
+                    IsEmailVerified = true,
                     CreatedAtUtc = DateTime.UtcNow
                 },
                 new ApiUser
@@ -75,9 +78,23 @@ public static class ApiSeeder
                     FirstName    = "Rider",
                     LastName     = "User",
                     Phone        = "+49 555 123456",
+                    IsEmailVerified = true,
                     CreatedAtUtc = DateTime.UtcNow
                 }
             );
+            await dbContext.SaveChangesAsync();
+        }
+
+        var unverifiedSeedUsers = await dbContext.Users.Where(x => !x.IsEmailVerified).ToListAsync();
+        if (unverifiedSeedUsers.Count > 0)
+        {
+            foreach (var user in unverifiedSeedUsers)
+            {
+                user.IsEmailVerified = true;
+                user.EmailVerificationCode = null;
+                user.EmailVerificationExpiresAtUtc = null;
+            }
+
             await dbContext.SaveChangesAsync();
         }
 

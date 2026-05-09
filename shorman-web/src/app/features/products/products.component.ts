@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { NgFor, NgIf, NgClass, CurrencyPipe, AsyncPipe } from '@angular/common';
 import { ProductService } from '../../core/services/product.service';
 import { CartService } from '../../core/services/cart.service';
+import { DeliveryCheckResult, DeliveryService } from '../../core/services/delivery.service';
 import { Product, Category, Supermarket } from '../../core/models/product.model';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 
@@ -33,6 +34,7 @@ export class ProductsComponent implements OnInit {
 
   private productService = inject(ProductService);
   private cdr = inject(ChangeDetectorRef);
+  private deliveryService = inject(DeliveryService);
   cartService = inject(CartService);
 
   supermarketTabs = SUPERMARKET_TABS;
@@ -48,6 +50,16 @@ export class ProductsComponent implements OnInit {
   searchQuery = '';
   loading = true;
   mobileFiltersOpen = false;
+  deliveryCheck = {
+    street: '',
+    houseNumber: '',
+    postalCode: '',
+    city: 'Frankfurt am Main',
+    country: 'Germany'
+  };
+  deliveryCheckResult: DeliveryCheckResult | null = null;
+  checkingDelivery = false;
+  deliveryCheckError = '';
 
   cartOpen$ = this.cartService.isOpen$;
 
@@ -147,6 +159,30 @@ export class ProductsComponent implements OnInit {
 
     this.currentPage = page;
     this.loadProducts(false);
+  }
+
+  checkDeliveryZone(): void {
+    if (!this.deliveryCheck.postalCode.trim() || !this.deliveryCheck.city.trim()) {
+      this.deliveryCheckError = 'Postal code and city are required to check delivery.';
+      this.deliveryCheckResult = null;
+      return;
+    }
+
+    this.checkingDelivery = true;
+    this.deliveryCheckError = '';
+    this.deliveryService.checkDelivery(this.deliveryCheck).subscribe({
+      next: result => {
+        this.deliveryCheckResult = result;
+        this.checkingDelivery = false;
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        this.deliveryCheckError = err?.error?.message || 'Failed to check delivery coverage.';
+        this.deliveryCheckResult = null;
+        this.checkingDelivery = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   get visiblePageNumbers(): number[] {

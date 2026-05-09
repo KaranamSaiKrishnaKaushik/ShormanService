@@ -3,6 +3,100 @@
   min-height: calc(100vh - 128px);
 }
 
+.delivery-zone-banner {
+  max-width: 1200px;
+  margin: 1.25rem auto 0;
+  padding: 0 1rem;
+}
+
+.delivery-zone-inner {
+  background: linear-gradient(135deg, #133b2b 0%, #1e6b45 55%, #e8f5e9 55%, #f6fbf7 100%);
+  border-radius: 20px;
+  padding: 1.4rem;
+  box-shadow: 0 12px 30px rgba(18, 63, 39, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.delivery-zone-copy {
+  color: #fff;
+  max-width: 620px;
+}
+
+.delivery-zone-kicker {
+  display: inline-flex;
+  margin-bottom: 0.45rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.delivery-zone-copy h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+.delivery-zone-copy p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.delivery-zone-form {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 0.9fr 1.1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.delivery-zone-form input {
+  min-width: 0;
+  border: 1px solid rgba(19, 59, 43, 0.15);
+  border-radius: 12px;
+  padding: 0.85rem 0.95rem;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.delivery-zone-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 0.9rem 1.15rem;
+  background: #f4b400;
+  color: #173321;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.delivery-zone-btn:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.delivery-zone-error {
+  margin: 0;
+  color: #fff4d8;
+  font-weight: 600;
+}
+
+.delivery-zone-result {
+  display: grid;
+  gap: 0.25rem;
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  background: rgba(228, 255, 237, 0.92);
+  color: #174d2b;
+}
+
+.delivery-zone-result.ineligible {
+  background: rgba(255, 242, 242, 0.96);
+  color: #8f2d21;
+}
+
 /* ===== Header ===== */
 .page-header {
   background: #fff;
@@ -506,6 +600,10 @@
 
 /* ===== Responsive ===== */
 @media (max-width: 960px) {
+  .delivery-zone-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .products-layout {
     grid-template-columns: 1fr;
   }
@@ -576,6 +674,18 @@
 }
 
 @media (max-width: 500px) {
+  .delivery-zone-inner {
+    padding: 1rem;
+  }
+
+  .delivery-zone-form {
+    grid-template-columns: 1fr;
+  }
+
+  .delivery-zone-copy h2 {
+    font-size: 1.3rem;
+  }
+
   .product-grid {
     grid-template-columns: 1fr;
   }

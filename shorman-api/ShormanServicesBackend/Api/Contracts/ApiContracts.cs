@@ -4,9 +4,39 @@ public record UserDto(int Id, string Email, string FirstName, string LastName, s
 public record AuthResponse(string Token, UserDto User);
 public record LoginRequest(string Email, string Password);
 public record RegisterRequest(string FirstName, string LastName, string Email, string Password, string? Phone);
+public record RegisterResponse(string Email, string Message, bool VerificationRequired, string? VerificationCode);
 public record Auth0ExchangeRequest(string Email, string? FirstName, string? LastName);
+public record VerifyEmailRequest(string Email, string Code);
+public record PasswordResetRequest(string Email);
+public record PasswordResetConfirmRequest(string Email, string Code, string NewPassword);
+public record PasswordResetRequestResponse(string Message, string? ResetCode);
 public record UpdateUserRoleRequest(string Role);
+public record DeleteUserResponse(int UserId, string Message);
 public record AdminUserListItemDto(int Id, string Email, string FirstName, string LastName, string? Phone, string? CreatedAt, IReadOnlyCollection<string> Roles);
+public record AdminOrderSummaryDto(
+	int Id,
+	int UserId,
+	string CustomerName,
+	string CustomerEmail,
+	string Status,
+	string PaymentMethod,
+	string PaymentStatus,
+	int AddressId,
+	string? DeliveryAddress,
+	IReadOnlyCollection<OrderItemDto> Items,
+	decimal Subtotal,
+	decimal DeliveryFee,
+	decimal Total,
+	int? AssignedRiderId,
+	string? AssignedRiderName,
+	string CreatedAt,
+	string? UpdatedAt,
+	string? AcceptedAt,
+	string? PickedUpAt,
+	string? OutForDeliveryAt,
+	string? DeliveredAt,
+	string? CashCollectedAt,
+	string? CompletedAt);
 public record RoleMenuPermissionDto(string Role, string MenuKey, bool IsEnabled);
 public record RoleMenuPermissionsDto(string Role, IReadOnlyCollection<RoleMenuPermissionDto> Permissions);
 public record UpdateRoleMenuPermissionsRequest(string Role, IReadOnlyCollection<string> EnabledMenuKeys);
@@ -31,5 +61,26 @@ public record UpdateCartItemRequest(int Quantity);
 
 public record CreateOrderItemRequest(int ProductId, int Quantity);
 public record CreateOrderRequest(int AddressId, string PaymentMethod, IReadOnlyCollection<CreateOrderItemRequest> Items);
-public record OrderItemDto(int Id, int ProductId, string ProductName, string? ProductImageUrl, int Quantity, decimal UnitPrice, decimal TotalPrice);
-public record OrderDto(int Id, int UserId, string Status, string PaymentMethod, int AddressId, string? DeliveryAddress, IReadOnlyCollection<OrderItemDto> Items, decimal Subtotal, decimal DeliveryFee, decimal Total, string CreatedAt, string? UpdatedAt);
+public record OrderItemDto(int Id, int ProductId, string ProductName, string? ProductImageUrl, string? SupermarketName, int Quantity, decimal UnitPrice, decimal TotalPrice);
+public record OrderDto(
+	int Id,
+	int UserId,
+	string Status,
+	string PaymentMethod,
+	string PaymentStatus,
+	int AddressId,
+	string? DeliveryAddress,
+	IReadOnlyCollection<OrderItemDto> Items,
+	decimal Subtotal,
+	decimal DeliveryFee,
+	decimal Total,
+	int? AssignedRiderId,
+	string? AssignedRiderName,
+	string CreatedAt,
+	string? UpdatedAt,
+	string? AcceptedAt,
+	string? PickedUpAt,
+	string? OutForDeliveryAt,
+	string? DeliveredAt,
+	string? CashCollectedAt,
+	string? CompletedAt);

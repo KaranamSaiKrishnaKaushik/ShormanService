@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using ShormanServicesBackend.Api.Features;
 using ShormanServicesBackend.Api.Persistence;
 using ShormanServicesBackend.Api.Security;
 
@@ -14,6 +15,7 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<Auth0Options>(configuration.GetSection(Auth0Options.SectionName));
+        services.Configure<DeliveryZoneOptions>(configuration.GetSection(DeliveryZoneOptions.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
         var auth0Options = configuration.GetSection(Auth0Options.SectionName).Get<Auth0Options>() ?? new Auth0Options();
         var apiConnection = configuration.GetConnectionString("ApiConnection");
@@ -58,6 +60,14 @@ public static class DependencyInjection
 
         services.AddMediatR(typeof(DependencyInjection).Assembly);
         services.AddScoped<JwtTokenService>();
+        services.AddScoped<IDeliveryGeocodingService, DeliveryGeocodingService>();
+        services.AddHttpClient("delivery-geocoder", client =>
+        {
+            client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
+            client.Timeout = TimeSpan.FromSeconds(8);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("ShormanService/1.0");
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.8,de;q=0.7");
+        });
 
         services.AddAuthentication(options =>
             {
@@ -125,9 +135,44 @@ public static class DependencyInjection
             FirstName NVARCHAR(100) NOT NULL,
             LastName NVARCHAR(100) NOT NULL,
             Phone NVARCHAR(50) NULL,
+            IsEmailVerified BIT NOT NULL DEFAULT 1,
+            EmailVerificationCode NVARCHAR(20) NULL,
+            EmailVerificationExpiresAtUtc DATETIME2 NULL,
+            PasswordResetCode NVARCHAR(20) NULL,
+            PasswordResetExpiresAtUtc DATETIME2 NULL,
+            IsDeleted BIT NOT NULL DEFAULT 0,
+            DeletedAtUtc DATETIME2 NULL,
             CreatedAtUtc DATETIME2 NOT NULL,
             CONSTRAINT UQ_users_Email UNIQUE (Email)
         );
+        """,
+        """
+        IF COL_LENGTH('users', 'IsDeleted') IS NULL
+        ALTER TABLE users ADD IsDeleted BIT NOT NULL CONSTRAINT DF_users_IsDeleted DEFAULT 0;
+        """,
+        """
+        IF COL_LENGTH('users', 'DeletedAtUtc') IS NULL
+        ALTER TABLE users ADD DeletedAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('users', 'IsEmailVerified') IS NULL
+        ALTER TABLE users ADD IsEmailVerified BIT NOT NULL CONSTRAINT DF_users_IsEmailVerified DEFAULT 1;
+        """,
+        """
+        IF COL_LENGTH('users', 'EmailVerificationCode') IS NULL
+        ALTER TABLE users ADD EmailVerificationCode NVARCHAR(20) NULL;
+        """,
+        """
+        IF COL_LENGTH('users', 'EmailVerificationExpiresAtUtc') IS NULL
+        ALTER TABLE users ADD EmailVerificationExpiresAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('users', 'PasswordResetCode') IS NULL
+        ALTER TABLE users ADD PasswordResetCode NVARCHAR(20) NULL;
+        """,
+        """
+        IF COL_LENGTH('users', 'PasswordResetExpiresAtUtc') IS NULL
+        ALTER TABLE users ADD PasswordResetExpiresAtUtc DATETIME2 NULL;
         """,
         """
         IF OBJECT_ID('categories', 'U') IS NULL
@@ -223,17 +268,85 @@ public static class DependencyInjection
         CREATE TABLE orders (
             Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
             UserId INT NOT NULL,
+            CustomerNameSnapshot NVARCHAR(201) NULL,
+            CustomerEmailSnapshot NVARCHAR(256) NULL,
             Status NVARCHAR(30) NOT NULL,
             PaymentMethod NVARCHAR(30) NOT NULL,
+            PaymentStatus NVARCHAR(30) NOT NULL CONSTRAINT DF_orders_PaymentStatus DEFAULT 'PENDING',
             AddressId INT NOT NULL,
             Subtotal DECIMAL(10,2) NOT NULL,
             DeliveryFee DECIMAL(10,2) NOT NULL,
             Total DECIMAL(10,2) NOT NULL,
+            AssignedRiderId INT NULL,
             CreatedAtUtc DATETIME2 NOT NULL,
             UpdatedAtUtc DATETIME2 NULL,
+            AcceptedAtUtc DATETIME2 NULL,
+            PickedUpAtUtc DATETIME2 NULL,
+            OutForDeliveryAtUtc DATETIME2 NULL,
+            DeliveredAtUtc DATETIME2 NULL,
+            CashCollectedAtUtc DATETIME2 NULL,
+            CompletedAtUtc DATETIME2 NULL,
             CONSTRAINT FK_orders_User FOREIGN KEY (UserId) REFERENCES users(Id),
-            CONSTRAINT FK_orders_Address FOREIGN KEY (AddressId) REFERENCES addresses(Id)
+            CONSTRAINT FK_orders_Address FOREIGN KEY (AddressId) REFERENCES addresses(Id),
+            CONSTRAINT FK_orders_AssignedRider FOREIGN KEY (AssignedRiderId) REFERENCES users(Id)
         );
+        """,
+        """
+        IF COL_LENGTH('orders', 'CustomerNameSnapshot') IS NULL
+        ALTER TABLE orders ADD CustomerNameSnapshot NVARCHAR(201) NULL;
+        """,
+        """
+        IF COL_LENGTH('orders', 'CustomerEmailSnapshot') IS NULL
+        ALTER TABLE orders ADD CustomerEmailSnapshot NVARCHAR(256) NULL;
+        """,
+        """
+        IF COL_LENGTH('orders', 'PaymentStatus') IS NULL
+        ALTER TABLE orders ADD PaymentStatus NVARCHAR(30) NOT NULL CONSTRAINT DF_orders_PaymentStatus_Live DEFAULT 'PENDING';
+        """,
+        """
+        IF COL_LENGTH('orders', 'AssignedRiderId') IS NULL
+        ALTER TABLE orders ADD AssignedRiderId INT NULL;
+        """,
+        """
+        IF COL_LENGTH('orders', 'AcceptedAtUtc') IS NULL
+        ALTER TABLE orders ADD AcceptedAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('orders', 'PickedUpAtUtc') IS NULL
+        ALTER TABLE orders ADD PickedUpAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('orders', 'OutForDeliveryAtUtc') IS NULL
+        ALTER TABLE orders ADD OutForDeliveryAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('orders', 'DeliveredAtUtc') IS NULL
+        ALTER TABLE orders ADD DeliveredAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('orders', 'CashCollectedAtUtc') IS NULL
+        ALTER TABLE orders ADD CashCollectedAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('orders', 'CompletedAtUtc') IS NULL
+        ALTER TABLE orders ADD CompletedAtUtc DATETIME2 NULL;
+        """,
+        """
+        UPDATE o
+        SET
+            o.CustomerNameSnapshot = COALESCE(NULLIF(o.CustomerNameSnapshot, ''), NULLIF(LTRIM(RTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.Email),
+            o.CustomerEmailSnapshot = COALESCE(NULLIF(o.CustomerEmailSnapshot, ''), u.Email)
+        FROM orders o
+        INNER JOIN users u ON u.Id = o.UserId
+        WHERE o.CustomerNameSnapshot IS NULL OR o.CustomerNameSnapshot = '' OR o.CustomerEmailSnapshot IS NULL OR o.CustomerEmailSnapshot = '';
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_orders_AssignedRiderId' AND object_id = OBJECT_ID('orders'))
+        CREATE INDEX IX_orders_AssignedRiderId ON orders (AssignedRiderId);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_orders_Status' AND object_id = OBJECT_ID('orders'))
+        CREATE INDEX IX_orders_Status ON orders (Status);
         """,
         """
         IF OBJECT_ID('order_items', 'U') IS NULL
@@ -243,11 +356,24 @@ public static class DependencyInjection
             ProductId INT NOT NULL,
             ProductName NVARCHAR(220) NOT NULL,
             ProductImageUrl NVARCHAR(1000) NULL,
+            SupermarketName NVARCHAR(100) NULL,
             Quantity INT NOT NULL,
             UnitPrice DECIMAL(10,2) NOT NULL,
             TotalPrice DECIMAL(10,2) NOT NULL,
             CONSTRAINT FK_order_items_Order FOREIGN KEY (OrderId) REFERENCES orders(Id)
         );
+        """,
+        """
+        IF COL_LENGTH('order_items', 'SupermarketName') IS NULL
+        ALTER TABLE order_items ADD SupermarketName NVARCHAR(100) NULL;
+        """,
+        """
+        UPDATE oi
+        SET oi.SupermarketName = s.Name
+        FROM order_items oi
+        INNER JOIN products p ON p.Id = oi.ProductId
+        INNER JOIN supermarkets s ON s.Id = p.SupermarketId
+        WHERE oi.SupermarketName IS NULL;
         """,
         """
         IF OBJECT_ID('roles', 'U') IS NULL
@@ -344,9 +470,37 @@ public static class DependencyInjection
             `FirstName` VARCHAR(100) NOT NULL,
             `LastName` VARCHAR(100) NOT NULL,
             `Phone` VARCHAR(50) NULL,
+            `IsEmailVerified` TINYINT(1) NOT NULL DEFAULT 1,
+            `EmailVerificationCode` VARCHAR(20) NULL,
+            `EmailVerificationExpiresAtUtc` DATETIME NULL,
+            `PasswordResetCode` VARCHAR(20) NULL,
+            `PasswordResetExpiresAtUtc` DATETIME NULL,
+            `IsDeleted` TINYINT(1) NOT NULL DEFAULT 0,
+            `DeletedAtUtc` DATETIME NULL,
             `CreatedAtUtc` DATETIME NOT NULL,
             UNIQUE KEY `UQ_users_Email` (`Email`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        """
+        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `IsDeleted` TINYINT(1) NOT NULL DEFAULT 0;
+        """,
+        """
+        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `DeletedAtUtc` DATETIME NULL;
+        """,
+        """
+        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `IsEmailVerified` TINYINT(1) NOT NULL DEFAULT 1;
+        """,
+        """
+        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `EmailVerificationCode` VARCHAR(20) NULL;
+        """,
+        """
+        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `EmailVerificationExpiresAtUtc` DATETIME NULL;
+        """,
+        """
+        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `PasswordResetCode` VARCHAR(20) NULL;
+        """,
+        """
+        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `PasswordResetExpiresAtUtc` DATETIME NULL;
         """,
         """
         CREATE TABLE IF NOT EXISTS `categories` (
@@ -423,17 +577,71 @@ public static class DependencyInjection
         CREATE TABLE IF NOT EXISTS `orders` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `UserId` INT NOT NULL,
+            `CustomerNameSnapshot` VARCHAR(201) NULL,
+            `CustomerEmailSnapshot` VARCHAR(256) NULL,
             `Status` VARCHAR(30) NOT NULL,
             `PaymentMethod` VARCHAR(30) NOT NULL,
+            `PaymentStatus` VARCHAR(30) NOT NULL DEFAULT 'PENDING',
             `AddressId` INT NOT NULL,
             `Subtotal` DECIMAL(10,2) NOT NULL,
             `DeliveryFee` DECIMAL(10,2) NOT NULL,
             `Total` DECIMAL(10,2) NOT NULL,
+            `AssignedRiderId` INT NULL,
             `CreatedAtUtc` DATETIME NOT NULL,
             `UpdatedAtUtc` DATETIME NULL,
+            `AcceptedAtUtc` DATETIME NULL,
+            `PickedUpAtUtc` DATETIME NULL,
+            `OutForDeliveryAtUtc` DATETIME NULL,
+            `DeliveredAtUtc` DATETIME NULL,
+            `CashCollectedAtUtc` DATETIME NULL,
+            `CompletedAtUtc` DATETIME NULL,
             CONSTRAINT `FK_orders_User` FOREIGN KEY (`UserId`) REFERENCES `users` (`Id`),
             CONSTRAINT `FK_orders_Address` FOREIGN KEY (`AddressId`) REFERENCES `addresses` (`Id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `PaymentStatus` VARCHAR(30) NOT NULL DEFAULT 'PENDING';
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `AssignedRiderId` INT NULL;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `AcceptedAtUtc` DATETIME NULL;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `PickedUpAtUtc` DATETIME NULL;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `OutForDeliveryAtUtc` DATETIME NULL;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `DeliveredAtUtc` DATETIME NULL;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `CashCollectedAtUtc` DATETIME NULL;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `CompletedAtUtc` DATETIME NULL;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `CustomerNameSnapshot` VARCHAR(201) NULL;
+        """,
+        """
+        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `CustomerEmailSnapshot` VARCHAR(256) NULL;
+        """,
+        """
+        UPDATE `orders` o
+        INNER JOIN `users` u ON u.`Id` = o.`UserId`
+        SET
+            o.`CustomerNameSnapshot` = COALESCE(NULLIF(o.`CustomerNameSnapshot`, ''), NULLIF(TRIM(CONCAT(COALESCE(u.`FirstName`, ''), ' ', COALESCE(u.`LastName`, ''))), ''), u.`Email`),
+            o.`CustomerEmailSnapshot` = COALESCE(NULLIF(o.`CustomerEmailSnapshot`, ''), u.`Email`)
+        WHERE o.`CustomerNameSnapshot` IS NULL OR o.`CustomerNameSnapshot` = '' OR o.`CustomerEmailSnapshot` IS NULL OR o.`CustomerEmailSnapshot` = '';
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS `IX_orders_AssignedRiderId` ON `orders` (`AssignedRiderId`);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS `IX_orders_Status` ON `orders` (`Status`);
         """,
         """
         CREATE TABLE IF NOT EXISTS `order_items` (
@@ -442,11 +650,22 @@ public static class DependencyInjection
             `ProductId` INT NOT NULL,
             `ProductName` VARCHAR(220) NOT NULL,
             `ProductImageUrl` VARCHAR(1000) NULL,
+            `SupermarketName` VARCHAR(100) NULL,
             `Quantity` INT NOT NULL,
             `UnitPrice` DECIMAL(10,2) NOT NULL,
             `TotalPrice` DECIMAL(10,2) NOT NULL,
             CONSTRAINT `FK_order_items_Order` FOREIGN KEY (`OrderId`) REFERENCES `orders` (`Id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        """
+        ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `SupermarketName` VARCHAR(100) NULL;
+        """,
+        """
+        UPDATE `order_items` oi
+        INNER JOIN `products` p ON p.`Id` = oi.`ProductId`
+        INNER JOIN `supermarkets` s ON s.`Id` = p.`SupermarketId`
+        SET oi.`SupermarketName` = s.`Name`
+        WHERE oi.`SupermarketName` IS NULL;
         """,
         """
         CREATE TABLE IF NOT EXISTS `roles` (
