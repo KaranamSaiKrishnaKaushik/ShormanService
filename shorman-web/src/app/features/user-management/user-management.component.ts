@@ -15,14 +15,14 @@ import { AppRole } from '../../core/models/user.model';
     <section class="page-shell">
       <header class="page-hero">
         <div>
-          <span class="eyebrow">Admin Workspace</span>
+          <span class="eyebrow">Management Workspace</span>
           <h1>User Management</h1>
-          <p>Use the submenus to manage users, role-based menu access, and catalog data from one place.</p>
+          <p>Use the submenus to open the management views enabled for your account.</p>
         </div>
       </header>
 
       <section *ngIf="loading" class="state-card">
-        <h2>Loading admin views</h2>
+        <h2>Loading management views</h2>
         <p>Checking your available user-management access.</p>
       </section>
 
@@ -36,7 +36,7 @@ import { AppRole } from '../../core/models/user.model';
       </section>
 
       <section *ngIf="!loading && tabs.length === 0" class="state-card">
-        <h2>No available admin views</h2>
+        <h2>No available management views</h2>
         <p>The current role does not have any enabled user-management submenu.</p>
       </section>
 
@@ -162,7 +162,8 @@ export class UserManagementComponent implements OnInit {
     const candidates: Array<{ path: string; label: string; menuKey: MenuPermissionKey; roles: AppRole[] }> = [
       { path: 'user-list', label: 'User List', menuKey: 'user-management.user-list', roles: ['SuperAdmin'] },
       { path: 'role-access', label: 'Role Access', menuKey: 'user-management.role-access', roles: ['SuperAdmin'] },
-      { path: 'product-data', label: 'Product Data', menuKey: 'user-management.product-data', roles: ['SuperAdmin', 'Admin'] }
+      { path: 'product-data', label: 'Product Data', menuKey: 'user-management.product-data', roles: ['SuperAdmin', 'Admin'] },
+      { path: 'order-summary', label: 'Order History', menuKey: 'user-management.order-summary', roles: ['SuperAdmin', 'Admin', 'Rider'] }
     ];
 
     this.tabs = candidates.filter(tab => this.auth.hasAnyRole(tab.roles) && this.menuPermissions.hasPermission(tab.menuKey));

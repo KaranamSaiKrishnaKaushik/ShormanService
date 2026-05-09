@@ -129,6 +129,18 @@ internal static class CartFeatureShared
         var cart = await LoadCartQuery(dbContext, userId).SingleOrDefaultAsync(cancellationToken);
         if (cart is not null)
         {
+            var invalidItems = cart.Items
+                .Where(item => item.Product is null || !item.Product.IsAvailable)
+                .ToList();
+
+            if (invalidItems.Count > 0)
+            {
+                dbContext.CartItems.RemoveRange(invalidItems);
+                cart.UpdatedAtUtc = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return await LoadCartQuery(dbContext, userId).SingleAsync(cancellationToken);
+            }
+
             return cart;
         }
 

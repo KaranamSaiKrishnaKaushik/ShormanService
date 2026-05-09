@@ -1,11 +1,11 @@
 <div class="orders-page">
   <div class="container">
-    <h1>Order History</h1>
+    <h1>{{ pageTitle }}</h1>
 
     <!-- Loading State -->
     <div *ngIf="loading" class="loading">
       <div class="spinner"></div>
-      <p>Loading your orders…</p>
+      <p>{{ loadingMessage }}</p>
     </div>
 
     <!-- Error State -->
@@ -18,8 +18,8 @@
     <!-- Empty State -->
     <div *ngIf="!loading && !errorMsg && orders.length === 0" class="empty-state">
       <div class="empty-icon">📦</div>
-      <h3>No orders yet</h3>
-      <p>Your order history will appear here.</p>
+      <h3>{{ emptyTitle }}</h3>
+      <p>{{ emptyMessage }}</p>
     </div>
 
     <!-- Order Cards -->

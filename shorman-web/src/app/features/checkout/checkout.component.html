@@ -25,15 +25,15 @@
                 <div class="addr-text">
                   {{ addr.street }} {{ addr.houseNumber }}, {{ addr.postalCode }} {{ addr.city }}
                 </div>
-                <div class="delivery-check" *ngIf="deliveryChecks[addr.postalCode] as check">
+                <div class="delivery-check" *ngIf="deliveryChecks[deliveryCheckKey(addr.id)] as check">
                   <span [class.eligible]="check.eligible" [class.ineligible]="!check.eligible">
                     {{ check.eligible ? '✅ ' : '❌ ' }}{{ check.message }}
                     <span *ngIf="check.eligible"> (Fee: {{ check.deliveryFee | currency:'EUR' }})</span>
                   </span>
                 </div>
                 <button type="button" class="btn-check-delivery"
-                  *ngIf="!deliveryChecks[addr.postalCode]"
-                  (click)="checkDelivery(addr.postalCode)">
+                  *ngIf="!deliveryChecks[deliveryCheckKey(addr.id)]"
+                  (click)="checkDelivery(addr)">
                   Check delivery
                 </button>
               </div>
@@ -145,9 +145,12 @@
 
             <div class="error-msg" *ngIf="orderError">{{ orderError }}</div>
             <div class="success-msg" *ngIf="orderSuccess">{{ orderSuccess }}</div>
+            <div class="error-msg" *ngIf="selectedAddressId && !selectedAddressEligible()">
+              The selected address is outside the current delivery zone around 60596 Frankfurt am Main.
+            </div>
 
             <button class="btn-place-order"
-              [disabled]="placing || cart.items.length === 0 || !selectedAddressId"
+              [disabled]="placing || cart.items.length === 0 || !selectedAddressId || !selectedAddressEligible()"
               (click)="placeOrder(cart)">
               <span *ngIf="placing" class="btn-spinner"></span>
               {{ placing ? 'Placing Order…' : 'Place Order' }}

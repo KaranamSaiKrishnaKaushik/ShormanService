@@ -76,19 +76,64 @@
   margin: 0;
 }
 
-.form-preview {
+.auth-form {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.95rem;
   margin-bottom: 1.25rem;
 }
 
-.preview-field {
+.form-group label {
+  display: block;
+  font-weight: 700;
+  color: #243328;
+  margin-bottom: 0.35rem;
+}
+
+.form-control {
+  width: 100%;
   border: 1.5px solid #B7C4B7;
   border-radius: 10px;
   padding: 0.9rem 1rem;
   background: #fff;
-  color: #8A948B;
+  color: #1a1a1a;
   font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #2E7D32;
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+}
+
+.form-control.is-invalid {
+  border-color: #dc3545;
+}
+
+.invalid-feedback {
+  color: #dc3545;
+  font-size: 0.82rem;
+  margin-top: 0.3rem;
+}
+
+.input-wrapper {
+  position: relative;
+}
+
+.input-wrapper .form-control {
+  padding-right: 4.6rem;
+}
+
+.toggle-pwd {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  font-weight: 700;
+  color: #2E7D32;
+  cursor: pointer;
 }
 
 .preview-link {
@@ -109,6 +154,20 @@
 }
 
 .error-msg.compact {
+  margin-bottom: 1rem;
+}
+
+.success-msg {
+  background: #F1F8F1;
+  color: #2E7D32;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  border: 1px solid #a5d6a7;
+}
+
+.success-msg.compact {
   margin-bottom: 1rem;
 }
 
@@ -151,9 +210,26 @@
   background: #F8FCF8;
 }
 
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.text-link {
+  width: fit-content;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #2E7D32;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .btn-spinner {
@@ -175,12 +251,39 @@
   border-top: 1px solid #E4EAE3;
 }
 
+.reset-panel {
+  margin-top: 1.5rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid #E4EAE3;
+}
+
 .signup-block h2,
+.reset-panel h2,
 .auth-alt-copy h2 {
   margin: 0 0 0.6rem;
   font-size: 1.05rem;
   font-weight: 800;
   color: #1a1a1a;
+}
+
+.inline-actions {
+  display: flex;
+}
+
+.code-preview {
+  background: #FFF8E6;
+  border: 1px solid #FFE0A3;
+  color: #8A5A00;
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.signup-copy {
+  margin: 0 0 0.85rem;
+  color: #5F6B63;
+  line-height: 1.5;
+  font-size: 0.92rem;
 }
 
 .auth-card-alt {
