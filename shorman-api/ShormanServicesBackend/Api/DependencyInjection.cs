@@ -460,7 +460,13 @@ public static class DependencyInjection
         """
     ];
 
-    private static string MySqlAddColumnIfMissing(string tableName, string columnName, string columnDefinition) => $"""
+    private static string EscapeMySqlStringLiteral(string value) => value.Replace("'", "''");
+
+    private static string MySqlAddColumnIfMissing(string tableName, string columnName, string columnDefinition)
+    {
+        var escapedDefinition = EscapeMySqlStringLiteral(columnDefinition);
+
+        return $"""
         SET @column_exists := (
             SELECT COUNT(*)
             FROM INFORMATION_SCHEMA.COLUMNS
@@ -469,14 +475,19 @@ public static class DependencyInjection
               AND COLUMN_NAME = '{columnName}'
         );
         SET @sql := IF(@column_exists = 0,
-            'ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {columnDefinition}',
+            'ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {escapedDefinition}',
             'SELECT 1');
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
         DEALLOCATE PREPARE stmt;
         """;
+    }
 
-    private static string MySqlCreateIndexIfMissing(string tableName, string indexName, string indexDefinition) => $"""
+    private static string MySqlCreateIndexIfMissing(string tableName, string indexName, string indexDefinition)
+    {
+        var escapedDefinition = EscapeMySqlStringLiteral(indexDefinition);
+
+        return $"""
         SET @index_exists := (
             SELECT COUNT(*)
             FROM INFORMATION_SCHEMA.STATISTICS
@@ -485,12 +496,13 @@ public static class DependencyInjection
               AND INDEX_NAME = '{indexName}'
         );
         SET @sql := IF(@index_exists = 0,
-            'CREATE INDEX `{indexName}` ON `{tableName}` ({indexDefinition})',
+            'CREATE INDEX `{indexName}` ON `{tableName}` ({escapedDefinition})',
             'SELECT 1');
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
         DEALLOCATE PREPARE stmt;
         """;
+    }
 
     private static IEnumerable<string> GetMySqlCreateScripts() =>
     [
