@@ -6,12 +6,15 @@ import { CartService } from '../../../core/services/cart.service';
 import { AppRole, CUSTOMER_ROLES, RIDER_ROLES } from '../../../core/models/user.model';
 import { MenuPermissionService } from '../../../core/services/menu-permission.service';
 import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.model';
+import { OrderAlertService } from '../../../core/services/order-alert.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
   imports: [RouterLink, RouterLinkActive, AsyncPipe, NgIf],
   template: `
+    <ng-container *ngIf="orderAlert.notification$ | async as notification">
+    </ng-container>
     <nav class="navbar">
       <div class="navbar-container">
         <a routerLink="/products" class="navbar-brand">
@@ -24,7 +27,7 @@ import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.
         <div class="navbar-links">
           <a routerLink="/products" routerLinkActive="active" class="nav-link">Products</a>
           <ng-container *ngIf="auth.isLoggedIn$ | async">
-            <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('orders')" routerLink="/orders" routerLinkActive="active" class="nav-link">Orders</a>
+            <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="nav-link">Orders</a>
             <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="nav-link">Addresses</a>
             <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="nav-link">Checkout</a>
             <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="nav-link">Rider Dashboard</a>
@@ -38,7 +41,31 @@ import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.
             <span>☰</span>
           </button>
 
-          <button class="cart-btn" (click)="cartService.toggleCart()">
+          <button *ngIf="showOrderInboxButton()"
+            type="button"
+            class="order-inbox-btn"
+            (click)="toggleOrderDropdown()"
+            [attr.aria-label]="orderAlertLabel()">
+            <span class="order-inbox-icon">🔔</span>
+            <span class="cart-badge" *ngIf="orderAlert.notification$ | async as notification">
+              {{ notification.count > 99 ? '99+' : notification.count }}
+            </span>
+          </button>
+
+          <div *ngIf="orderDropdownOpen && showOrderInboxButton()" class="order-dropdown">
+            <div class="order-dropdown-header">
+              <strong>{{ orderDropdownTitle() }}</strong>
+              <span *ngIf="orderAlert.notification$ | async as notification" class="order-dropdown-count">
+                {{ notification.count }} waiting
+              </span>
+            </div>
+            <p class="order-dropdown-copy">{{ orderDropdownMessage() }}</p>
+            <a class="order-dropdown-link" [routerLink]="orderAlertTarget()" (click)="closeOrderDropdown()">
+              {{ orderDropdownActionLabel() }}
+            </a>
+          </div>
+
+          <button *ngIf="showCartButton()" class="cart-btn" (click)="cartService.toggleCart()">
             <span class="cart-icon">🛒</span>
             <span class="cart-badge" *ngIf="(cartService.cart$ | async)?.itemCount as count">
               {{ count > 99 ? '99+' : count }}
@@ -61,7 +88,7 @@ import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.
       <div class="mobile-menu" [class.open]="mobileMenuOpen">
         <a routerLink="/products" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Products</a>
         <ng-container *ngIf="auth.isLoggedIn$ | async">
-          <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('orders')" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Orders</a>
+          <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Orders</a>
           <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Addresses</a>
           <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Checkout</a>
           <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Rider Dashboard</a>
@@ -135,6 +162,7 @@ import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.
       align-items: center;
       gap: 0.75rem;
       flex-shrink: 0;
+      position: relative;
     }
     .cart-btn {
       position: relative;
@@ -149,7 +177,25 @@ import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.
       transition: all 0.2s;
       font-size: 1.1rem;
     }
+    .order-inbox-btn {
+      position: relative;
+      background: #fff;
+      border: 2px solid #2E7D32;
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+      transition: all 0.2s;
+      font-size: 1.1rem;
+      text-decoration: none;
+      color: #2E7D32;
+      min-width: 48px;
+    }
     .cart-btn:hover { background: #E8F5E9; }
+    .order-inbox-btn:hover { background: #E8F5E9; }
     .cart-badge {
       position: absolute;
       top: -8px;
@@ -165,6 +211,56 @@ import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.
       font-size: 0.7rem;
       font-weight: 700;
       padding: 0 3px;
+    }
+    .order-inbox-icon {
+      line-height: 1;
+    }
+    .order-dropdown {
+      position: absolute;
+      top: calc(100% + 0.75rem);
+      right: 5.25rem;
+      width: min(320px, 78vw);
+      padding: 1rem;
+      border-radius: 16px;
+      background: #fff;
+      border: 1px solid #dce6d8;
+      box-shadow: 0 18px 38px rgba(24, 54, 44, 0.16);
+      z-index: 1005;
+    }
+    .order-dropdown-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 0.6rem;
+      color: #174d2b;
+    }
+    .order-dropdown-count {
+      background: #eef7ed;
+      color: #1f6a35;
+      border-radius: 999px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .order-dropdown-copy {
+      margin: 0 0 0.9rem;
+      color: #566b5d;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .order-dropdown-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0.6rem 0.9rem;
+      border-radius: 999px;
+      background: #174d2b;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
     }
     .user-menu {
       display: flex;
@@ -268,7 +364,6 @@ import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.
       opacity: 1;
       pointer-events: all;
     }
-
     @media (max-width: 768px) {
       .navbar-links { display: none; }
       .mobile-menu-toggle { display: block; }
@@ -277,6 +372,9 @@ import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.
       .user-name { display: none; }
       .brand-sub { display: none; }
       .btn-login { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+      .order-dropdown {
+        right: 0;
+      }
     }
 
     @media (max-width: 600px) {
@@ -288,7 +386,9 @@ export class NavbarComponent {
   auth = inject(AuthService);
   cartService = inject(CartService);
   menuPermissions = inject(MenuPermissionService);
+  orderAlert = inject(OrderAlertService);
   mobileMenuOpen = false;
+  orderDropdownOpen = false;
   customerRoles: AppRole[] = CUSTOMER_ROLES;
   riderRoles: AppRole[] = RIDER_ROLES;
 
@@ -304,11 +404,58 @@ export class NavbarComponent {
     this.mobileMenuOpen = !this.mobileMenuOpen;
   }
 
+  toggleOrderDropdown() {
+    this.orderDropdownOpen = !this.orderDropdownOpen;
+  }
+
   closeMobileMenu() {
     this.mobileMenuOpen = false;
   }
 
+  closeOrderDropdown() {
+    this.orderDropdownOpen = false;
+  }
+
+  showCartButton(): boolean {
+    return this.auth.hasAnyRole(this.customerRoles);
+  }
+
+  showOrderInboxButton(): boolean {
+    return this.auth.hasRole('Rider') || this.auth.hasRole('Admin') || this.auth.hasRole('SuperAdmin');
+  }
+
+  orderAlertTarget(): string {
+    if (this.auth.hasRole('Rider')) {
+      return '/rider';
+    }
+
+    return this.orderAlert.currentNotification?.route ?? '/user-management/order-summary';
+  }
+
+  orderDropdownTitle(): string {
+    return this.auth.hasRole('Rider') ? 'Rider Queue' : 'Order Alerts';
+  }
+
+  orderDropdownMessage(): string {
+    return this.orderAlert.currentNotification?.message
+      ?? (this.auth.hasRole('Rider')
+        ? 'Open Rider Dashboard to review available pickup requests.'
+        : 'Open Order History to review new incoming orders.');
+  }
+
+  orderDropdownActionLabel(): string {
+    return this.auth.hasRole('Rider') ? 'Open Rider Dashboard' : 'Open Order History';
+  }
+
+  orderAlertLabel(): string {
+    return this.orderAlert.currentNotification?.message ?? 'Open order notifications';
+  }
+
+  showOrders(): boolean {
+    return (this.auth.hasRole('Customer') || this.auth.hasRole('Rider')) && this.menuPermissions.hasPermission('orders');
+  }
+
   showUserManagement(): boolean {
-    return this.auth.hasAnyRole(['SuperAdmin', 'Admin']) && this.menuPermissions.hasAnyPermission(USER_MANAGEMENT_MENU_KEYS);
+    return this.menuPermissions.hasAnyPermission(USER_MANAGEMENT_MENU_KEYS);
   }
 }

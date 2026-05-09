@@ -12,18 +12,19 @@ export const routes: Routes = [
   { path: 'register', loadComponent: () => import('./features/auth/register.component').then(m => m.RegisterComponent), canActivate: [authEntryGuard] },
   { path: 'cart', loadComponent: () => import('./features/cart/cart-sidebar.component').then(m => m.CartSidebarComponent) },
   { path: 'checkout', loadComponent: () => import('./features/checkout/checkout.component').then(m => m.CheckoutComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Customer'], menuKey: 'checkout' } },
-  { path: 'orders', loadComponent: () => import('./features/orders/orders.component').then(m => m.OrdersComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Customer'], menuKey: 'orders' } },
+  { path: 'orders', loadComponent: () => import('./features/orders/orders.component').then(m => m.OrdersComponent), canActivate: [roleGuard], data: { roles: ['Customer', 'Rider'], menuKey: 'orders' } },
   { path: 'addresses', loadComponent: () => import('./features/addresses/addresses.component').then(m => m.AddressesComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Customer'], menuKey: 'addresses' } },
   { path: 'rider', loadComponent: () => import('./features/rider-dashboard/rider-dashboard.component').then(m => m.RiderDashboardComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Rider'], menuKey: 'rider-dashboard' } },
   {
     path: 'user-management',
     loadComponent: () => import('./features/user-management/user-management.component').then(m => m.UserManagementComponent),
     canActivate: [roleGuard],
-    data: { roles: ['SuperAdmin', 'Admin'], anyMenuKeys: ['user-management.user-list', 'user-management.role-access', 'user-management.product-data'] },
+    data: { anyMenuKeys: ['user-management.user-list', 'user-management.role-access', 'user-management.product-data', 'user-management.order-summary'] },
     children: [
       { path: 'user-list', loadComponent: () => import('./features/user-management/user-list-management.component').then(m => m.UserListManagementComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin'], menuKey: 'user-management.user-list' } },
       { path: 'role-access', loadComponent: () => import('./features/user-management/role-access-management.component').then(m => m.RoleAccessManagementComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin'], menuKey: 'user-management.role-access' } },
-      { path: 'product-data', loadComponent: () => import('./features/user-management/product-data-management.component').then(m => m.ProductDataManagementComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin'], menuKey: 'user-management.product-data' } }
+      { path: 'product-data', loadComponent: () => import('./features/user-management/product-data-management.component').then(m => m.ProductDataManagementComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin'], menuKey: 'user-management.product-data' } },
+      { path: 'order-summary', loadComponent: () => import('./features/user-management/order-summary-management.component').then(m => m.OrderSummaryManagementComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Rider'], menuKey: 'user-management.order-summary' } }
     ]
   },
   { path: 'unauthorized', loadComponent: () => import('./features/unauthorized/unauthorized.component').then(m => m.UnauthorizedComponent), canActivate: [authGuard] },

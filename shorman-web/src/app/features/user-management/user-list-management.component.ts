@@ -65,9 +65,17 @@ import { UserManagementService } from '../../core/services/user-management.servi
           <button
             type="button"
             class="save-btn"
-            [disabled]="savingUserId === user.id || pendingRoles[user.id] === getPrimaryRole(user)"
+            [disabled]="savingUserId === user.id || deletingUserId === user.id || pendingRoles[user.id] === getPrimaryRole(user)"
             (click)="saveRole(user)">
             {{ savingUserId === user.id ? 'Saving...' : 'Save Role' }}
+          </button>
+
+          <button
+            type="button"
+            class="delete-btn"
+            [disabled]="savingUserId === user.id || deletingUserId === user.id"
+            (click)="deleteUser(user)">
+            {{ deletingUserId === user.id ? 'Deleting...' : 'Delete Account' }}
           </button>
         </div>
       </article>
@@ -204,10 +212,28 @@ import { UserManagementService } from '../../core/services/user-management.servi
       background: #ff8f00;
       color: #1f1a12;
     }
+    .delete-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 0.8rem 1.15rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+      background: #a92d2d;
+      color: #fff;
+    }
     .save-btn:hover {
       transform: translateY(-1px);
     }
+    .delete-btn:hover {
+      transform: translateY(-1px);
+    }
     .save-btn:disabled {
+      opacity: 0.65;
+      cursor: default;
+      transform: none;
+    }
+    .delete-btn:disabled {
       opacity: 0.65;
       cursor: default;
       transform: none;
@@ -237,6 +263,7 @@ export class UserListManagementComponent implements OnInit {
   searchTerm = '';
   loading = true;
   savingUserId: number | null = null;
+  deletingUserId: number | null = null;
   errorMsg = '';
 
   ngOnInit(): void {
@@ -300,6 +327,30 @@ export class UserListManagementComponent implements OnInit {
       error: err => {
         this.errorMsg = err?.error?.message || 'Failed to update user role.';
         this.savingUserId = null;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  deleteUser(user: AdminUser): void {
+    const primaryRole = this.getPrimaryRole(user);
+    if (!window.confirm(`Delete ${user.firstName} ${user.lastName} (${primaryRole})? Their account access will be removed, but order history will stay for audit.`)) {
+      return;
+    }
+
+    this.deletingUserId = user.id;
+    this.errorMsg = '';
+
+    this.userManagementService.deleteUser(user.id).subscribe({
+      next: () => {
+        this.users = this.users.filter(existingUser => existingUser.id !== user.id);
+        delete this.pendingRoles[user.id];
+        this.deletingUserId = null;
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        this.errorMsg = err?.error?.message || 'Failed to delete user account.';
+        this.deletingUserId = null;
         this.cdr.detectChanges();
       }
     });
