@@ -460,6 +460,38 @@ public static class DependencyInjection
         """
     ];
 
+    private static string MySqlAddColumnIfMissing(string tableName, string columnName, string columnDefinition) => $"""
+        SET @column_exists := (
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = '{tableName}'
+              AND COLUMN_NAME = '{columnName}'
+        );
+        SET @sql := IF(@column_exists = 0,
+            'ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {columnDefinition}',
+            'SELECT 1');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+        """;
+
+    private static string MySqlCreateIndexIfMissing(string tableName, string indexName, string indexDefinition) => $"""
+        SET @index_exists := (
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = '{tableName}'
+              AND INDEX_NAME = '{indexName}'
+        );
+        SET @sql := IF(@index_exists = 0,
+            'CREATE INDEX `{indexName}` ON `{tableName}` ({indexDefinition})',
+            'SELECT 1');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+        """;
+
     private static IEnumerable<string> GetMySqlCreateScripts() =>
     [
         """
@@ -481,27 +513,13 @@ public static class DependencyInjection
             UNIQUE KEY `UQ_users_Email` (`Email`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
-        """
-        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `IsDeleted` TINYINT(1) NOT NULL DEFAULT 0;
-        """,
-        """
-        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `DeletedAtUtc` DATETIME NULL;
-        """,
-        """
-        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `IsEmailVerified` TINYINT(1) NOT NULL DEFAULT 1;
-        """,
-        """
-        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `EmailVerificationCode` VARCHAR(20) NULL;
-        """,
-        """
-        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `EmailVerificationExpiresAtUtc` DATETIME NULL;
-        """,
-        """
-        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `PasswordResetCode` VARCHAR(20) NULL;
-        """,
-        """
-        ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `PasswordResetExpiresAtUtc` DATETIME NULL;
-        """,
+        MySqlAddColumnIfMissing("users", "IsDeleted", "TINYINT(1) NOT NULL DEFAULT 0"),
+        MySqlAddColumnIfMissing("users", "DeletedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("users", "IsEmailVerified", "TINYINT(1) NOT NULL DEFAULT 1"),
+        MySqlAddColumnIfMissing("users", "EmailVerificationCode", "VARCHAR(20) NULL"),
+        MySqlAddColumnIfMissing("users", "EmailVerificationExpiresAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("users", "PasswordResetCode", "VARCHAR(20) NULL"),
+        MySqlAddColumnIfMissing("users", "PasswordResetExpiresAtUtc", "DATETIME NULL"),
         """
         CREATE TABLE IF NOT EXISTS `categories` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -599,36 +617,16 @@ public static class DependencyInjection
             CONSTRAINT `FK_orders_Address` FOREIGN KEY (`AddressId`) REFERENCES `addresses` (`Id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `PaymentStatus` VARCHAR(30) NOT NULL DEFAULT 'PENDING';
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `AssignedRiderId` INT NULL;
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `AcceptedAtUtc` DATETIME NULL;
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `PickedUpAtUtc` DATETIME NULL;
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `OutForDeliveryAtUtc` DATETIME NULL;
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `DeliveredAtUtc` DATETIME NULL;
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `CashCollectedAtUtc` DATETIME NULL;
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `CompletedAtUtc` DATETIME NULL;
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `CustomerNameSnapshot` VARCHAR(201) NULL;
-        """,
-        """
-        ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `CustomerEmailSnapshot` VARCHAR(256) NULL;
-        """,
+        MySqlAddColumnIfMissing("orders", "PaymentStatus", "VARCHAR(30) NOT NULL DEFAULT 'PENDING'"),
+        MySqlAddColumnIfMissing("orders", "AssignedRiderId", "INT NULL"),
+        MySqlAddColumnIfMissing("orders", "AcceptedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "PickedUpAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "OutForDeliveryAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "DeliveredAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "CashCollectedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "CompletedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "CustomerNameSnapshot", "VARCHAR(201) NULL"),
+        MySqlAddColumnIfMissing("orders", "CustomerEmailSnapshot", "VARCHAR(256) NULL"),
         """
         UPDATE `orders` o
         INNER JOIN `users` u ON u.`Id` = o.`UserId`
@@ -637,12 +635,8 @@ public static class DependencyInjection
             o.`CustomerEmailSnapshot` = COALESCE(NULLIF(o.`CustomerEmailSnapshot`, ''), u.`Email`)
         WHERE o.`CustomerNameSnapshot` IS NULL OR o.`CustomerNameSnapshot` = '' OR o.`CustomerEmailSnapshot` IS NULL OR o.`CustomerEmailSnapshot` = '';
         """,
-        """
-        CREATE INDEX IF NOT EXISTS `IX_orders_AssignedRiderId` ON `orders` (`AssignedRiderId`);
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS `IX_orders_Status` ON `orders` (`Status`);
-        """,
+        MySqlCreateIndexIfMissing("orders", "IX_orders_AssignedRiderId", "`AssignedRiderId`"),
+        MySqlCreateIndexIfMissing("orders", "IX_orders_Status", "`Status`"),
         """
         CREATE TABLE IF NOT EXISTS `order_items` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -657,9 +651,7 @@ public static class DependencyInjection
             CONSTRAINT `FK_order_items_Order` FOREIGN KEY (`OrderId`) REFERENCES `orders` (`Id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
-        """
-        ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `SupermarketName` VARCHAR(100) NULL;
-        """,
+        MySqlAddColumnIfMissing("order_items", "SupermarketName", "VARCHAR(100) NULL"),
         """
         UPDATE `order_items` oi
         INNER JOIN `products` p ON p.`Id` = oi.`ProductId`
