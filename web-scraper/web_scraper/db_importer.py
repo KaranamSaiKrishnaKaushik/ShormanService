@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 DEFAULT_PRICE = 0
+MYSQL_INSERT_BATCH_SIZE = 200
 IMPORTED_CATEGORY_SLUG = "imported-products"
 IMPORTED_CATEGORY_NAME = "Imported Products"
 IMPORTED_CATEGORY_ICON = "box"
@@ -175,6 +176,13 @@ def _to_text(value: object) -> str:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _chunked[T](items: list[T], chunk_size: int) -> list[list[T]]:
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than 0")
+
+    return [items[index:index + chunk_size] for index in range(0, len(items), chunk_size)]
 
 
 def _resolve_database_settings(
@@ -396,17 +404,18 @@ def _import_mysql(*, store: str, input_file: Path, connection_string: str, recor
         cursor.execute("DELETE FROM off_store_products WHERE StoreSlug = %s", (store,))
         rows = [_record_tuple(record, store=store, run_id=run_id, imported_at=now) for record in records]
         if rows:
-            cursor.executemany(
-                """
-                INSERT INTO off_store_products (
-                    ImportRunId, StoreSlug, Code, Url, Creator, CreatedDatetime, LastModifiedDatetime,
-                    LastUpdatedDatetime, ProductName, Brands, Origins, Stores, Countries, CountriesTags,
-                    CountriesEn, IngredientsText, IngredientsTags, IngredientsAnalysisTags, Price, ImageUrl,
-                    ImageSmallUrl, ImportedAtUtc
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                rows,
-            )
+            for batch in _chunked(rows, MYSQL_INSERT_BATCH_SIZE):
+                cursor.executemany(
+                    """
+                    INSERT INTO off_store_products (
+                        ImportRunId, StoreSlug, Code, Url, Creator, CreatedDatetime, LastModifiedDatetime,
+                        LastUpdatedDatetime, ProductName, Brands, Origins, Stores, Countries, CountriesTags,
+                        CountriesEn, IngredientsText, IngredientsTags, IngredientsAnalysisTags, Price, ImageUrl,
+                        ImageSmallUrl, ImportedAtUtc
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    batch,
+                )
         cursor.execute(
             "UPDATE off_import_runs SET CompletedAtUtc = %s, Status = %s, RecordCount = %s WHERE Id = %s",
             (now, "completed", len(records), run_id),
