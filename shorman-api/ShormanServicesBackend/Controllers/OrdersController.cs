@@ -10,7 +10,7 @@ namespace ShormanServicesBackend.Controllers;
 
 [ApiController]
 [Route("api/orders")]
-[Authorize(Roles = $"{RoleNames.SuperAdmin},{RoleNames.Admin},{RoleNames.Customer}")]
+[Authorize(Roles = RoleNames.Customer)]
 public class OrdersController(IMediator mediator) : ControllerBase
 {
     [HttpGet]

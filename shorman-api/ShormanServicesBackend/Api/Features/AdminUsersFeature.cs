@@ -8,7 +8,9 @@ using ShormanServicesBackend.Api.Security;
 namespace ShormanServicesBackend.Api.Features;
 
 public record GetAdminUsersQuery() : IRequest<IReadOnlyCollection<AdminUserListItemDto>>;
+public record GetAdminOrderSummariesQuery() : IRequest<IReadOnlyCollection<AdminOrderSummaryDto>>;
 public record UpdateUserRoleCommand(int UserId, string Role) : IRequest<AdminUserListItemDto?>;
+public record DeleteUserCommand(int UserId, int RequestedByUserId) : IRequest<DeleteUserResponse?>;
 public record GetRoleMenuPermissionsQuery() : IRequest<IReadOnlyCollection<RoleMenuPermissionsDto>>;
 public record UpdateRoleMenuPermissionsCommand(string Role, IReadOnlyCollection<string> EnabledMenuKeys) : IRequest<RoleMenuPermissionsDto>;
 public record GetCurrentMenuPermissionsQuery(IReadOnlyCollection<string> Roles) : IRequest<CurrentMenuPermissionsDto>;
@@ -21,6 +23,7 @@ public class GetAdminUsersQueryHandler(ApiDbContext dbContext) : IRequestHandler
             .AsNoTracking()
             .Include(x => x.UserRoles)
             .ThenInclude(x => x.Role)
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.FirstName)
             .ThenBy(x => x.LastName)
             .Select(ToDto())
@@ -50,7 +53,7 @@ public class UpdateUserRoleCommandHandler(ApiDbContext dbContext) : IRequestHand
         var user = await dbContext.Users
             .Include(x => x.UserRoles)
             .ThenInclude(x => x.Role)
-            .SingleOrDefaultAsync(x => x.Id == request.UserId, cancellationToken);
+            .SingleOrDefaultAsync(x => x.Id == request.UserId && !x.IsDeleted, cancellationToken);
 
         if (user is null)
         {
@@ -100,6 +103,90 @@ public class UpdateUserRoleCommandHandler(ApiDbContext dbContext) : IRequestHand
 
     private Task<int> CountSuperAdminsAsync(CancellationToken cancellationToken) =>
         dbContext.UserRoles.CountAsync(x => x.Role.Name == RoleNames.SuperAdmin, cancellationToken);
+}
+
+public class GetAdminOrderSummariesQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetAdminOrderSummariesQuery, IReadOnlyCollection<AdminOrderSummaryDto>>
+{
+    public async Task<IReadOnlyCollection<AdminOrderSummaryDto>> Handle(GetAdminOrderSummariesQuery request, CancellationToken cancellationToken)
+    {
+        var orders = await dbContext.Orders
+            .AsNoTracking()
+            .Include(x => x.User)
+            .Include(x => x.Address)
+            .Include(x => x.AssignedRider)
+            .Include(x => x.Items)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return orders.Select(AdminUsersFeatureMappings.MapAdminOrderSummary).ToArray();
+    }
+}
+
+public class DeleteUserCommandHandler(ApiDbContext dbContext) : IRequestHandler<DeleteUserCommand, DeleteUserResponse?>
+{
+    public async Task<DeleteUserResponse?> Handle(DeleteUserCommand request, CancellationToken cancellationToken)
+    {
+        var user = await dbContext.Users
+            .Include(x => x.UserRoles)
+            .ThenInclude(x => x.Role)
+            .SingleOrDefaultAsync(x => x.Id == request.UserId && !x.IsDeleted, cancellationToken);
+
+        if (user is null)
+        {
+            return null;
+        }
+
+        if (user.Id == request.RequestedByUserId)
+        {
+            throw new InvalidOperationException("You cannot delete your own account.");
+        }
+
+        if (user.UserRoles.Any(x => string.Equals(x.Role.Name, RoleNames.SuperAdmin, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("SuperAdmin accounts cannot be deleted.");
+        }
+
+        var displayName = $"{user.FirstName} {user.LastName}".Trim();
+        var snapshotName = string.IsNullOrWhiteSpace(displayName) ? user.Email : displayName;
+
+        await dbContext.Orders
+            .Where(x => x.UserId == user.Id)
+            .Where(x => x.CustomerNameSnapshot == null || x.CustomerEmailSnapshot == null)
+            .ExecuteUpdateAsync(updates => updates
+                .SetProperty(x => x.CustomerNameSnapshot, snapshotName)
+                .SetProperty(x => x.CustomerEmailSnapshot, user.Email), cancellationToken);
+
+        var cartIds = await dbContext.Carts
+            .Where(x => x.UserId == user.Id)
+            .Select(x => x.Id)
+            .ToArrayAsync(cancellationToken);
+
+        if (cartIds.Length > 0)
+        {
+            await dbContext.CartItems.Where(x => cartIds.Contains(x.CartId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.Carts.Where(x => cartIds.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken);
+        }
+
+        await dbContext.UserRoles.Where(x => x.UserId == user.Id).ExecuteDeleteAsync(cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("DELETE FROM refresh_tokens WHERE UserId = {0}", [user.Id], cancellationToken);
+
+        user.Email = $"deleted-user-{user.Id}-{DateTime.UtcNow:yyyyMMddHHmmss}@deleted.local";
+        user.PasswordHash = string.Empty;
+        user.FirstName = "Deleted";
+        user.LastName = "Account";
+        user.Phone = null;
+        user.IsEmailVerified = false;
+        user.EmailVerificationCode = null;
+        user.EmailVerificationExpiresAtUtc = null;
+        user.PasswordResetCode = null;
+        user.PasswordResetExpiresAtUtc = null;
+        user.IsDeleted = true;
+        user.DeletedAtUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new DeleteUserResponse(user.Id, "User account deleted while preserving order history for audit.");
+    }
 }
 
 public class GetRoleMenuPermissionsQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetRoleMenuPermissionsQuery, IReadOnlyCollection<RoleMenuPermissionsDto>>
@@ -199,6 +286,42 @@ public class GetCurrentMenuPermissionsQueryHandler(ApiDbContext dbContext) : IRe
 
 internal static class AdminUsersFeatureMappings
 {
+    internal static AdminOrderSummaryDto MapAdminOrderSummary(ApiOrder order)
+    {
+        var customerName = string.IsNullOrWhiteSpace(order.CustomerNameSnapshot)
+            ? $"{order.User.FirstName} {order.User.LastName}".Trim()
+            : order.CustomerNameSnapshot;
+        var customerEmail = string.IsNullOrWhiteSpace(order.CustomerEmailSnapshot)
+            ? order.User.Email
+            : order.CustomerEmailSnapshot;
+        var orderDto = GetOrdersQueryHandler.Map(order);
+
+        return new AdminOrderSummaryDto(
+            orderDto.Id,
+            orderDto.UserId,
+            string.IsNullOrWhiteSpace(customerName) ? customerEmail : customerName,
+            customerEmail,
+            orderDto.Status,
+            orderDto.PaymentMethod,
+            orderDto.PaymentStatus,
+            orderDto.AddressId,
+            orderDto.DeliveryAddress,
+            orderDto.Items,
+            orderDto.Subtotal,
+            orderDto.DeliveryFee,
+            orderDto.Total,
+            orderDto.AssignedRiderId,
+            orderDto.AssignedRiderName,
+            orderDto.CreatedAt,
+            orderDto.UpdatedAt,
+            orderDto.AcceptedAt,
+            orderDto.PickedUpAt,
+            orderDto.OutForDeliveryAt,
+            orderDto.DeliveredAt,
+            orderDto.CashCollectedAt,
+            orderDto.CompletedAt);
+    }
+
     internal static RoleMenuPermissionsDto MapRoleMenuPermissions(ApiRole role)
     {
         var enabledKeys = role.MenuPermissions

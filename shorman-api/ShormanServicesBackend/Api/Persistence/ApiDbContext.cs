@@ -30,6 +30,8 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Phone).HasMaxLength(50);
+            entity.Property(x => x.EmailVerificationCode).HasMaxLength(20);
+            entity.Property(x => x.PasswordResetCode).HasMaxLength(20);
         });
 
         modelBuilder.Entity<ApiRole>(entity =>
@@ -125,13 +127,19 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
         {
             entity.ToTable("orders");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.CustomerNameSnapshot).HasMaxLength(201);
+            entity.Property(x => x.CustomerEmailSnapshot).HasMaxLength(256);
             entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
             entity.Property(x => x.PaymentMethod).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.PaymentStatus).HasMaxLength(30).IsRequired();
             entity.Property(x => x.Subtotal).HasPrecision(10, 2);
             entity.Property(x => x.DeliveryFee).HasPrecision(10, 2);
             entity.Property(x => x.Total).HasPrecision(10, 2);
+            entity.HasIndex(x => x.AssignedRiderId);
+            entity.HasIndex(x => x.Status);
             entity.HasOne(x => x.User).WithMany(x => x.Orders).HasForeignKey(x => x.UserId);
             entity.HasOne(x => x.Address).WithMany().HasForeignKey(x => x.AddressId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.AssignedRider).WithMany(x => x.AssignedOrders).HasForeignKey(x => x.AssignedRiderId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ApiOrderItem>(entity =>
@@ -140,6 +148,7 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.HasKey(x => x.Id);
             entity.Property(x => x.ProductName).HasMaxLength(220).IsRequired();
             entity.Property(x => x.ProductImageUrl).HasMaxLength(1000);
+            entity.Property(x => x.SupermarketName).HasMaxLength(100);
             entity.Property(x => x.UnitPrice).HasPrecision(10, 2);
             entity.Property(x => x.TotalPrice).HasPrecision(10, 2);
             entity.HasOne(x => x.Order).WithMany(x => x.Items).HasForeignKey(x => x.OrderId);

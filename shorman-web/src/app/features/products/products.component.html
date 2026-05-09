@@ -38,6 +38,32 @@
     </div>
   </div>
 
+  <section class="delivery-zone-banner">
+    <div class="delivery-zone-inner">
+      <div class="delivery-zone-copy">
+        <span class="delivery-zone-kicker">Delivery Zone</span>
+        <h2>Check if your address is within 3 km of 60596 Frankfurt am Main.</h2>
+        <p>We currently deliver in a radius around 60596 Frankfurt am Main. Enter your address to verify coverage before you start shopping.</p>
+      </div>
+
+      <form class="delivery-zone-form" (ngSubmit)="checkDeliveryZone()">
+        <input type="text" [(ngModel)]="deliveryCheck.street" name="deliveryStreet" placeholder="Street" />
+        <input type="text" [(ngModel)]="deliveryCheck.houseNumber" name="deliveryHouseNumber" placeholder="House no." />
+        <input type="text" [(ngModel)]="deliveryCheck.postalCode" name="deliveryPostalCode" placeholder="Postal code" />
+        <input type="text" [(ngModel)]="deliveryCheck.city" name="deliveryCity" placeholder="City" />
+        <button type="submit" class="delivery-zone-btn" [disabled]="checkingDelivery">
+          {{ checkingDelivery ? 'Checking…' : 'Check Address' }}
+        </button>
+      </form>
+
+      <p class="delivery-zone-error" *ngIf="deliveryCheckError">{{ deliveryCheckError }}</p>
+      <div class="delivery-zone-result" *ngIf="deliveryCheckResult as result" [class.ineligible]="!result.eligible">
+        <strong>{{ result.eligible ? 'Available' : 'Not available yet' }}</strong>
+        <span>{{ result.message }}</span>
+      </div>
+    </div>
+  </section>
+
   <div class="products-layout">
     <!-- Mobile Filter Overlay -->
     <div class="mobile-filter-overlay" *ngIf="mobileFiltersOpen" (click)="closeMobileFilters()"></div>

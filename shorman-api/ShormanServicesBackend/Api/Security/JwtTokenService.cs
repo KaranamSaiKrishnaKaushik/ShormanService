@@ -31,6 +31,7 @@ public static class MenuPermissionKeys
     public const string UserList = "user-management.user-list";
     public const string RoleAccess = "user-management.role-access";
     public const string ProductData = "user-management.product-data";
+    public const string OrderSummary = "user-management.order-summary";
 
     public static readonly string[] All =
     [
@@ -41,7 +42,8 @@ public static class MenuPermissionKeys
         RiderDashboard,
         UserList,
         RoleAccess,
-        ProductData
+        ProductData,
+        OrderSummary
     ];
 
     public static bool IsValid(string key) => All.Contains(key, StringComparer.OrdinalIgnoreCase);
@@ -54,9 +56,9 @@ public static class MenuPermissionKeys
             [
                 Products,
                 Checkout,
-                Orders,
                 Addresses,
-                ProductData
+                ProductData,
+                OrderSummary
             ],
             RoleNames.Customer =>
             [
