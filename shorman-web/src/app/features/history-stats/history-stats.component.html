@@ -2,7 +2,7 @@
   <header class="page-head">
     <div>
       <p class="crumb">History Stats - {{ currentName }}</p>
-      <h1>Where your money goes</h1>
+      <h1>{{ 'history.title' | translate }}</h1>
       <p class="sub">{{ profileSubtitle() }}</p>
     </div>
     <div class="range-pill" role="tablist" aria-label="History range">
@@ -11,35 +11,35 @@
         *ngFor="let range of rangeOptions"
         [class.on]="selectedRange === range.key"
         (click)="selectRange(range.key)">
-        {{ range.label }}
+        {{ range.labelKey | translate }}
       </button>
     </div>
   </header>
 
   <section class="kpis">
     <article class="kpi" [class.up]="spendDeltaPct() >= 0" [class.down]="spendDeltaPct() < 0">
-      <p class="label">Total spend</p>
+      <p class="label">{{ 'history.kpi.totalSpend' | translate }}</p>
       <p class="value">EUR {{ totalSpend | number:'1.2-2' }}</p>
       <p class="delta" [class.down]="spendDeltaPct() < 0">
         {{ deltaArrow(spendDeltaPct()) }} {{ signedDelta(spendDeltaPct(), 1) }}% {{ comparisonSuffix() }}
       </p>
     </article>
     <article class="kpi" [class.up]="totalOrders >= previousTotalOrders" [class.down]="totalOrders < previousTotalOrders">
-      <p class="label">Total orders</p>
+      <p class="label">{{ 'history.kpi.totalOrders' | translate }}</p>
       <p class="value">{{ totalOrders | number }}</p>
       <p class="delta" [class.down]="totalOrders < previousTotalOrders">
-        {{ deltaArrow(totalOrders - previousTotalOrders) }} {{ signedDelta(totalOrders - previousTotalOrders, 0) }} more orders
+        {{ deltaArrow(totalOrders - previousTotalOrders) }} {{ signedDelta(totalOrders - previousTotalOrders, 0) }} {{ 'history.kpi.moreOrders' | translate }}
       </p>
     </article>
     <article class="kpi" [class.up]="avgBasketDelta() >= 0" [class.down]="avgBasketDelta() < 0">
-      <p class="label">Avg basket</p>
+      <p class="label">{{ 'history.kpi.avgBasket' | translate }}</p>
       <p class="value">EUR {{ averageBasket | number:'1.2-2' }}</p>
       <p class="delta" [class.down]="avgBasketDelta() < 0">
         {{ deltaArrow(avgBasketDelta()) }} EUR {{ signedDelta(avgBasketDelta(), 2) }}
       </p>
     </article>
     <article class="kpi" [class.up]="favoriteStoreShare >= 50" [class.down]="favoriteStoreShare < 50">
-      <p class="label">Favorite store</p>
+      <p class="label">{{ 'history.kpi.favoriteStore' | translate }}</p>
       <p class="value">{{ favoriteStore }}</p>
       <p class="delta">
         <span class="bubble" [class.red]="favoriteStoreShare < 30">
@@ -48,7 +48,7 @@
       </p>
     </article>
     <article class="kpi" [class.up]="favoriteCategoryShare >= 20" [class.down]="favoriteCategoryShare < 20">
-      <p class="label">Favorite category</p>
+      <p class="label">{{ 'history.kpi.favoriteCategory' | translate }}</p>
       <p class="value">{{ favoriteCategory }}</p>
       <p class="delta">
         <span class="bubble" [class.red]="favoriteCategoryShare < 20">
@@ -57,7 +57,7 @@
       </p>
     </article>
     <article class="kpi" [class.up]="groceryShare >= drugstoreShare" [class.down]="groceryShare < drugstoreShare">
-      <p class="label">Grocery vs drugstore</p>
+      <p class="label">{{ 'history.kpi.groceryVsDrugstore' | translate }}</p>
       <p class="value">{{ groceryShare | number:'1.0-0' }}% - {{ drugstoreShare | number:'1.0-0' }}%</p>
       <div class="split">
         <span class="g" [style.flex]="groceryShare"></span>
@@ -69,8 +69,8 @@
   <section class="grid two-left">
     <article class="card">
       <header>
-        <h2>Spend over time</h2>
-        <p>Monthly euros stacked by store</p>
+        <h2>{{ 'history.charts.spendOverTime' | translate }}</h2>
+        <p>{{ 'history.charts.monthlyStacked' | translate }}</p>
       </header>
       <div class="chart-wrap"><canvas #areaCanvas></canvas></div>
       <div class="legend-row">
@@ -83,8 +83,8 @@
 
     <article class="card">
       <header>
-        <h2>Spend by store</h2>
-        <p>Share of total spend</p>
+        <h2>{{ 'history.charts.spendByStore' | translate }}</h2>
+        <p>{{ 'history.charts.shareTotalSpend' | translate }}</p>
       </header>
       <div class="chart-wrap"><canvas #donutCanvas></canvas></div>
       <div class="legend-list">
@@ -99,8 +99,8 @@
   <section class="grid two-right">
     <article class="card">
       <header>
-        <h2>Top categories</h2>
-        <p>Green = groceries, magenta = drugstore</p>
+        <h2>{{ 'history.charts.topCategories' | translate }}</h2>
+        <p>{{ 'history.charts.categoryLegend' | translate }}</p>
       </header>
       <div class="chart-wrap tall"><canvas #categoryCanvas></canvas></div>
       <ul class="category-meta">
@@ -113,12 +113,12 @@
 
     <article class="card">
       <header>
-        <h2>Store x Category heatmap</h2>
-        <p>Darker means more spend</p>
+        <h2>{{ 'history.charts.heatmap' | translate }}</h2>
+        <p>{{ 'history.charts.heatmapHint' | translate }}</p>
       </header>
 
       <div class="heat">
-        <p class="group-title grocery">Groceries</p>
+        <p class="group-title grocery">{{ 'history.charts.groceries' | translate }}</p>
         <div class="heat-row head" [style.gridTemplateColumns]="heatGridCols(groceryCategoryAxis.length)">
           <span></span>
           <span *ngFor="let key of groceryCategoryAxis">{{ key }}</span>
@@ -131,7 +131,7 @@
           </span>
         </div>
 
-        <p class="group-title drugstore">Drugstore</p>
+        <p class="group-title drugstore">{{ 'history.charts.drugstore' | translate }}</p>
         <div class="heat-row head drug" [style.gridTemplateColumns]="heatGridCols(drugstoreCategoryAxis.length)">
           <span></span>
           <span *ngFor="let key of drugstoreCategoryAxis">{{ key }}</span>
@@ -149,8 +149,8 @@
 
   <article class="card">
     <header>
-      <h2>Top reordered products</h2>
-      <p>Your 10 most ordered items</p>
+      <h2>{{ 'history.charts.topReordered' | translate }}</h2>
+      <p>{{ 'history.charts.topReorderedHint' | translate }}</p>
     </header>
 
     <section class="reorder-grid">
@@ -163,7 +163,7 @@
           <p class="name">{{ item.name }}</p>
           <p class="meta">
             <span class="badge" [style.background]="storeColor(item.store)">{{ item.store }}</span>
-              x{{ item.quantity }} bought
+              x{{ item.quantity }} {{ 'history.charts.bought' | translate }}
           </p>
           <div class="progress"><i [style.width.%]="reorderPercent(item.repeatCount)"></i></div>
         </div>
@@ -172,6 +172,6 @@
     </section>
   </article>
 
-  <p *ngIf="loading" class="state-note">Loading history insights...</p>
+  <p *ngIf="loading" class="state-note">{{ 'history.state.loading' | translate }}</p>
   <p *ngIf="!loading && errorMsg" class="state-note warn">{{ errorMsg }}</p>
 </section>

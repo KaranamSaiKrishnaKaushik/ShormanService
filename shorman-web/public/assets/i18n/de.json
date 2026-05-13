@@ -1,0 +1,308 @@
+{
+  "lang": {
+    "en": "EN",
+    "de": "DE"
+  },
+  "navbar": {
+    "products": "Produkte",
+    "orders": "Bestellungen",
+    "historyStats": "Verlaufsstatistik",
+    "addresses": "Adressen",
+    "checkout": "Kasse",
+    "riderDashboard": "Fahrer-Dashboard",
+    "productManagement": "Produktverwaltung",
+    "userManagement": "Benutzerverwaltung",
+    "logout": "Abmelden",
+    "login": "Anmelden",
+    "riderQueue": "Fahrer-Warteschlange",
+    "orderAlerts": "Bestellhinweise",
+    "waiting": "offen",
+    "openRiderDashboard": "Fahrer-Dashboard öffnen",
+    "openOrderHistory": "Bestellverlauf öffnen",
+    "openOrderNotifications": "Bestellbenachrichtigungen öffnen",
+    "riderMessage": "Öffne das Fahrer-Dashboard, um verfügbare Abholaufträge zu prüfen.",
+    "adminMessage": "Öffne den Bestellverlauf, um neue eingehende Bestellungen zu prüfen."
+  },
+  "history": {
+    "title": "Wofür dein Geld ausgegeben wird",
+    "subtitle": "Ausgaben in Lebensmittel- und Drogeriemärkten für {{range}} - {{orders}} Bestellungen - EUR {{spend}}",
+    "range": {
+      "30d": "30 Tage",
+      "6m": "6 Monate",
+      "1y": "1 Jahr",
+      "all": "Gesamt"
+    },
+    "kpi": {
+      "totalSpend": "Gesamtausgaben",
+      "totalOrders": "Bestellungen gesamt",
+      "avgBasket": "Durchschn. Warenkorb",
+      "favoriteStore": "Lieblingsmarkt",
+      "favoriteCategory": "Lieblingskategorie",
+      "groceryVsDrugstore": "Lebensmittel vs Drogerie",
+      "moreOrders": "mehr Bestellungen"
+    },
+    "compare": {
+      "30d": "gegenüber vorherigen 30 T",
+      "6m": "gegenüber vorherigen 6 M",
+      "1y": "gegenüber vorherigem Jahr",
+      "all": "gegenüber vorheriger Periode"
+    },
+    "charts": {
+      "spendOverTime": "Ausgaben im Zeitverlauf",
+      "monthlyStacked": "Monatliche EUR nach Markt gestapelt",
+      "spendByStore": "Ausgaben nach Markt",
+      "shareTotalSpend": "Anteil an Gesamtausgaben",
+      "topCategories": "Top-Kategorien",
+      "categoryLegend": "Grün = Lebensmittel, Magenta = Drogerie",
+      "heatmap": "Markt x Kategorie Heatmap",
+      "heatmapHint": "Dunkler bedeutet höhere Ausgaben",
+      "groceries": "Lebensmittel",
+      "drugstore": "Drogerie",
+      "topReordered": "Am häufigsten nachbestellt",
+      "topReorderedHint": "Deine 10 am häufigsten bestellten Artikel",
+      "bought": "gekauft"
+    },
+    "state": {
+      "loading": "Verlaufsstatistik wird geladen...",
+      "fallback": "Es werden Mock-Daten angezeigt, da Live-Statistiken derzeit nicht verfügbar sind."
+    },
+    "donut": {
+      "total": "GESAMT"
+    },
+    "tooltip": {
+      "orders": "Bestellungen"
+    }
+  },
+  "common": {
+    "retry": "Erneut versuchen",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "refresh": "Aktualisieren",
+    "search": "Suchen",
+    "reset": "Zurücksetzen"
+  },
+  "categories": {
+    "bakery": "Bäckerei",
+    "beverages": "Getränke",
+    "eggs-dairy": "Eier & Milchprodukte",
+    "fruits-vegetables": "Obst & Gemüse",
+    "meat": "Fleisch",
+    "snacks": "Snacks",
+    "hair-care": "Haarpflege",
+    "skin-care": "Hautpflege",
+    "body-bath": "Körper & Bad",
+    "makeup-fragrance": "Make-up & Duft",
+    "health-wellness": "Gesundheit & Wellness",
+    "baby-kids": "Baby & Kinder"
+  },
+  "products": {
+    "mode": {
+      "groceries": {
+        "title": "Lebensmittel",
+        "allStores": "Alle Lebensmittel"
+      },
+      "beauty": {
+        "title": "Drogerie & Beauty",
+        "allStores": "Alle Drogerien"
+      }
+    },
+    "filters": "Filter",
+    "searchPlaceholder": "Produkte suchen...",
+    "add": "Hinzufügen",
+    "cart": "Warenkorb",
+    "sidebar": {
+      "groceryCategories": "Lebensmittel Kategorien",
+      "drugstoreCategories": "Drogeriekategorien",
+      "allGroceries": "Alle Lebensmittel",
+      "allDrugstore": "Alle Drogerien"
+    },
+    "delivery": {
+      "kicker": "Lieferzone",
+      "title": "Prüfe, ob deine Adresse innerhalb von 3 km um 60596 Frankfurt am Main liegt.",
+      "subtitle": "Wir liefern derzeit im Umkreis von 60596 Frankfurt am Main. Gib deine Adresse ein, um die Lieferbarkeit vor dem Einkauf zu prüfen.",
+      "street": "Straße",
+      "houseNumber": "Hausnr.",
+      "postalCode": "PLZ",
+      "city": "Stadt",
+      "checking": "Prüfung...",
+      "checkAddress": "Adresse prüfen",
+      "available": "Verfügbar",
+      "notAvailable": "Noch nicht verfügbar"
+    },
+    "results": {
+      "productSingular": "Produkt",
+      "productPlural": "Produkte",
+      "found": "gefunden",
+      "page": "Seite",
+      "of": "von"
+    },
+    "empty": {
+      "title": "Keine Produkte gefunden",
+      "subtitle": "Passe deine Suche oder Filter an",
+      "reset": "Filter zurücksetzen"
+    },
+    "pagination": {
+      "prev": "Zurück",
+      "next": "Weiter"
+    }
+  },
+  "addresses": {
+    "title": "Meine Adressen",
+    "subtitle": "Verwalte deine Lieferadressen",
+    "loading": "Adressen werden geladen...",
+    "savedAddresses": "Gespeicherte Adressen",
+    "default": "Standard",
+    "addressFallback": "Adresse",
+    "empty": {
+      "title": "Noch keine Adressen",
+      "subtitle": "Füge deine erste Lieferadresse hinzu"
+    },
+    "actions": {
+      "addAddress": "Adresse hinzufügen",
+      "addNew": "Neu hinzufügen",
+      "editAddress": "Adresse bearbeiten",
+      "deleteAddress": "Adresse löschen",
+      "cannotDeleteLast": "Letzte Adresse kann nicht gelöscht werden",
+      "updateAddress": "Adresse aktualisieren",
+      "saveAddress": "Adresse speichern",
+      "saving": "Speichern..."
+    },
+    "form": {
+      "addTitle": "Neue Adresse hinzufügen",
+      "editTitle": "Adresse bearbeiten",
+      "addressLabel": "Adressbezeichnung",
+      "optional": "optional",
+      "labelPlaceholder": "z. B. Zuhause, Arbeit, Eltern",
+      "labelHint": "Gib der Adresse einen eindeutigen Namen",
+      "street": "Straße",
+      "streetPlaceholder": "Straßenname",
+      "houseNumber": "Hausnr.",
+      "postalCode": "Postleitzahl",
+      "city": "Stadt",
+      "country": "Land",
+      "setDefault": "Als Standard-Lieferadresse festlegen"
+    },
+    "validation": {
+      "streetRequired": "Straße ist erforderlich",
+      "houseNumberRequired": "Hausnummer ist erforderlich",
+      "postalCodeRequired": "PLZ ist erforderlich",
+      "postalCodePattern": "Muss 5-stellig sein",
+      "cityRequired": "Stadt ist erforderlich"
+    },
+    "deleteModal": {
+      "title": "Adresse löschen?",
+      "confirm": "Möchtest du wirklich löschen",
+      "thisAddress": "diese Adresse"
+    }
+  },
+  "checkout": {
+    "title": "Kasse",
+    "deliveryAddress": "Lieferadresse",
+    "addressFallback": "Adresse",
+    "default": "Standard",
+    "fee": "Gebühr",
+    "checkDelivery": "Lieferung prüfen",
+    "noAddresses": "Noch keine Adressen gespeichert.",
+    "cancelAddAddress": "✕ Abbrechen",
+    "addNewAddress": "+ Neue Adresse hinzufügen",
+    "saving": "Speichern...",
+    "saveAddress": "Adresse speichern",
+    "paymentMethod": "Zahlungsmethode",
+    "payment": {
+      "paypalLabel": "PayPal",
+      "paypalDesc": "Sicher mit PayPal bezahlen",
+      "bankTransferLabel": "Banküberweisung",
+      "bankTransferDesc": "Auf unser Bankkonto überweisen",
+      "codLabel": "Bar bei Lieferung",
+      "codDesc": "Bezahle bei Erhalt deiner Bestellung"
+    },
+    "form": {
+      "label": "Bezeichnung (z. B. Zuhause)",
+      "labelPlaceholder": "Zuhause",
+      "postalCode": "Postleitzahl",
+      "street": "Straße",
+      "streetPlaceholder": "Hauptstraße",
+      "houseNumber": "Hausnummer",
+      "city": "Stadt",
+      "country": "Land",
+      "countryPlaceholder": "Deutschland"
+    },
+    "orderSummary": "Bestellübersicht",
+    "subtotal": "Zwischensumme",
+    "deliveryFee": "Liefergebühr",
+    "total": "Gesamt",
+    "outsideDeliveryZone": "Die ausgewählte Adresse liegt außerhalb der aktuellen Lieferzone um 60596 Frankfurt am Main.",
+    "placingOrder": "Bestellung wird aufgegeben...",
+    "placeOrder": "Bestellen",
+    "securePayment": "Deine Zahlung ist gesichert"
+  },
+  "rider": {
+    "eyebrow": "Fahrer-Arbeitsbereich",
+    "title": "Geteilte Abhol-Warteschlange und aktive Lieferungen an einem Ort.",
+    "subtitle": "Bestellungen kommen in eine gemeinsame Fahrer-Warteschlange. Ein Fahrer nimmt an, danach läuft die Lieferung durch Abholung, Fahrt, Zustellung und Abschluss.",
+    "openQueue": "offene Warteschlange",
+    "availableOrders": "Verfügbare Bestellungen",
+    "availableOrdersHint": "Alle Fahrer sehen diese Bestellungen, bis einer annimmt.",
+    "loadingQueue": "Fahrer-Warteschlange wird geladen...",
+    "noOpenRequests": "Derzeit keine offenen Abholanfragen.",
+    "myActiveDeliveries": "Meine aktiven Lieferungen",
+    "activeDeliveriesHint": "Angenommene Bestellungen bleiben hier bis zum Abschluss oder Storno.",
+    "noActiveDeliveries": "Dir sind keine aktiven Lieferungen zugewiesen.",
+    "completedHistory": "Abgeschlossene Historie",
+    "completedHistoryHint": "Abgeschlossene Lieferungen bleiben hier in deiner Fahrerhistorie sichtbar.",
+    "noCompletedOrders": "Noch keine abgeschlossenen Fahrerbestellungen.",
+    "order": "Bestellung",
+    "openInGoogleMaps": "In Google Maps öffnen",
+    "deliveryAddress": "Lieferadresse",
+    "assignedRider": "Zugewiesener Fahrer",
+    "unassigned": "Nicht zugewiesen",
+    "paymentMethod": "Zahlungsmethode",
+    "total": "Gesamt",
+    "actions": {
+      "acceptOrder": "Bestellung annehmen",
+      "markPickedUp": "Als abgeholt markieren",
+      "outForDelivery": "Unterwegs",
+      "markDelivered": "Als zugestellt markieren",
+      "cashCollected": "Bargeld erhalten",
+      "completeOrder": "Bestellung abschließen"
+    }
+  },
+  "productManagement": {
+    "eyebrow": "Katalogoperationen",
+    "title": "Produktverwaltung",
+    "subtitle": "Lade store-spezifische Excel-Dateien hoch, prüfe Importläufe und nachvollziehe Änderungen im Live-Katalog.",
+    "downloadTemplate": "REWE-Vorlage herunterladen",
+    "openUploadRuns": "Upload-Läufe öffnen",
+    "uploadTitle": "Neue Produktdatei hochladen",
+    "uploadSubtitle": "Akzeptiertes Format: Excel .xlsx mit Vorlagen-Headern. image_url bleibt optional.",
+    "uploading": "Wird hochgeladen...",
+    "uploadSheet": "Datei hochladen",
+    "allCategories": "Alle Kategorien",
+    "allStores": "Alle Märkte",
+    "searchProductsPlaceholder": "Produktschlüssel oder Produktname suchen",
+    "summary": {
+      "currentProducts": "Aktuelle Katalogprodukte",
+      "uploadRuns": "Verfolgte Upload-Läufe",
+      "historyRows": "Verfügbare Historienzeilen"
+    },
+    "sections": {
+      "currentProducts": "Aktuelle Produkte",
+      "uploadRuns": "Upload-Läufe",
+      "history": "Historie"
+    }
+  },
+  "userManagement": {
+    "eyebrow": "Management-Arbeitsbereich",
+    "title": "Benutzerverwaltung",
+    "subtitle": "Nutze die Untermenüs, um die für dein Konto freigegebenen Verwaltungsansichten zu öffnen.",
+    "loadingTitle": "Verwaltungsansichten werden geladen",
+    "loadingSubtitle": "Verfügbare Zugriffe der Benutzerverwaltung werden geprüft.",
+    "emptyTitle": "Keine verfügbaren Verwaltungsansichten",
+    "emptySubtitle": "Die aktuelle Rolle hat keine aktivierten Untermenüs in der Benutzerverwaltung.",
+    "tabs": {
+      "userList": "Benutzerliste",
+      "roleAccess": "Rollen-Zugriff",
+      "orderHistory": "Bestellhistorie"
+    }
+  }
+}

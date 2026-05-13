@@ -9,5 +9,7 @@ export const environment = {
   useMockProducts: false,
   useMockAuth: false,
   useMockAddresses: false,
-  useMockOrders: false
+  useMockOrders: false,
+  defaultLanguage: 'en',
+  supportedLanguages: ['en', 'de']
 };

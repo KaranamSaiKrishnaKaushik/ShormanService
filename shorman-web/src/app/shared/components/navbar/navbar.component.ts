@@ -1,17 +1,19 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AsyncPipe, NgIf } from '@angular/common';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { AppRole, CUSTOMER_ROLES, RIDER_ROLES } from '../../../core/models/user.model';
 import { MenuPermissionService } from '../../../core/services/menu-permission.service';
 import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.model';
 import { OrderAlertService } from '../../../core/services/order-alert.service';
+import { LanguageService } from '../../../core/services/language.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, AsyncPipe, NgIf],
+  imports: [RouterLink, RouterLinkActive, AsyncPipe, NgIf, TranslatePipe],
   template: `
     <ng-container *ngIf="orderAlert.notification$ | async as notification">
     </ng-container>
@@ -25,15 +27,15 @@ import { OrderAlertService } from '../../../core/services/order-alert.service';
 
         <!-- Desktop Navigation -->
         <div class="navbar-links">
-          <a routerLink="/products" routerLinkActive="active" class="nav-link">Products</a>
+          <a routerLink="/products" routerLinkActive="active" class="nav-link">{{ 'navbar.products' | translate }}</a>
           <ng-container *ngIf="auth.isLoggedIn$ | async">
-            <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="nav-link">Orders</a>
-            <a *ngIf="showHistoryStats()" routerLink="/history-stats" routerLinkActive="active" class="nav-link">History Stats</a>
-            <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="nav-link">Addresses</a>
-            <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="nav-link">Checkout</a>
-            <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="nav-link">Rider Dashboard</a>
-            <a *ngIf="showProductManagement()" routerLink="/product-management" routerLinkActive="active" class="nav-link">Product Management</a>
-            <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="nav-link">User Management</a>
+            <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="nav-link">{{ 'navbar.orders' | translate }}</a>
+            <a *ngIf="showHistoryStats()" routerLink="/history-stats" routerLinkActive="active" class="nav-link">{{ 'navbar.historyStats' | translate }}</a>
+            <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="nav-link">{{ 'navbar.addresses' | translate }}</a>
+            <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="nav-link">{{ 'navbar.checkout' | translate }}</a>
+            <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="nav-link">{{ 'navbar.riderDashboard' | translate }}</a>
+            <a *ngIf="showProductManagement()" routerLink="/product-management" routerLinkActive="active" class="nav-link">{{ 'navbar.productManagement' | translate }}</a>
+            <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="nav-link">{{ 'navbar.userManagement' | translate }}</a>
           </ng-container>
         </div>
 
@@ -58,13 +60,18 @@ import { OrderAlertService } from '../../../core/services/order-alert.service';
             <div class="order-dropdown-header">
               <strong>{{ orderDropdownTitle() }}</strong>
               <span *ngIf="orderAlert.notification$ | async as notification" class="order-dropdown-count">
-                {{ notification.count }} waiting
+                {{ notification.count }} {{ 'navbar.waiting' | translate }}
               </span>
             </div>
             <p class="order-dropdown-copy">{{ orderDropdownMessage() }}</p>
             <a class="order-dropdown-link" [routerLink]="orderAlertTarget()" (click)="closeOrderDropdown()">
               {{ orderDropdownActionLabel() }}
             </a>
+          </div>
+
+          <div class="lang-switch">
+            <button type="button" class="lang-btn" [class.active]="currentLanguage === 'en'" (click)="setLanguage('en')">{{ 'lang.en' | translate }}</button>
+            <button type="button" class="lang-btn" [class.active]="currentLanguage === 'de'" (click)="setLanguage('de')">{{ 'lang.de' | translate }}</button>
           </div>
 
           <button *ngIf="showCartButton()" class="cart-btn" (click)="cartService.toggleCart()">
@@ -77,26 +84,26 @@ import { OrderAlertService } from '../../../core/services/order-alert.service';
           <ng-container *ngIf="auth.isLoggedIn$ | async; else loginBtn">
             <div class="user-menu">
               <span class="user-name">{{ (auth.currentUser$ | async)?.firstName }}</span>
-              <button class="btn-logout" (click)="auth.logout()">Logout</button>
+              <button class="btn-logout" (click)="auth.logout()">{{ 'navbar.logout' | translate }}</button>
             </div>
           </ng-container>
           <ng-template #loginBtn>
-            <a routerLink="/login" class="btn-login">Login</a>
+            <a routerLink="/login" class="btn-login">{{ 'navbar.login' | translate }}</a>
           </ng-template>
         </div>
       </div>
 
       <!-- Mobile Navigation Menu -->
       <div class="mobile-menu" [class.open]="mobileMenuOpen">
-        <a routerLink="/products" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Products</a>
+        <a routerLink="/products" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.products' | translate }}</a>
         <ng-container *ngIf="auth.isLoggedIn$ | async">
-          <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Orders</a>
-          <a *ngIf="showHistoryStats()" routerLink="/history-stats" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">History Stats</a>
-          <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Addresses</a>
-          <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Checkout</a>
-          <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Rider Dashboard</a>
-          <a *ngIf="showProductManagement()" routerLink="/product-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Product Management</a>
-          <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">User Management</a>
+          <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.orders' | translate }}</a>
+          <a *ngIf="showHistoryStats()" routerLink="/history-stats" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.historyStats' | translate }}</a>
+          <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.addresses' | translate }}</a>
+          <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.checkout' | translate }}</a>
+          <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.riderDashboard' | translate }}</a>
+          <a *ngIf="showProductManagement()" routerLink="/product-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.productManagement' | translate }}</a>
+          <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.userManagement' | translate }}</a>
         </ng-container>
       </div>
     </nav>
@@ -266,6 +273,29 @@ import { OrderAlertService } from '../../../core/services/order-alert.service';
       text-decoration: none;
       font-weight: 700;
     }
+    .lang-switch {
+      display: flex;
+      gap: 0.25rem;
+      border: 1px solid #c8d8c8;
+      border-radius: 8px;
+      padding: 0.12rem;
+      background: #f7fbf7;
+    }
+    .lang-btn {
+      border: none;
+      background: transparent;
+      color: #3f4f3f;
+      border-radius: 6px;
+      min-width: 34px;
+      height: 28px;
+      font-weight: 700;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .lang-btn.active {
+      background: #2E7D32;
+      color: #fff;
+    }
     .user-menu {
       display: flex;
       align-items: center;
@@ -391,17 +421,29 @@ export class NavbarComponent {
   cartService = inject(CartService);
   menuPermissions = inject(MenuPermissionService);
   orderAlert = inject(OrderAlertService);
+  languageService = inject(LanguageService);
+  translate = inject(TranslateService);
   mobileMenuOpen = false;
   orderDropdownOpen = false;
+  currentLanguage = 'en';
   customerRoles: AppRole[] = CUSTOMER_ROLES;
   riderRoles: AppRole[] = RIDER_ROLES;
 
   constructor() {
+    this.currentLanguage = this.languageService.getCurrentLanguage();
     this.auth.currentUser$.subscribe(async user => {
       if (user) {
         await this.menuPermissions.ensureLoaded();
       }
     });
+
+    this.languageService.currentLanguage$.subscribe(lang => {
+      this.currentLanguage = lang;
+    });
+  }
+
+  async setLanguage(language: string): Promise<void> {
+    await this.languageService.setLanguage(language);
   }
 
   toggleMobileMenu() {
@@ -437,22 +479,26 @@ export class NavbarComponent {
   }
 
   orderDropdownTitle(): string {
-    return this.auth.hasRole('Rider') ? 'Rider Queue' : 'Order Alerts';
+    return this.auth.hasRole('Rider')
+      ? this.translate.instant('navbar.riderQueue')
+      : this.translate.instant('navbar.orderAlerts');
   }
 
   orderDropdownMessage(): string {
     return this.orderAlert.currentNotification?.message
       ?? (this.auth.hasRole('Rider')
-        ? 'Open Rider Dashboard to review available pickup requests.'
-        : 'Open Order History to review new incoming orders.');
+        ? this.translate.instant('navbar.riderMessage')
+        : this.translate.instant('navbar.adminMessage'));
   }
 
   orderDropdownActionLabel(): string {
-    return this.auth.hasRole('Rider') ? 'Open Rider Dashboard' : 'Open Order History';
+    return this.auth.hasRole('Rider')
+      ? this.translate.instant('navbar.openRiderDashboard')
+      : this.translate.instant('navbar.openOrderHistory');
   }
 
   orderAlertLabel(): string {
-    return this.orderAlert.currentNotification?.message ?? 'Open order notifications';
+    return this.orderAlert.currentNotification?.message ?? this.translate.instant('navbar.openOrderNotifications');
   }
 
   showOrders(): boolean {

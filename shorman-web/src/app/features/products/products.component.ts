@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgFor, NgIf, CurrencyPipe, AsyncPipe, NgStyle } from '@angular/common';
 import { Observable, forkJoin, map } from 'rxjs';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductService } from '../../core/services/product.service';
 import { CartService } from '../../core/services/cart.service';
 import { DeliveryCheckResult, DeliveryService } from '../../core/services/delivery.service';
@@ -103,7 +104,7 @@ const CATEGORY_ICON_MAP: Record<string, string> = {
 @Component({
   selector: 'app-products',
   standalone: true,
-  imports: [FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe, NgStyle, LoadingSpinnerComponent],
+  imports: [FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe, NgStyle, LoadingSpinnerComponent, TranslateModule],
   templateUrl: './products.component.html',
   styleUrls: ['./products.component.scss']
 })
@@ -112,6 +113,7 @@ export class ProductsComponent implements OnInit {
   private static readonly MODE_FETCH_PAGE_SIZE = 120;
 
   private productService = inject(ProductService);
+  private translate = inject(TranslateService);
   private cdr = inject(ChangeDetectorRef);
   private deliveryService = inject(DeliveryService);
   cartService = inject(CartService);
@@ -162,7 +164,11 @@ export class ProductsComponent implements OnInit {
   }
 
   get modeHeading(): string {
-    return `${this.currentMode.title} · ${this.totalProducts} product${this.totalProducts !== 1 ? 's' : ''}`;
+    const modeTitleKey = `products.mode.${this.activeMode}.title`;
+    const translatedModeTitle = this.translate.instant(modeTitleKey);
+    const modeTitle = translatedModeTitle === modeTitleKey ? this.currentMode.title : translatedModeTitle;
+    const nounKey = this.totalProducts === 1 ? 'products.results.productSingular' : 'products.results.productPlural';
+    return `${modeTitle} · ${this.totalProducts} ${this.translate.instant(nounKey)}`;
   }
 
   get visibleSupermarketTabs(): SupermarketTab[] {
@@ -170,7 +176,7 @@ export class ProductsComponent implements OnInit {
     return this.supermarketTabs
       .filter(tab => tab.slug === 'all' || modeStores.has(tab.slug))
       .map(tab => tab.slug === 'all'
-        ? { ...tab, name: this.currentMode.allStoresLabel.toUpperCase() }
+        ? { ...tab, name: this.translate.instant(`products.mode.${this.activeMode}.allStores`).toUpperCase() }
         : tab);
   }
 
@@ -184,6 +190,16 @@ export class ProductsComponent implements OnInit {
 
   get isModeWideSelection(): boolean {
     return this.activeSupermarket === 'all';
+  }
+
+  get sidebarTitle(): string {
+    const key = this.activeMode === 'groceries' ? 'products.sidebar.groceryCategories' : 'products.sidebar.drugstoreCategories';
+    return this.translate.instant(key);
+  }
+
+  get allCategoriesLabel(): string {
+    const key = this.activeMode === 'groceries' ? 'products.sidebar.allGroceries' : 'products.sidebar.allDrugstore';
+    return this.translate.instant(key);
   }
 
   ngOnInit(): void {
@@ -279,6 +295,16 @@ export class ProductsComponent implements OnInit {
     }
 
     return CATEGORY_ICON_MAP[category.slug] || CATEGORY_ICON_MAP[category.icon ?? ''] || '•';
+  }
+
+  getCategoryLabel(category: Category | undefined | null): string {
+    if (!category) {
+      return '';
+    }
+
+    const key = `categories.${category.slug}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? category.name : translated;
   }
 
   getStoreBadgeStyle(product: Product): Record<string, string> {

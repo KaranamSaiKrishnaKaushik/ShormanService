@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { NavbarComponent } from './shared/components/navbar/navbar.component';
 import { FooterComponent } from './shared/components/footer/footer.component';
 import { CartSidebarComponent } from './features/cart/cart-sidebar.component';
+import { LanguageService } from './core/services/language.service';
 
 @Component({
   selector: 'app-root',
@@ -21,4 +22,10 @@ import { CartSidebarComponent } from './features/cart/cart-sidebar.component';
     main { flex: 1; padding-top: 64px; }
   `]
 })
-export class App {}
+export class App implements OnInit {
+  private readonly languageService = inject(LanguageService);
+
+  ngOnInit(): void {
+    void this.languageService.initialize();
+  }
+}
