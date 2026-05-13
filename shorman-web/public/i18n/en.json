@@ -1,0 +1,76 @@
+{
+  "lang": {
+    "en": "EN",
+    "de": "DE"
+  },
+  "navbar": {
+    "products": "Products",
+    "orders": "Orders",
+    "historyStats": "History Stats",
+    "addresses": "Addresses",
+    "checkout": "Checkout",
+    "riderDashboard": "Rider Dashboard",
+    "productManagement": "Product Management",
+    "userManagement": "User Management",
+    "logout": "Logout",
+    "login": "Login",
+    "riderQueue": "Rider Queue",
+    "orderAlerts": "Order Alerts",
+    "waiting": "waiting",
+    "openRiderDashboard": "Open Rider Dashboard",
+    "openOrderHistory": "Open Order History",
+    "openOrderNotifications": "Open order notifications",
+    "riderMessage": "Open Rider Dashboard to review available pickup requests.",
+    "adminMessage": "Open Order History to review new incoming orders."
+  },
+  "history": {
+    "title": "Where your money goes",
+    "subtitle": "Spending across groceries and drugstore stores for {{range}} - {{orders}} orders - EUR {{spend}}",
+    "range": {
+      "30d": "30 days",
+      "6m": "6 months",
+      "1y": "1 year",
+      "all": "All time"
+    },
+    "kpi": {
+      "totalSpend": "Total spend",
+      "totalOrders": "Total orders",
+      "avgBasket": "Avg basket",
+      "favoriteStore": "Favorite store",
+      "favoriteCategory": "Favorite category",
+      "groceryVsDrugstore": "Grocery vs drugstore",
+      "moreOrders": "more orders"
+    },
+    "compare": {
+      "30d": "vs prior 30 d",
+      "6m": "vs prior 6 mo",
+      "1y": "vs prior 1 y",
+      "all": "vs previous period"
+    },
+    "charts": {
+      "spendOverTime": "Spend over time",
+      "monthlyStacked": "Monthly euros stacked by store",
+      "spendByStore": "Spend by store",
+      "shareTotalSpend": "Share of total spend",
+      "topCategories": "Top categories",
+      "categoryLegend": "Green = groceries, magenta = drugstore",
+      "heatmap": "Store x Category heatmap",
+      "heatmapHint": "Darker means more spend",
+      "groceries": "Groceries",
+      "drugstore": "Drugstore",
+      "topReordered": "Top reordered products",
+      "topReorderedHint": "Your 10 most ordered items",
+      "bought": "bought"
+    },
+    "state": {
+      "loading": "Loading history insights...",
+      "fallback": "Showing mocked data because live stats are currently unavailable."
+    },
+    "donut": {
+      "total": "TOTAL"
+    },
+    "tooltip": {
+      "orders": "orders"
+    }
+  }
+}

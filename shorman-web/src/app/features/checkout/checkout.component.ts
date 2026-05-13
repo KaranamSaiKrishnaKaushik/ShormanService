@@ -8,24 +8,25 @@ import { AddressService } from '../../core/services/address.service';
 import { DeliveryService } from '../../core/services/delivery.service';
 import { Address } from '../../core/models/address.model';
 import { PaymentMethod } from '../../core/models/order.model';
+import { TranslateModule } from '@ngx-translate/core';
 
 interface PaymentOption {
   value: PaymentMethod;
-  label: string;
+  labelKey: string;
   icon: string;
-  desc: string;
+  descKey: string;
 }
 
 const PAYMENT_OPTIONS: PaymentOption[] = [
-  { value: 'PAYPAL', label: 'PayPal', icon: '💳', desc: 'Pay securely with PayPal' },
-  { value: 'BANK_TRANSFER', label: 'Bank Transfer', icon: '🏦', desc: 'Transfer to our bank account' },
-  { value: 'CASH_ON_DELIVERY', label: 'Cash on Delivery', icon: '💵', desc: 'Pay when your order arrives' },
+  { value: 'PAYPAL', labelKey: 'checkout.payment.paypalLabel', icon: '💳', descKey: 'checkout.payment.paypalDesc' },
+  { value: 'BANK_TRANSFER', labelKey: 'checkout.payment.bankTransferLabel', icon: '🏦', descKey: 'checkout.payment.bankTransferDesc' },
+  { value: 'CASH_ON_DELIVERY', labelKey: 'checkout.payment.codLabel', icon: '💵', descKey: 'checkout.payment.codDesc' },
 ];
 
 @Component({
   selector: 'app-checkout',
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe],
+  imports: [ReactiveFormsModule, FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe, TranslateModule],
   templateUrl: './checkout.component.html',
   styleUrls: ['./checkout.component.scss']
 })

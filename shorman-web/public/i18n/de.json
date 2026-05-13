@@ -1,0 +1,76 @@
+{
+  "lang": {
+    "en": "EN",
+    "de": "DE"
+  },
+  "navbar": {
+    "products": "Produkte",
+    "orders": "Bestellungen",
+    "historyStats": "Verlaufsstatistik",
+    "addresses": "Adressen",
+    "checkout": "Kasse",
+    "riderDashboard": "Fahrer-Dashboard",
+    "productManagement": "Produktverwaltung",
+    "userManagement": "Benutzerverwaltung",
+    "logout": "Abmelden",
+    "login": "Anmelden",
+    "riderQueue": "Fahrer-Warteschlange",
+    "orderAlerts": "Bestellhinweise",
+    "waiting": "offen",
+    "openRiderDashboard": "Fahrer-Dashboard öffnen",
+    "openOrderHistory": "Bestellverlauf öffnen",
+    "openOrderNotifications": "Bestellbenachrichtigungen öffnen",
+    "riderMessage": "Öffne das Fahrer-Dashboard, um verfügbare Abholaufträge zu prüfen.",
+    "adminMessage": "Öffne den Bestellverlauf, um neue eingehende Bestellungen zu prüfen."
+  },
+  "history": {
+    "title": "Wofür dein Geld ausgegeben wird",
+    "subtitle": "Ausgaben in Lebensmittel- und Drogeriemärkten für {{range}} - {{orders}} Bestellungen - EUR {{spend}}",
+    "range": {
+      "30d": "30 Tage",
+      "6m": "6 Monate",
+      "1y": "1 Jahr",
+      "all": "Gesamt"
+    },
+    "kpi": {
+      "totalSpend": "Gesamtausgaben",
+      "totalOrders": "Bestellungen gesamt",
+      "avgBasket": "Durchschn. Warenkorb",
+      "favoriteStore": "Lieblingsmarkt",
+      "favoriteCategory": "Lieblingskategorie",
+      "groceryVsDrugstore": "Lebensmittel vs Drogerie",
+      "moreOrders": "mehr Bestellungen"
+    },
+    "compare": {
+      "30d": "gegenüber vorherigen 30 T",
+      "6m": "gegenüber vorherigen 6 M",
+      "1y": "gegenüber vorherigem Jahr",
+      "all": "gegenüber vorheriger Periode"
+    },
+    "charts": {
+      "spendOverTime": "Ausgaben im Zeitverlauf",
+      "monthlyStacked": "Monatliche EUR nach Markt gestapelt",
+      "spendByStore": "Ausgaben nach Markt",
+      "shareTotalSpend": "Anteil an Gesamtausgaben",
+      "topCategories": "Top-Kategorien",
+      "categoryLegend": "Grün = Lebensmittel, Magenta = Drogerie",
+      "heatmap": "Markt x Kategorie Heatmap",
+      "heatmapHint": "Dunkler bedeutet höhere Ausgaben",
+      "groceries": "Lebensmittel",
+      "drugstore": "Drogerie",
+      "topReordered": "Am häufigsten nachbestellt",
+      "topReorderedHint": "Deine 10 am häufigsten bestellten Artikel",
+      "bought": "gekauft"
+    },
+    "state": {
+      "loading": "Verlaufsstatistik wird geladen...",
+      "fallback": "Es werden Mock-Daten angezeigt, da Live-Statistiken derzeit nicht verfügbar sind."
+    },
+    "donut": {
+      "total": "GESAMT"
+    },
+    "tooltip": {
+      "orders": "Bestellungen"
+    }
+  }
+}

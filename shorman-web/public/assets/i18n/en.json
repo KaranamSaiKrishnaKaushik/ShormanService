@@ -1,0 +1,308 @@
+{
+  "lang": {
+    "en": "EN",
+    "de": "DE"
+  },
+  "navbar": {
+    "products": "Products",
+    "orders": "Orders",
+    "historyStats": "History Stats",
+    "addresses": "Addresses",
+    "checkout": "Checkout",
+    "riderDashboard": "Rider Dashboard",
+    "productManagement": "Product Management",
+    "userManagement": "User Management",
+    "logout": "Logout",
+    "login": "Login",
+    "riderQueue": "Rider Queue",
+    "orderAlerts": "Order Alerts",
+    "waiting": "waiting",
+    "openRiderDashboard": "Open Rider Dashboard",
+    "openOrderHistory": "Open Order History",
+    "openOrderNotifications": "Open order notifications",
+    "riderMessage": "Open Rider Dashboard to review available pickup requests.",
+    "adminMessage": "Open Order History to review new incoming orders."
+  },
+  "history": {
+    "title": "Where your money goes",
+    "subtitle": "Spending across groceries and drugstore stores for {{range}} - {{orders}} orders - EUR {{spend}}",
+    "range": {
+      "30d": "30 days",
+      "6m": "6 months",
+      "1y": "1 year",
+      "all": "All time"
+    },
+    "kpi": {
+      "totalSpend": "Total spend",
+      "totalOrders": "Total orders",
+      "avgBasket": "Avg basket",
+      "favoriteStore": "Favorite store",
+      "favoriteCategory": "Favorite category",
+      "groceryVsDrugstore": "Grocery vs drugstore",
+      "moreOrders": "more orders"
+    },
+    "compare": {
+      "30d": "vs prior 30 d",
+      "6m": "vs prior 6 mo",
+      "1y": "vs prior 1 y",
+      "all": "vs previous period"
+    },
+    "charts": {
+      "spendOverTime": "Spend over time",
+      "monthlyStacked": "Monthly euros stacked by store",
+      "spendByStore": "Spend by store",
+      "shareTotalSpend": "Share of total spend",
+      "topCategories": "Top categories",
+      "categoryLegend": "Green = groceries, magenta = drugstore",
+      "heatmap": "Store x Category heatmap",
+      "heatmapHint": "Darker means more spend",
+      "groceries": "Groceries",
+      "drugstore": "Drugstore",
+      "topReordered": "Top reordered products",
+      "topReorderedHint": "Your 10 most ordered items",
+      "bought": "bought"
+    },
+    "state": {
+      "loading": "Loading history insights...",
+      "fallback": "Showing mocked data because live stats are currently unavailable."
+    },
+    "donut": {
+      "total": "TOTAL"
+    },
+    "tooltip": {
+      "orders": "orders"
+    }
+  },
+  "common": {
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "refresh": "Refresh",
+    "search": "Search",
+    "reset": "Reset"
+  },
+  "categories": {
+    "bakery": "Bakery",
+    "beverages": "Beverages",
+    "eggs-dairy": "Eggs & Dairy",
+    "fruits-vegetables": "Fruits & Vegetables",
+    "meat": "Meat",
+    "snacks": "Snacks",
+    "hair-care": "Hair Care",
+    "skin-care": "Skin Care",
+    "body-bath": "Body & Bath",
+    "makeup-fragrance": "Makeup & Fragrance",
+    "health-wellness": "Health & Wellness",
+    "baby-kids": "Baby & Kids"
+  },
+  "products": {
+    "mode": {
+      "groceries": {
+        "title": "Groceries",
+        "allStores": "All groceries"
+      },
+      "beauty": {
+        "title": "Drugstore & Beauty",
+        "allStores": "All drugstore"
+      }
+    },
+    "filters": "Filters",
+    "searchPlaceholder": "Search products...",
+    "add": "Add",
+    "cart": "Cart",
+    "sidebar": {
+      "groceryCategories": "Grocery categories",
+      "drugstoreCategories": "Drugstore categories",
+      "allGroceries": "All groceries",
+      "allDrugstore": "All drugstore"
+    },
+    "delivery": {
+      "kicker": "Delivery Zone",
+      "title": "Check if your address is within 3 km of 60596 Frankfurt am Main.",
+      "subtitle": "We currently deliver in a radius around 60596 Frankfurt am Main. Enter your address to verify coverage before you start shopping.",
+      "street": "Street",
+      "houseNumber": "House no.",
+      "postalCode": "Postal code",
+      "city": "City",
+      "checking": "Checking...",
+      "checkAddress": "Check Address",
+      "available": "Available",
+      "notAvailable": "Not available yet"
+    },
+    "results": {
+      "productSingular": "product",
+      "productPlural": "products",
+      "found": "found",
+      "page": "Page",
+      "of": "of"
+    },
+    "empty": {
+      "title": "No products found",
+      "subtitle": "Try adjusting your search or filters",
+      "reset": "Reset Filters"
+    },
+    "pagination": {
+      "prev": "Prev",
+      "next": "Next"
+    }
+  },
+  "addresses": {
+    "title": "My Addresses",
+    "subtitle": "Manage your delivery addresses",
+    "loading": "Loading addresses...",
+    "savedAddresses": "Saved Addresses",
+    "default": "Default",
+    "addressFallback": "Address",
+    "empty": {
+      "title": "No addresses yet",
+      "subtitle": "Add your first delivery address to get started"
+    },
+    "actions": {
+      "addAddress": "Add Address",
+      "addNew": "Add New",
+      "editAddress": "Edit address",
+      "deleteAddress": "Delete address",
+      "cannotDeleteLast": "Cannot delete last address",
+      "updateAddress": "Update Address",
+      "saveAddress": "Save Address",
+      "saving": "Saving..."
+    },
+    "form": {
+      "addTitle": "Add New Address",
+      "editTitle": "Edit Address",
+      "addressLabel": "Address Label",
+      "optional": "optional",
+      "labelPlaceholder": "e.g., Home, Work, Mom's house",
+      "labelHint": "Give this address a memorable name",
+      "street": "Street",
+      "streetPlaceholder": "Street name",
+      "houseNumber": "House No.",
+      "postalCode": "Postal Code",
+      "city": "City",
+      "country": "Country",
+      "setDefault": "Set as default delivery address"
+    },
+    "validation": {
+      "streetRequired": "Street is required",
+      "houseNumberRequired": "House number is required",
+      "postalCodeRequired": "Postal code is required",
+      "postalCodePattern": "Must be 5 digits",
+      "cityRequired": "City is required"
+    },
+    "deleteModal": {
+      "title": "Delete Address?",
+      "confirm": "Are you sure you want to delete",
+      "thisAddress": "this address"
+    }
+  },
+  "checkout": {
+    "title": "Checkout",
+    "deliveryAddress": "Delivery Address",
+    "addressFallback": "Address",
+    "default": "Default",
+    "fee": "Fee",
+    "checkDelivery": "Check delivery",
+    "noAddresses": "No addresses saved yet.",
+    "cancelAddAddress": "✕ Cancel",
+    "addNewAddress": "+ Add New Address",
+    "saving": "Saving...",
+    "saveAddress": "Save Address",
+    "paymentMethod": "Payment Method",
+    "payment": {
+      "paypalLabel": "PayPal",
+      "paypalDesc": "Pay securely with PayPal",
+      "bankTransferLabel": "Bank Transfer",
+      "bankTransferDesc": "Transfer to our bank account",
+      "codLabel": "Cash on Delivery",
+      "codDesc": "Pay when your order arrives"
+    },
+    "form": {
+      "label": "Label (e.g. Home)",
+      "labelPlaceholder": "Home",
+      "postalCode": "Postal Code",
+      "street": "Street",
+      "streetPlaceholder": "Main Street",
+      "houseNumber": "House Number",
+      "city": "City",
+      "country": "Country",
+      "countryPlaceholder": "Germany"
+    },
+    "orderSummary": "Order Summary",
+    "subtotal": "Subtotal",
+    "deliveryFee": "Delivery Fee",
+    "total": "Total",
+    "outsideDeliveryZone": "The selected address is outside the current delivery zone around 60596 Frankfurt am Main.",
+    "placingOrder": "Placing Order...",
+    "placeOrder": "Place Order",
+    "securePayment": "Your payment is secured"
+  },
+  "rider": {
+    "eyebrow": "Rider Workspace",
+    "title": "Shared pickup queue and active deliveries in one place.",
+    "subtitle": "Orders enter a shared rider queue, one rider accepts, then the delivery moves through pickup, route, delivery, and completion.",
+    "openQueue": "open queue",
+    "availableOrders": "Available Orders",
+    "availableOrdersHint": "All riders can see these orders until one rider accepts.",
+    "loadingQueue": "Loading rider queue...",
+    "noOpenRequests": "No open pickup requests right now.",
+    "myActiveDeliveries": "My Active Deliveries",
+    "activeDeliveriesHint": "Accepted orders stay here until completed or cancelled.",
+    "noActiveDeliveries": "No active deliveries assigned to you.",
+    "completedHistory": "Completed History",
+    "completedHistoryHint": "Completed deliveries stay visible here as your rider order history.",
+    "noCompletedOrders": "No completed rider orders yet.",
+    "order": "Order",
+    "openInGoogleMaps": "Open in Google Maps",
+    "deliveryAddress": "Delivery Address",
+    "assignedRider": "Assigned Rider",
+    "unassigned": "Unassigned",
+    "paymentMethod": "Payment Method",
+    "total": "Total",
+    "actions": {
+      "acceptOrder": "Accept Order",
+      "markPickedUp": "Mark Picked Up",
+      "outForDelivery": "Out For Delivery",
+      "markDelivered": "Mark Delivered",
+      "cashCollected": "Cash Collected",
+      "completeOrder": "Complete Order"
+    }
+  },
+  "productManagement": {
+    "eyebrow": "Catalog Operations",
+    "title": "Product Management",
+    "subtitle": "Upload store-specific Excel sheets, review import runs, and audit what changed in the live catalog.",
+    "downloadTemplate": "Download REWE Template",
+    "openUploadRuns": "Open Upload Runs",
+    "uploadTitle": "Upload New Product Sheet",
+    "uploadSubtitle": "Accepted format: Excel .xlsx with the template headers. image_url remains optional.",
+    "uploading": "Uploading...",
+    "uploadSheet": "Upload Sheet",
+    "allCategories": "All Categories",
+    "allStores": "All Stores",
+    "searchProductsPlaceholder": "Search product key or product name",
+    "summary": {
+      "currentProducts": "Current catalog products",
+      "uploadRuns": "Upload runs tracked",
+      "historyRows": "History rows available"
+    },
+    "sections": {
+      "currentProducts": "Current Products",
+      "uploadRuns": "Upload Runs",
+      "history": "History"
+    }
+  },
+  "userManagement": {
+    "eyebrow": "Management Workspace",
+    "title": "User Management",
+    "subtitle": "Use the submenus to open the management views enabled for your account.",
+    "loadingTitle": "Loading management views",
+    "loadingSubtitle": "Checking your available user-management access.",
+    "emptyTitle": "No available management views",
+    "emptySubtitle": "The current role does not have any enabled user-management submenu.",
+    "tabs": {
+      "userList": "User List",
+      "roleAccess": "Role Access",
+      "orderHistory": "Order History"
+    }
+  }
+}

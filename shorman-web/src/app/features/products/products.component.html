@@ -10,13 +10,13 @@
           [style.--mode-accent]="mode.accent"
           [style.--mode-surface]="mode.surface"
           (click)="setMode(mode.slug)">
-          {{ mode.label }}
+          {{ ('products.mode.' + mode.slug + '.title') | translate }}
         </button>
       </div>
 
       <button type="button" class="mobile-filter-btn" (click)="toggleMobileFilters()">
         <span class="filter-icon">☰</span>
-        Filters
+        {{ 'products.filters' | translate }}
         <span class="filter-badge" *ngIf="activeFiltersCount > 0">{{ activeFiltersCount }}</span>
       </button>
 
@@ -26,7 +26,7 @@
           type="text"
           [(ngModel)]="searchQuery"
           (ngModelChange)="onSearchChange($event)"
-          placeholder="Search products…"
+          placeholder="{{ 'products.searchPlaceholder' | translate }}"
           class="search-input"
         />
         <button type="button" *ngIf="searchQuery" class="search-clear" (click)="searchQuery = ''; applyFilters()">✕</button>
@@ -54,24 +54,24 @@
   <section class="delivery-zone-banner">
     <div class="delivery-zone-inner">
       <div class="delivery-zone-copy">
-        <span class="delivery-zone-kicker">Delivery Zone</span>
-        <h2>Check if your address is within 3 km of 60596 Frankfurt am Main.</h2>
-        <p>We currently deliver in a radius around 60596 Frankfurt am Main. Enter your address to verify coverage before you start shopping.</p>
+        <span class="delivery-zone-kicker">{{ 'products.delivery.kicker' | translate }}</span>
+        <h2>{{ 'products.delivery.title' | translate }}</h2>
+        <p>{{ 'products.delivery.subtitle' | translate }}</p>
       </div>
 
       <form class="delivery-zone-form" (ngSubmit)="checkDeliveryZone()">
-        <input type="text" [(ngModel)]="deliveryCheck.street" name="deliveryStreet" placeholder="Street" />
-        <input type="text" [(ngModel)]="deliveryCheck.houseNumber" name="deliveryHouseNumber" placeholder="House no." />
-        <input type="text" [(ngModel)]="deliveryCheck.postalCode" name="deliveryPostalCode" placeholder="Postal code" />
-        <input type="text" [(ngModel)]="deliveryCheck.city" name="deliveryCity" placeholder="City" />
+        <input type="text" [(ngModel)]="deliveryCheck.street" name="deliveryStreet" placeholder="{{ 'products.delivery.street' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.houseNumber" name="deliveryHouseNumber" placeholder="{{ 'products.delivery.houseNumber' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.postalCode" name="deliveryPostalCode" placeholder="{{ 'products.delivery.postalCode' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.city" name="deliveryCity" placeholder="{{ 'products.delivery.city' | translate }}" />
         <button type="submit" class="delivery-zone-btn" [disabled]="checkingDelivery">
-          {{ checkingDelivery ? 'Checking…' : 'Check Address' }}
+          {{ checkingDelivery ? ('products.delivery.checking' | translate) : ('products.delivery.checkAddress' | translate) }}
         </button>
       </form>
 
       <p class="delivery-zone-error" *ngIf="deliveryCheckError">{{ deliveryCheckError }}</p>
       <div class="delivery-zone-result" *ngIf="deliveryCheckResult as result" [class.ineligible]="!result.eligible">
-        <strong>{{ result.eligible ? 'Available' : 'Not available yet' }}</strong>
+        <strong>{{ result.eligible ? ('products.delivery.available' | translate) : ('products.delivery.notAvailable' | translate) }}</strong>
         <span>{{ result.message }}</span>
       </div>
     </div>
@@ -84,24 +84,24 @@
     <!-- Sidebar -->
     <aside class="sidebar" [class.mobile-open]="mobileFiltersOpen">
       <div class="mobile-filter-header">
-        <h3>Filters</h3>
+        <h3>{{ 'products.filters' | translate }}</h3>
         <button type="button" class="close-btn" (click)="closeMobileFilters()">✕</button>
       </div>
 
       <div class="sidebar-section">
-        <h3 class="sidebar-title">{{ currentMode.sidebarTitle }}</h3>
+        <h3 class="sidebar-title">{{ sidebarTitle }}</h3>
         <div class="category-list">
           <label class="category-item" [class.active]="activeCategory === 'all'">
             <input type="radio" name="category" value="all" [(ngModel)]="activeCategory"
               (change)="applyFilters(); closeMobileFilters()" />
             <span class="cat-icon">{{ getCategoryGlyph('all') }}</span>
-            <span class="cat-name">{{ currentMode.allCategoriesLabel }}</span>
+            <span class="cat-name">{{ allCategoriesLabel }}</span>
           </label>
           <label *ngFor="let cat of visibleCategories" class="category-item" [class.active]="activeCategory === cat.slug">
             <input type="radio" name="category" [value]="cat.slug" [(ngModel)]="activeCategory"
               (change)="applyFilters(); closeMobileFilters()" />
             <span class="cat-icon">{{ getCategoryGlyph(cat) }}</span>
-            <span class="cat-name">{{ cat.name }}</span>
+            <span class="cat-name">{{ getCategoryLabel(cat) }}</span>
           </label>
         </div>
       </div>
@@ -112,10 +112,10 @@
       <div class="results-header">
         <div class="results-copy">
           <h2 class="results-title">{{ modeHeading }}</h2>
-          <span class="results-count">{{ totalProducts }} product{{ totalProducts !== 1 ? 's' : '' }} found</span>
+          <span class="results-count">{{ totalProducts }} {{ (totalProducts === 1 ? 'products.results.productSingular' : 'products.results.productPlural') | translate }} {{ 'products.results.found' | translate }}</span>
         </div>
         <span class="results-count" *ngIf="totalPages > 0">
-          Page <strong>{{ currentPage }}</strong> of <strong>{{ totalPages }}</strong>
+          {{ 'products.results.page' | translate }} <strong>{{ currentPage }}</strong> {{ 'products.results.of' | translate }} <strong>{{ totalPages }}</strong>
         </span>
       </div>
 
@@ -124,9 +124,9 @@
 
         <div *ngIf="!loading && filteredProducts.length === 0" class="empty-state">
           <div class="empty-icon">🔍</div>
-          <h3>No products found</h3>
-          <p>Try adjusting your search or filters</p>
-          <button type="button" class="btn-reset" (click)="resetFilters()">Reset Filters</button>
+          <h3>{{ 'products.empty.title' | translate }}</h3>
+          <p>{{ 'products.empty.subtitle' | translate }}</p>
+          <button type="button" class="btn-reset" (click)="resetFilters()">{{ 'products.empty.reset' | translate }}</button>
         </div>
 
         <div class="product-grid" *ngIf="!loading && filteredProducts.length > 0">
@@ -145,7 +145,7 @@
 
             <!-- Product Info -->
             <div class="product-info">
-              <div class="product-category">{{ product.category?.name }}</div>
+              <div class="product-category">{{ getCategoryLabel(product.category) }}</div>
               <h4 class="product-name">{{ product.name }}</h4>
               <div class="product-unit" *ngIf="product.unit">{{ product.unit }}</div>
 
@@ -158,7 +158,7 @@
                   <button type="button" class="qty-btn plus" (click)="increaseQty(product)">+</button>
                 </div>
                 <ng-template #addBtn>
-                  <button type="button" class="btn-add" (click)="addToCart(product)">+ Add</button>
+                  <button type="button" class="btn-add" (click)="addToCart(product)">+ {{ 'products.add' | translate }}</button>
                 </ng-template>
               </div>
             </div>
@@ -167,7 +167,7 @@
 
         <div *ngIf="!loading && totalPages > 1" class="empty-state pagination-panel">
           <div class="tabs-inner">
-            <button class="sm-tab" type="button" [disabled]="currentPage <= 1" (click)="changePage(currentPage - 1)">Prev</button>
+            <button class="sm-tab" type="button" [disabled]="currentPage <= 1" (click)="changePage(currentPage - 1)">{{ 'products.pagination.prev' | translate }}</button>
             <button
               *ngFor="let pageNumber of visiblePageNumbers"
               class="sm-tab"
@@ -176,7 +176,7 @@
               (click)="changePage(pageNumber)">
               {{ pageNumber }}
             </button>
-            <button class="sm-tab" type="button" [disabled]="currentPage >= totalPages" (click)="changePage(currentPage + 1)">Next</button>
+            <button class="sm-tab" type="button" [disabled]="currentPage >= totalPages" (click)="changePage(currentPage + 1)">{{ 'products.pagination.next' | translate }}</button>
           </div>
         </div>
       </div>
@@ -187,7 +187,7 @@
   <button type="button" class="mobile-cart-btn" (click)="cartService.openCart()"
     *ngIf="(cartService.cart$ | async)?.itemCount as count">
     <span class="cart-icon">🛒</span>
-    <span class="cart-text">Cart</span>
+    <span class="cart-text">{{ 'products.cart' | translate }}</span>
     <span class="cart-badge">{{ count }}</span>
   </button>
 </div>

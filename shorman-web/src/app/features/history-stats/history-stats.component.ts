@@ -1,9 +1,12 @@
 import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, ChartConfiguration, Plugin } from 'chart.js/auto';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { InsightsRange, OrderInsights } from '../../core/models/order-insights.model';
 import { OrderInsightsService } from '../../core/services/order-insights.service';
+import { LanguageService } from '../../core/services/language.service';
 
 type Segment = 'grocery' | 'drugstore';
 
@@ -40,7 +43,7 @@ interface HistoryStatsProfile {
 @Component({
   selector: 'app-history-stats',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslatePipe],
   templateUrl: './history-stats.component.html',
   styleUrl: './history-stats.component.scss'
 })
@@ -51,20 +54,15 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private readonly auth = inject(AuthService);
   private readonly insightsService = inject(OrderInsightsService);
+  private readonly translate = inject(TranslateService);
+  private readonly languageService = inject(LanguageService);
   private readonly cdr = inject(ChangeDetectorRef);
 
-  readonly rangeLabels: Record<InsightsRange, string> = {
-    '30d': '30 days',
-    '6m': '6 months',
-    '1y': '1 year',
-    all: 'All time'
-  };
-
-  readonly rangeOptions: Array<{ key: InsightsRange; label: string }> = [
-    { key: '30d', label: '30 days' },
-    { key: '6m', label: '6 months' },
-    { key: '1y', label: '1 year' },
-    { key: 'all', label: 'All time' }
+  readonly rangeOptions: Array<{ key: InsightsRange; labelKey: string }> = [
+    { key: '30d', labelKey: 'history.range.30d' },
+    { key: '6m', labelKey: 'history.range.6m' },
+    { key: '1y', labelKey: 'history.range.1y' },
+    { key: 'all', labelKey: 'history.range.all' }
   ];
 
   readonly storeColors: Record<string, string> = {
@@ -80,6 +78,7 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedRange: InsightsRange = '1y';
   currentEmail = '';
   currentName = 'Customer';
+  currentLanguage = 'en';
 
   loading = false;
   errorMsg = '';
@@ -113,6 +112,8 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
   private areaChart?: Chart;
   private categoryChart?: Chart;
   private viewReady = false;
+  private userSub?: Subscription;
+  private languageSub?: Subscription;
 
   private readonly donutCenterPlugin: Plugin<'doughnut'> = {
     id: 'donut-center-text',
@@ -129,7 +130,7 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#94A3B8';
       ctx.font = '600 11px Segoe UI';
-      ctx.fillText('TOTAL', cx, cy - 12);
+      ctx.fillText(this.translate.instant('history.donut.total'), cx, cy - 12);
       ctx.fillStyle = '#0F172A';
       ctx.font = '700 22px Segoe UI';
       ctx.fillText(`EUR ${this.totalSpend.toFixed(0)}`, cx, cy + 12);
@@ -138,10 +139,18 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   ngOnInit(): void {
-    this.auth.currentUser$.subscribe(user => {
+    this.currentLanguage = this.languageService.getCurrentLanguage();
+    this.userSub = this.auth.currentUser$.subscribe(user => {
       this.currentEmail = (user?.email ?? '').toLowerCase();
       this.currentName = user?.firstName?.trim() || 'Customer';
       this.loadInsights();
+    });
+
+    this.languageSub = this.languageService.currentLanguage$.subscribe(language => {
+      this.currentLanguage = language;
+      this.months = this.lastMonths(12).slice(Math.max(0, 12 - this.months.length));
+      this.cdr.detectChanges();
+      this.renderCharts();
     });
   }
 
@@ -151,6 +160,8 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.userSub?.unsubscribe();
+    this.languageSub?.unsubscribe();
     this.destroyCharts();
   }
 
@@ -160,21 +171,15 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   profileSubtitle(): string {
-    return `Spending across groceries and drugstore stores for ${this.rangeLabels[this.selectedRange]} - ${this.totalOrders} orders - EUR ${this.totalSpend.toFixed(2)}`;
+    return this.translate.instant('history.subtitle', {
+      range: this.translate.instant(`history.range.${this.selectedRange}`),
+      orders: this.totalOrders,
+      spend: this.totalSpend.toFixed(2)
+    });
   }
 
   comparisonSuffix(): string {
-    switch (this.selectedRange) {
-      case '30d':
-        return 'vs prior 30 d';
-      case '6m':
-        return 'vs prior 6 mo';
-      case 'all':
-        return 'vs previous period';
-      case '1y':
-      default:
-        return 'vs prior 1 y';
-    }
+    return this.translate.instant(`history.compare.${this.selectedRange}`);
   }
 
   spendDeltaPct(): number {
@@ -252,7 +257,7 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: () => {
         this.loading = false;
-        this.errorMsg = 'Showing mocked data because live stats are currently unavailable.';
+        this.errorMsg = this.translate.instant('history.state.fallback');
         this.applyMockProfile();
         this.cdr.detectChanges();
         this.renderCharts();
@@ -468,7 +473,7 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
             callbacks: {
               label: ctx => {
                 const category = this.categories[ctx.dataIndex];
-                return `EUR ${Number(ctx.raw).toFixed(2)} (${category.orderCount} orders)`;
+                return `EUR ${Number(ctx.raw).toFixed(2)} (${category.orderCount} ${this.translate.instant('history.tooltip.orders')})`;
               }
             }
           }
@@ -557,9 +562,10 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
   private lastMonths(count: number): string[] {
     const now = new Date();
     const labels: string[] = [];
+    const locale = this.currentLanguage === 'de' ? 'de-DE' : 'en-US';
     for (let i = count - 1; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      labels.push(date.toLocaleString('en-US', { month: 'short' }));
+      labels.push(date.toLocaleString(locale, { month: 'short' }));
     }
 
     return labels;
