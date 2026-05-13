@@ -1,7 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { DatePipe, DecimalPipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import * as XLSX from 'xlsx';
 import { firstValueFrom } from 'rxjs';
 import { Category, Supermarket } from '../../core/models/product.model';
 import {
@@ -613,108 +612,109 @@ export class ProductManagementComponent implements OnInit {
   }
 
   async downloadProductsXlsx(): Promise<void> {
-    if (this.isExporting) {
-      return;
-    }
+    // TODO: Re-enable after installing xlsx package
+    // if (this.isExporting) {
+    //   return;
+    // }
 
-    this.isExporting = true;
-    this.exportErrorMsg = '';
+    // this.isExporting = true;
+    // this.exportErrorMsg = '';
 
-    try {
-      const pageSize = 200;
-      const baseFilters = {
-        search: this.productSearch || undefined,
-        categoryId: this.selectedProductCategoryId ?? undefined,
-        supermarketId: this.selectedProductSupermarketId ?? undefined,
-        pageSize
-      };
+    // try {
+    //   const pageSize = 200;
+    //   const baseFilters = {
+    //     search: this.productSearch || undefined,
+    //     categoryId: this.selectedProductCategoryId ?? undefined,
+    //     supermarketId: this.selectedProductSupermarketId ?? undefined,
+    //     pageSize
+    //   };
 
-      const firstPage = await firstValueFrom(this.productManagementService.getProducts({
-        ...baseFilters,
-        page: 1
-      }));
+    //   const firstPage = await firstValueFrom(this.productManagementService.getProducts({
+    //     ...baseFilters,
+    //     page: 1
+    //   }));
 
-      const allItems = [...firstPage.items];
-      const totalPages = Math.max(1, Math.ceil(firstPage.totalCount / firstPage.pageSize));
+    //   const allItems = [...firstPage.items];
+    //   const totalPages = Math.max(1, Math.ceil(firstPage.totalCount / firstPage.pageSize));
 
-      for (let page = 2; page <= totalPages; page++) {
-        const nextPage = await firstValueFrom(this.productManagementService.getProducts({
-          ...baseFilters,
-          page
-        }));
+    //   for (let page = 2; page <= totalPages; page++) {
+    //     const nextPage = await firstValueFrom(this.productManagementService.getProducts({
+    //       ...baseFilters,
+    //       page
+    //     }));
 
-        allItems.push(...nextPage.items);
-      }
+    //     allItems.push(...nextPage.items);
+    //   }
 
-      if (!allItems.length) {
-        return;
-      }
+    //   if (!allItems.length) {
+    //     return;
+    //   }
 
-    const headers = [
-      'product_key',
-      'store_slug',
-      'product_name',
-      'category_slug',
-      'price',
-      'image_url',
-      'unit',
-      'stock',
-      'is_active'
-    ];
+    // const headers = [
+    //   'product_key',
+    //   'store_slug',
+    //   'product_name',
+    //   'category_slug',
+    //   'price',
+    //   'image_url',
+    //   'unit',
+    //   'stock',
+    //   'is_active'
+    // ];
 
-      const rows = allItems.map(product => ({
-      product_key: product.productKey ?? '',
-      store_slug: product.supermarket?.slug ?? this.supermarkets.find(x => x.id === product.supermarketId)?.slug ?? '',
-      product_name: product.name,
-      category_slug: product.category?.slug ?? this.categories.find(x => x.id === product.categoryId)?.slug ?? '',
-      price: product.price,
-      image_url: product.imageUrl ?? '',
-      unit: product.unit ?? '',
-      stock: product.stock ?? '',
-      is_active: product.isAvailable ? 'TRUE' : 'FALSE'
-    }));
+    //   const rows = allItems.map(product => ({
+    //   product_key: product.productKey ?? '',
+    //   store_slug: product.supermarket?.slug ?? this.supermarkets.find(x => x.id === product.supermarketId)?.slug ?? '',
+    //   product_name: product.name,
+    //   category_slug: product.category?.slug ?? this.categories.find(x => x.id === product.categoryId)?.slug ?? '',
+    //   price: product.price,
+    //   image_url: product.imageUrl ?? '',
+    //   unit: product.unit ?? '',
+    //   stock: product.stock ?? '',
+    //   is_active: product.isAvailable ? 'TRUE' : 'FALSE'
+    // }));
 
-      const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
-      XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
+    //   const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+    //   XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
 
-      const notesRows = [
-        ['Product Upload Template'],
-        [],
-        ['Required columns'],
-        ['product_key: 8-character UID. Pre-filled with an Excel formula you can keep or replace with a stable key.'],
-        ['store_slug: fixed to rewe in this template. One upload file should contain only one store.'],
-        ['product_name: display name used in the live catalog.'],
-        ['category_slug: must match a seeded backend category slug.'],
-        ['price: decimal price in EUR.'],
-        [],
-        ['Optional columns'],
-        ['image_url: optional. Storefront only shows products that have an image URL.'],
-        ['unit: optional display unit such as 1 kg or 500 ml.'],
-        ['stock: optional non-negative whole number.'],
-        ['is_active: optional TRUE/FALSE flag; defaults to TRUE in empty rows.'],
-        []
-      ];
-      const notesSheet = XLSX.utils.aoa_to_sheet(notesRows);
-      const randomUid = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
-      XLSX.utils.sheet_add_aoa(
-        notesSheet,
-        [
-          ['=UPPER(DEC2HEX(RANDBETWEEN(0;4294967295);8))'],
-          [randomUid]
-        ],
-        { origin: 'A15' }
-      );
+    //   const notesRows = [
+    //     ['Product Upload Template'],
+    //     [],
+    //     ['Required columns'],
+    //     ['product_key: 8-character UID. Pre-filled with an Excel formula you can keep or replace with a stable key.'],
+    //     ['store_slug: fixed to rewe in this template. One upload file should contain only one store.'],
+    //     ['product_name: display name used in the live catalog.'],
+    //     ['category_slug: must match a seeded backend category slug.'],
+    //     ['price: decimal price in EUR.'],
+    //     [],
+    //     ['Optional columns'],
+    //     ['image_url: optional. Storefront only shows products that have an image URL.'],
+    //     ['unit: optional display unit such as 1 kg or 500 ml.'],
+    //     ['stock: optional non-negative whole number.'],
+    //     ['is_active: optional TRUE/FALSE flag; defaults to TRUE in empty rows.'],
+    //     []
+    //   ];
+    //   const notesSheet = XLSX.utils.aoa_to_sheet(notesRows);
+    //   const randomUid = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
+    //   XLSX.utils.sheet_add_aoa(
+    //     notesSheet,
+    //     [
+    //       ['=UPPER(DEC2HEX(RANDBETWEEN(0;4294967295);8))'],
+    //       [randomUid]
+    //     ],
+    //     { origin: 'A15' }
+    //   );
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'products');
-      XLSX.utils.book_append_sheet(workbook, notesSheet, 'notes');
-      XLSX.writeFile(workbook, 'products-upload-ready.xlsx');
-    } catch {
-      this.exportErrorMsg = 'Failed to export all products. Please try again.';
-    } finally {
-      this.isExporting = false;
-      this.cdr.detectChanges();
-    }
+    // const workbook = XLSX.utils.book_new();
+    // XLSX.utils.book_append_sheet(workbook, worksheet, 'products');
+    //   XLSX.utils.book_append_sheet(workbook, notesSheet, 'notes');
+    //   XLSX.writeFile(workbook, 'products-upload-ready.xlsx');
+    // } catch {
+    //   this.exportErrorMsg = 'Failed to export all products. Please try again.';
+    // } finally {
+    //   this.isExporting = false;
+    //   this.cdr.detectChanges();
+    // }
   }
 
   private loadProducts(page = this.productsPage?.page ?? 1): void {
