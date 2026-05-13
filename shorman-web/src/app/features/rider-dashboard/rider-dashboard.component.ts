@@ -2,22 +2,23 @@ import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CurrencyPipe, DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { Order } from '../../core/models/order.model';
 import { OrderService } from '../../core/services/order.service';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-rider-dashboard',
   standalone: true,
-  imports: [NgFor, NgIf, NgClass, DatePipe, CurrencyPipe],
+  imports: [NgFor, NgIf, NgClass, DatePipe, CurrencyPipe, TranslateModule],
   template: `
     <section class="rider-shell">
       <header class="hero">
         <div>
-          <span class="eyebrow">Rider Workspace</span>
-          <h1>Shared pickup queue and active deliveries in one place.</h1>
-          <p>Orders enter a shared rider queue, one rider accepts, then the delivery moves through pickup, route, delivery, and completion.</p>
+          <span class="eyebrow">{{ 'rider.eyebrow' | translate }}</span>
+          <h1>{{ 'rider.title' | translate }}</h1>
+          <p>{{ 'rider.subtitle' | translate }}</p>
         </div>
         <div class="meta-card">
           <span>{{ today | date: 'EEEE, d MMM y' }}</span>
-          <strong>{{ availableOrders.length }} open queue</strong>
+          <strong>{{ availableOrders.length }} {{ 'rider.openQueue' | translate }}</strong>
         </div>
       </header>
 
@@ -26,13 +27,13 @@ import { OrderService } from '../../core/services/order.service';
       <div class="layout">
         <section class="column card-shell">
           <div class="section-head">
-            <h2>Available Orders</h2>
-            <button type="button" class="ghost-btn" (click)="loadOrders()" [disabled]="loading">Refresh</button>
+            <h2>{{ 'rider.availableOrders' | translate }}</h2>
+            <button type="button" class="ghost-btn" (click)="loadOrders()" [disabled]="loading">{{ 'common.refresh' | translate }}</button>
           </div>
-          <p class="section-copy">All riders can see these orders until one rider accepts.</p>
+          <p class="section-copy">{{ 'rider.availableOrdersHint' | translate }}</p>
 
-          <div *ngIf="loading" class="state-msg">Loading rider queue...</div>
-          <div *ngIf="!loading && availableOrders.length === 0" class="state-msg">No open pickup requests right now.</div>
+          <div *ngIf="loading" class="state-msg">{{ 'rider.loadingQueue' | translate }}</div>
+          <div *ngIf="!loading && availableOrders.length === 0" class="state-msg">{{ 'rider.noOpenRequests' | translate }}</div>
 
           <button
             *ngFor="let order of availableOrders"
@@ -54,12 +55,12 @@ import { OrderService } from '../../core/services/order.service';
 
         <section class="column card-shell">
           <div class="section-head">
-            <h2>My Active Deliveries</h2>
+            <h2>{{ 'rider.myActiveDeliveries' | translate }}</h2>
             <span class="count-pill">{{ myOrders.length }}</span>
           </div>
-          <p class="section-copy">Accepted orders stay here until completed or cancelled.</p>
+          <p class="section-copy">{{ 'rider.activeDeliveriesHint' | translate }}</p>
 
-          <div *ngIf="!loading && myOrders.length === 0" class="state-msg">No active deliveries assigned to you.</div>
+          <div *ngIf="!loading && myOrders.length === 0" class="state-msg">{{ 'rider.noActiveDeliveries' | translate }}</div>
 
           <button
             *ngFor="let order of myOrders"
@@ -79,12 +80,12 @@ import { OrderService } from '../../core/services/order.service';
           </button>
 
           <div class="history-head">
-            <h2>Completed History</h2>
+            <h2>{{ 'rider.completedHistory' | translate }}</h2>
             <span class="count-pill">{{ completedOrders.length }}</span>
           </div>
-          <p class="section-copy">Completed deliveries stay visible here as your rider order history.</p>
+          <p class="section-copy">{{ 'rider.completedHistoryHint' | translate }}</p>
 
-          <div *ngIf="!loading && completedOrders.length === 0" class="state-msg">No completed rider orders yet.</div>
+          <div *ngIf="!loading && completedOrders.length === 0" class="state-msg">{{ 'rider.noCompletedOrders' | translate }}</div>
 
           <button
             *ngFor="let order of completedOrders"
@@ -107,38 +108,38 @@ import { OrderService } from '../../core/services/order.service';
         <section class="detail-shell card-shell" *ngIf="selectedOrder as order">
           <div class="section-head">
             <div>
-              <h2>Order #{{ order.id }}</h2>
+              <h2>{{ 'rider.order' | translate }} #{{ order.id }}</h2>
               <p class="detail-copy">{{ formatStatus(order.status) }} · {{ formatPaymentStatus(order.paymentStatus) }}</p>
             </div>
-            <a class="ghost-btn link-btn" [href]="mapsLink(order)" target="_blank" rel="noreferrer">Open in Google Maps</a>
+            <a class="ghost-btn link-btn" [href]="mapsLink(order)" target="_blank" rel="noreferrer">{{ 'rider.openInGoogleMaps' | translate }}</a>
           </div>
 
           <div class="detail-grid">
             <div>
-              <span class="label">Delivery Address</span>
+              <span class="label">{{ 'rider.deliveryAddress' | translate }}</span>
               <strong>{{ order.deliveryAddress }}</strong>
             </div>
             <div>
-              <span class="label">Assigned Rider</span>
-              <strong>{{ order.assignedRiderName || 'Unassigned' }}</strong>
+              <span class="label">{{ 'rider.assignedRider' | translate }}</span>
+              <strong>{{ order.assignedRiderName || ('rider.unassigned' | translate) }}</strong>
             </div>
             <div>
-              <span class="label">Payment Method</span>
+              <span class="label">{{ 'rider.paymentMethod' | translate }}</span>
               <strong>{{ order.paymentMethod }}</strong>
             </div>
             <div>
-              <span class="label">Total</span>
+              <span class="label">{{ 'rider.total' | translate }}</span>
               <strong>{{ order.total | currency:'EUR' }}</strong>
             </div>
           </div>
 
           <div class="actions-row">
-            <button *ngIf="order.status === 'AWAITING_PICKUP'" type="button" class="primary-btn" (click)="acceptOrder(order)" [disabled]="actionOrderId === order.id">Accept Order</button>
-            <button *ngIf="order.status === 'ASSIGNED_TO_RIDER'" type="button" class="primary-btn" (click)="markPickedUp(order)" [disabled]="actionOrderId === order.id">Mark Picked Up</button>
-            <button *ngIf="order.status === 'PICKED_UP'" type="button" class="primary-btn" (click)="markOutForDelivery(order)" [disabled]="actionOrderId === order.id">Out For Delivery</button>
-            <button *ngIf="order.status === 'OUT_FOR_DELIVERY'" type="button" class="primary-btn" (click)="markDelivered(order)" [disabled]="actionOrderId === order.id">Mark Delivered</button>
-            <button *ngIf="order.status === 'DELIVERED' && order.paymentStatus === 'CASH_PENDING'" type="button" class="primary-btn" (click)="markCashCollected(order)" [disabled]="actionOrderId === order.id">Cash Collected</button>
-            <button *ngIf="canComplete(order)" type="button" class="success-btn" (click)="completeOrder(order)" [disabled]="actionOrderId === order.id">Complete Order</button>
+            <button *ngIf="order.status === 'AWAITING_PICKUP'" type="button" class="primary-btn" (click)="acceptOrder(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.acceptOrder' | translate }}</button>
+            <button *ngIf="order.status === 'ASSIGNED_TO_RIDER'" type="button" class="primary-btn" (click)="markPickedUp(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.markPickedUp' | translate }}</button>
+            <button *ngIf="order.status === 'PICKED_UP'" type="button" class="primary-btn" (click)="markOutForDelivery(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.outForDelivery' | translate }}</button>
+            <button *ngIf="order.status === 'OUT_FOR_DELIVERY'" type="button" class="primary-btn" (click)="markDelivered(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.markDelivered' | translate }}</button>
+            <button *ngIf="order.status === 'DELIVERED' && order.paymentStatus === 'CASH_PENDING'" type="button" class="primary-btn" (click)="markCashCollected(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.cashCollected' | translate }}</button>
+            <button *ngIf="canComplete(order)" type="button" class="success-btn" (click)="completeOrder(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.completeOrder' | translate }}</button>
           </div>
 
           <div class="timeline">

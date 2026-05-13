@@ -3,11 +3,12 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgFor, NgIf } from '@angular/common';
 import { AddressService } from '../../core/services/address.service';
 import { Address } from '../../core/models/address.model';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-addresses',
   standalone: true,
-  imports: [ReactiveFormsModule, NgFor, NgIf],
+  imports: [ReactiveFormsModule, NgFor, NgIf, TranslateModule],
   templateUrl: './addresses.component.html',
   styleUrls: ['./addresses.component.scss']
 })

@@ -6,24 +6,25 @@ import { AuthService } from '../../core/services/auth.service';
 import { MenuPermissionService } from '../../core/services/menu-permission.service';
 import { MenuPermissionKey } from '../../core/models/menu-permission.model';
 import { AppRole } from '../../core/models/user.model';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-user-management',
   standalone: true,
-  imports: [NgFor, NgIf, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [NgFor, NgIf, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule],
   template: `
     <section class="page-shell">
       <header class="page-hero">
         <div>
-          <span class="eyebrow">Management Workspace</span>
-          <h1>User Management</h1>
-          <p>Use the submenus to open the management views enabled for your account.</p>
+          <span class="eyebrow">{{ 'userManagement.eyebrow' | translate }}</span>
+          <h1>{{ 'userManagement.title' | translate }}</h1>
+          <p>{{ 'userManagement.subtitle' | translate }}</p>
         </div>
       </header>
 
       <section *ngIf="loading" class="state-card">
-        <h2>Loading management views</h2>
-        <p>Checking your available user-management access.</p>
+        <h2>{{ 'userManagement.loadingTitle' | translate }}</h2>
+        <p>{{ 'userManagement.loadingSubtitle' | translate }}</p>
       </section>
 
       <section *ngIf="!loading && tabs.length > 0" class="subnav-shell">
@@ -31,13 +32,13 @@ import { AppRole } from '../../core/models/user.model';
           [routerLink]="tab.path"
           routerLinkActive="active"
           class="subnav-link">
-          {{ tab.label }}
+          {{ tab.labelKey | translate }}
         </a>
       </section>
 
       <section *ngIf="!loading && tabs.length === 0" class="state-card">
-        <h2>No available management views</h2>
-        <p>The current role does not have any enabled user-management submenu.</p>
+        <h2>{{ 'userManagement.emptyTitle' | translate }}</h2>
+        <p>{{ 'userManagement.emptySubtitle' | translate }}</p>
       </section>
 
       <router-outlet *ngIf="!loading && tabs.length > 0"></router-outlet>
@@ -133,7 +134,7 @@ export class UserManagementComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly cdr = inject(ChangeDetectorRef);
 
-  tabs: Array<{ path: string; label: string; menuKey: MenuPermissionKey }> = [];
+  tabs: Array<{ path: string; labelKey: string; menuKey: MenuPermissionKey }> = [];
   loading = true;
 
   ngOnInit(): void {
@@ -159,10 +160,10 @@ export class UserManagementComponent implements OnInit {
 
     await this.menuPermissions.ensureLoaded();
 
-    const candidates: Array<{ path: string; label: string; menuKey: MenuPermissionKey; roles: AppRole[] }> = [
-      { path: 'user-list', label: 'User List', menuKey: 'user-management.user-list', roles: ['SuperAdmin'] },
-      { path: 'role-access', label: 'Role Access', menuKey: 'user-management.role-access', roles: ['SuperAdmin'] },
-      { path: 'order-summary', label: 'Order History', menuKey: 'user-management.order-summary', roles: ['SuperAdmin', 'Admin', 'Rider'] }
+    const candidates: Array<{ path: string; labelKey: string; menuKey: MenuPermissionKey; roles: AppRole[] }> = [
+      { path: 'user-list', labelKey: 'userManagement.tabs.userList', menuKey: 'user-management.user-list', roles: ['SuperAdmin'] },
+      { path: 'role-access', labelKey: 'userManagement.tabs.roleAccess', menuKey: 'user-management.role-access', roles: ['SuperAdmin'] },
+      { path: 'order-summary', labelKey: 'userManagement.tabs.orderHistory', menuKey: 'user-management.order-summary', roles: ['SuperAdmin', 'Admin', 'Rider'] }
     ];
 
     this.tabs = candidates.filter(tab => this.auth.hasAnyRole(tab.roles) && this.menuPermissions.hasPermission(tab.menuKey));

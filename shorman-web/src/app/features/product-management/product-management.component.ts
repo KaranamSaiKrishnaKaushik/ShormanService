@@ -11,36 +11,37 @@ import {
 } from '../../core/models/product-management.model';
 import { ProductService } from '../../core/services/product.service';
 import { ProductManagementService } from '../../core/services/product-management.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 type ProductManagementSection = 'catalog' | 'uploads' | 'history';
 
 @Component({
   selector: 'app-product-management',
   standalone: true,
-  imports: [FormsModule, NgFor, NgIf, NgClass, DecimalPipe, DatePipe],
+  imports: [FormsModule, NgFor, NgIf, NgClass, DecimalPipe, DatePipe, TranslateModule],
   template: `
     <section class="page-shell">
       <header class="hero-card">
         <div>
-          <span class="eyebrow">Catalog Operations</span>
-          <h1>Product Management</h1>
-          <p>Upload store-specific Excel sheets, review import runs, and audit what changed in the live catalog.</p>
+          <span class="eyebrow">{{ 'productManagement.eyebrow' | translate }}</span>
+          <h1>{{ 'productManagement.title' | translate }}</h1>
+          <p>{{ 'productManagement.subtitle' | translate }}</p>
         </div>
         <div class="hero-actions">
-          <a class="ghost-btn" [href]="templateUrl" download>Download REWE Template</a>
-          <button type="button" class="primary-btn" (click)="setSection('uploads')">Open Upload Runs</button>
+          <a class="ghost-btn" [href]="templateUrl" download>{{ 'productManagement.downloadTemplate' | translate }}</a>
+          <button type="button" class="primary-btn" (click)="setSection('uploads')">{{ 'productManagement.openUploadRuns' | translate }}</button>
         </div>
       </header>
 
       <section class="upload-card">
         <div>
-          <h2>Upload New Product Sheet</h2>
-          <p>Accepted format: Excel .xlsx with the template headers. image_url remains optional.</p>
+          <h2>{{ 'productManagement.uploadTitle' | translate }}</h2>
+          <p>{{ 'productManagement.uploadSubtitle' | translate }}</p>
         </div>
         <div class="upload-row">
           <input type="file" accept=".xlsx" (change)="onFileSelected($event)" />
           <button type="button" class="primary-btn" [disabled]="uploading" (click)="uploadSheet()">
-            {{ uploading ? 'Uploading...' : 'Upload Sheet' }}
+            {{ uploading ? ('productManagement.uploading' | translate) : ('productManagement.uploadSheet' | translate) }}
           </button>
         </div>
         <p *ngIf="selectedFileName">Selected: {{ selectedFileName }}</p>
@@ -51,37 +52,37 @@ type ProductManagementSection = 'catalog' | 'uploads' | 'history';
       <section class="summary-grid">
         <article class="summary-card">
           <strong>{{ productsPage?.totalCount ?? 0 | number }}</strong>
-          <span>Current catalog products</span>
+          <span>{{ 'productManagement.summary.currentProducts' | translate }}</span>
         </article>
         <article class="summary-card">
           <strong>{{ uploadsPage?.totalCount ?? 0 | number }}</strong>
-          <span>Upload runs tracked</span>
+          <span>{{ 'productManagement.summary.uploadRuns' | translate }}</span>
         </article>
         <article class="summary-card">
           <strong>{{ historyPage?.totalCount ?? 0 | number }}</strong>
-          <span>History rows available</span>
+          <span>{{ 'productManagement.summary.historyRows' | translate }}</span>
         </article>
       </section>
 
       <section class="section-nav">
-        <button type="button" class="section-link" [ngClass]="{ active: section === 'catalog' }" (click)="setSection('catalog')">Current Products</button>
-        <button type="button" class="section-link" [ngClass]="{ active: section === 'uploads' }" (click)="setSection('uploads')">Upload Runs</button>
-        <button type="button" class="section-link" [ngClass]="{ active: section === 'history' }" (click)="setSection('history')">History</button>
+        <button type="button" class="section-link" [ngClass]="{ active: section === 'catalog' }" (click)="setSection('catalog')">{{ 'productManagement.sections.currentProducts' | translate }}</button>
+        <button type="button" class="section-link" [ngClass]="{ active: section === 'uploads' }" (click)="setSection('uploads')">{{ 'productManagement.sections.uploadRuns' | translate }}</button>
+        <button type="button" class="section-link" [ngClass]="{ active: section === 'history' }" (click)="setSection('history')">{{ 'productManagement.sections.history' | translate }}</button>
       </section>
 
       <ng-container *ngIf="section === 'catalog'">
         <section class="toolbar-card">
-          <input type="search" [(ngModel)]="productSearch" (keydown.enter)="applyProductFilters()" placeholder="Search product key or product name" />
+          <input type="search" [(ngModel)]="productSearch" (keydown.enter)="applyProductFilters()" placeholder="{{ 'productManagement.searchProductsPlaceholder' | translate }}" />
           <select [(ngModel)]="selectedProductCategoryId" (ngModelChange)="applyProductFilters()">
-            <option [ngValue]="null">All Categories</option>
-            <option *ngFor="let category of categories" [ngValue]="category.id">{{ category.name }}</option>
+            <option [ngValue]="null">{{ 'productManagement.allCategories' | translate }}</option>
+            <option *ngFor="let category of categories" [ngValue]="category.id">{{ getCategoryLabel(category) }}</option>
           </select>
           <select [(ngModel)]="selectedProductSupermarketId" (ngModelChange)="applyProductFilters()">
-            <option [ngValue]="null">All Stores</option>
+            <option [ngValue]="null">{{ 'productManagement.allStores' | translate }}</option>
             <option *ngFor="let supermarket of supermarkets" [ngValue]="supermarket.id">{{ supermarket.name }}</option>
           </select>
-          <button type="button" class="primary-btn" (click)="applyProductFilters()">Search</button>
-          <button type="button" class="ghost-btn" (click)="resetProductFilters()">Reset</button>
+          <button type="button" class="primary-btn" (click)="applyProductFilters()">{{ 'common.search' | translate }}</button>
+          <button type="button" class="ghost-btn" (click)="resetProductFilters()">{{ 'common.reset' | translate }}</button>
           <button type="button" class="ghost-btn" [disabled]="isExporting" (click)="downloadProductsXlsx()">
             {{ isExporting ? 'Preparing XLSX...' : 'Download as XLSX' }}
           </button>
@@ -117,7 +118,7 @@ type ProductManagementSection = 'catalog' | 'uploads' | 'history';
                   <small *ngIf="product.unit">Unit: {{ product.unit }}</small>
                 </td>
                 <td>{{ product.price | number:'1.2-2' }} EUR</td>
-                <td>{{ product.category?.name || product.categoryId }}</td>
+                <td>{{ getCategoryLabel(product.category) || product.categoryId }}</td>
                 <td>{{ product.supermarket?.name || product.supermarketId }}</td>
                 <td>{{ product.stock || 'N/A' }}</td>
                 <td>{{ product.isAvailable ? 'Available' : 'Unavailable' }}</td>
@@ -240,7 +241,7 @@ type ProductManagementSection = 'catalog' | 'uploads' | 'history';
                 <td>{{ entry.productKey || 'N/A' }}</td>
                 <td>
                   <strong>{{ entry.name }}</strong>
-                  <small>{{ entry.category?.name || entry.categoryId }}</small>
+                  <small>{{ getCategoryLabel(entry.category) || entry.categoryId }}</small>
                 </td>
                 <td>{{ entry.price | number:'1.2-2' }} EUR</td>
                 <td>{{ entry.supermarket?.name || entry.supermarketId }}</td>
@@ -459,6 +460,7 @@ type ProductManagementSection = 'catalog' | 'uploads' | 'history';
 export class ProductManagementComponent implements OnInit {
   private readonly productManagementService = inject(ProductManagementService);
   private readonly productService = inject(ProductService);
+  private readonly translate = inject(TranslateService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly templateUrl = '/templates/rewe-product-upload-template.xlsx';
@@ -512,6 +514,16 @@ export class ProductManagementComponent implements OnInit {
     this.loadProducts();
     this.loadUploads();
     this.loadHistory();
+  }
+
+  getCategoryLabel(category: Category | undefined | null): string {
+    if (!category) {
+      return '';
+    }
+
+    const key = `categories.${category.slug}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? category.name : translated;
   }
 
   setSection(section: ProductManagementSection): void {
