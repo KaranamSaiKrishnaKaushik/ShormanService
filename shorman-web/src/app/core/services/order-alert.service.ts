@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 import { MenuPermissionService } from './menu-permission.service';
 import { OrderService } from './order.service';
 import { UserManagementService } from './user-management.service';
-import { AdminOrderSummary, Order } from '../models/order.model';
+import { Order } from '../models/order.model';
 
 export interface OrderAlertNotification {
   count: number;
@@ -71,7 +71,7 @@ export class OrderAlertService {
 
     if ((this.auth.hasRole('Admin') || this.auth.hasRole('SuperAdmin')) && this.menuPermissions.hasPermission('user-management.order-summary')) {
       this.startPolling(
-        () => this.userManagementService.getOrderSummary().pipe(map(orders => this.countAwaitingPickup(orders))),
+        () => this.userManagementService.getAwaitingPickupCount(),
         (count, hasIncrease) => ({
           count,
           route: '/user-management/order-summary',
@@ -103,7 +103,7 @@ export class OrderAlertService {
       });
   }
 
-  private countAwaitingPickup(orders: Array<Order | AdminOrderSummary>): number {
+  private countAwaitingPickup(orders: Order[]): number {
     return orders.filter(order => order.status === 'AWAITING_PICKUP').length;
   }
 }

@@ -6,9 +6,9 @@ export type MenuPermissionKey =
   | 'orders'
   | 'addresses'
   | 'rider-dashboard'
+  | 'product-management'
   | 'user-management.user-list'
   | 'user-management.role-access'
-  | 'user-management.product-data'
   | 'user-management.order-summary';
 
 export interface RoleMenuPermission {
@@ -29,6 +29,5 @@ export interface CurrentMenuPermissions {
 export const USER_MANAGEMENT_MENU_KEYS: MenuPermissionKey[] = [
   'user-management.user-list',
   'user-management.role-access',
-  'user-management.product-data',
   'user-management.order-summary'
 ];

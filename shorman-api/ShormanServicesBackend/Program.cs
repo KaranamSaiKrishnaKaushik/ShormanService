@@ -1,4 +1,7 @@
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
 using ShormanServicesBackend.Api;
+using ShormanServicesBackend.Api.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +62,12 @@ builder.Services.AddApi(builder.Configuration);
 
 var app = builder.Build();
 
+var productManagementOptions = app.Services.GetRequiredService<IOptions<ProductManagementOptions>>().Value;
+var storageRoot = Path.IsPathRooted(productManagementOptions.StorageRootPath)
+    ? productManagementOptions.StorageRootPath
+    : Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, productManagementOptions.StorageRootPath));
+Directory.CreateDirectory(storageRoot);
+
 app.UseExceptionHandler();
 
 app.UseSwagger();
@@ -66,6 +75,12 @@ app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "ShormanServices API v1");
     options.RoutePrefix = "swagger";
+});
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(storageRoot),
+    RequestPath = GetProductManagementRequestPath(productManagementOptions.PublicBasePath)
 });
 
 app.UseCors("AngularClient");
@@ -85,3 +100,13 @@ app.MapGet("/health", () => Results.Ok(new
 await app.Services.InitializeApiAsync();
 
 app.Run();
+
+static string GetProductManagementRequestPath(string requestPath)
+{
+    if (string.IsNullOrWhiteSpace(requestPath))
+    {
+        return "/product-management-assets";
+    }
+
+    return requestPath.StartsWith('/') ? requestPath.TrimEnd('/') : "/" + requestPath.Trim('/');
+}

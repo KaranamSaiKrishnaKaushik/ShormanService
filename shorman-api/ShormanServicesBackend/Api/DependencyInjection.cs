@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<Auth0Options>(configuration.GetSection(Auth0Options.SectionName));
         services.Configure<DeliveryZoneOptions>(configuration.GetSection(DeliveryZoneOptions.SectionName));
+        services.Configure<ProductManagementOptions>(configuration.GetSection(ProductManagementOptions.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
         var auth0Options = configuration.GetSection(Auth0Options.SectionName).Get<Auth0Options>() ?? new Auth0Options();
         var apiConnection = configuration.GetConnectionString("ApiConnection");
@@ -61,6 +62,7 @@ public static class DependencyInjection
         services.AddMediatR(typeof(DependencyInjection).Assembly);
         services.AddScoped<JwtTokenService>();
         services.AddScoped<IDeliveryGeocodingService, DeliveryGeocodingService>();
+        services.AddScoped<IProductManagementImportService, ProductManagementImportService>();
         services.AddHttpClient("delivery-geocoder", client =>
         {
             client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
@@ -199,6 +201,7 @@ public static class DependencyInjection
         IF OBJECT_ID('products', 'U') IS NULL
         CREATE TABLE products (
             Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            ProductKey NVARCHAR(64) NULL,
             Name NVARCHAR(220) NOT NULL,
             Description NVARCHAR(1000) NULL,
             Price DECIMAL(10,2) NOT NULL,
@@ -208,9 +211,28 @@ public static class DependencyInjection
             Unit NVARCHAR(50) NULL,
             Stock INT NULL,
             IsAvailable BIT NOT NULL DEFAULT 1,
+            DataSource NVARCHAR(30) NOT NULL DEFAULT 'manual',
+            UpdatedAtUtc DATETIME2 NULL,
+            LastImportRunId INT NULL,
             CONSTRAINT FK_products_Category FOREIGN KEY (CategoryId) REFERENCES categories(Id),
             CONSTRAINT FK_products_Supermarket FOREIGN KEY (SupermarketId) REFERENCES supermarkets(Id)
         );
+        """,
+        """
+        IF COL_LENGTH('products', 'ProductKey') IS NULL
+        ALTER TABLE products ADD ProductKey NVARCHAR(64) NULL;
+        """,
+        """
+        IF COL_LENGTH('products', 'DataSource') IS NULL
+        ALTER TABLE products ADD DataSource NVARCHAR(30) NOT NULL CONSTRAINT DF_products_DataSource DEFAULT 'manual';
+        """,
+        """
+        IF COL_LENGTH('products', 'UpdatedAtUtc') IS NULL
+        ALTER TABLE products ADD UpdatedAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('products', 'LastImportRunId') IS NULL
+        ALTER TABLE products ADD LastImportRunId INT NULL;
         """,
         """
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_IsAvailable_Name' AND object_id = OBJECT_ID('products'))
@@ -223,6 +245,67 @@ public static class DependencyInjection
         """
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_SupermarketId' AND object_id = OBJECT_ID('products'))
         CREATE INDEX IX_products_SupermarketId ON products (SupermarketId);
+        """,
+        """
+        IF OBJECT_ID('product_upload_runs', 'U') IS NULL
+        CREATE TABLE product_upload_runs (
+            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            StoreSlug NVARCHAR(100) NOT NULL,
+            OriginalFileName NVARCHAR(260) NOT NULL,
+            StoredFilePath NVARCHAR(500) NOT NULL,
+            Status NVARCHAR(30) NOT NULL,
+            TotalRows INT NOT NULL DEFAULT 0,
+            InsertedCount INT NOT NULL DEFAULT 0,
+            UpdatedCount INT NOT NULL DEFAULT 0,
+            UnchangedCount INT NOT NULL DEFAULT 0,
+            DeactivatedCount INT NOT NULL DEFAULT 0,
+            UploadedAtUtc DATETIME2 NOT NULL,
+            CompletedAtUtc DATETIME2 NULL,
+            UploadedByUserId INT NOT NULL,
+            ErrorMessage NVARCHAR(1000) NULL
+        );
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_product_upload_runs_StoreSlug' AND object_id = OBJECT_ID('product_upload_runs'))
+        CREATE INDEX IX_product_upload_runs_StoreSlug ON product_upload_runs (StoreSlug);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_product_upload_runs_UploadedAtUtc' AND object_id = OBJECT_ID('product_upload_runs'))
+        CREATE INDEX IX_product_upload_runs_UploadedAtUtc ON product_upload_runs (UploadedAtUtc DESC);
+        """,
+        """
+        IF OBJECT_ID('product_history_data', 'U') IS NULL
+        CREATE TABLE product_history_data (
+            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            ProductId INT NULL,
+            ProductKey NVARCHAR(64) NULL,
+            Name NVARCHAR(220) NOT NULL,
+            Description NVARCHAR(1000) NULL,
+            Price DECIMAL(10,2) NOT NULL,
+            ImageUrl NVARCHAR(1000) NULL,
+            CategoryId INT NOT NULL,
+            SupermarketId INT NOT NULL,
+            Unit NVARCHAR(50) NULL,
+            Stock INT NULL,
+            IsAvailable BIT NOT NULL,
+            DataSource NVARCHAR(30) NOT NULL,
+            ChangeType NVARCHAR(30) NOT NULL,
+            ChangedAtUtc DATETIME2 NOT NULL,
+            ChangedByUserId INT NOT NULL,
+            ImportRunId INT NULL
+        );
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_product_history_data_ProductId' AND object_id = OBJECT_ID('product_history_data'))
+        CREATE INDEX IX_product_history_data_ProductId ON product_history_data (ProductId);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_product_history_data_SupermarketId' AND object_id = OBJECT_ID('product_history_data'))
+        CREATE INDEX IX_product_history_data_SupermarketId ON product_history_data (SupermarketId);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_product_history_data_ChangedAtUtc' AND object_id = OBJECT_ID('product_history_data'))
+        CREATE INDEX IX_product_history_data_ChangedAtUtc ON product_history_data (ChangedAtUtc DESC);
         """,
         """
         IF OBJECT_ID('carts', 'U') IS NULL
@@ -554,6 +637,7 @@ public static class DependencyInjection
         """
         CREATE TABLE IF NOT EXISTS `products` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `ProductKey` VARCHAR(64) NULL,
             `Name` VARCHAR(220) NOT NULL,
             `Description` VARCHAR(1000) NULL,
             `Price` DECIMAL(10,2) NOT NULL,
@@ -563,10 +647,61 @@ public static class DependencyInjection
             `Unit` VARCHAR(50) NULL,
             `Stock` INT NULL,
             `IsAvailable` TINYINT(1) NOT NULL DEFAULT 1,
+            `DataSource` VARCHAR(30) NOT NULL DEFAULT 'manual',
+            `UpdatedAtUtc` DATETIME NULL,
+            `LastImportRunId` INT NULL,
             CONSTRAINT `FK_products_Category` FOREIGN KEY (`CategoryId`) REFERENCES `categories` (`Id`),
             CONSTRAINT `FK_products_Supermarket` FOREIGN KEY (`SupermarketId`) REFERENCES `supermarkets` (`Id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
+        MySqlAddColumnIfMissing("products", "ProductKey", "VARCHAR(64) NULL"),
+        MySqlAddColumnIfMissing("products", "DataSource", "VARCHAR(30) NOT NULL DEFAULT 'manual'"),
+        MySqlAddColumnIfMissing("products", "UpdatedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("products", "LastImportRunId", "INT NULL"),
+        """
+        CREATE TABLE IF NOT EXISTS `product_upload_runs` (
+            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `StoreSlug` VARCHAR(100) NOT NULL,
+            `OriginalFileName` VARCHAR(260) NOT NULL,
+            `StoredFilePath` VARCHAR(500) NOT NULL,
+            `Status` VARCHAR(30) NOT NULL,
+            `TotalRows` INT NOT NULL DEFAULT 0,
+            `InsertedCount` INT NOT NULL DEFAULT 0,
+            `UpdatedCount` INT NOT NULL DEFAULT 0,
+            `UnchangedCount` INT NOT NULL DEFAULT 0,
+            `DeactivatedCount` INT NOT NULL DEFAULT 0,
+            `UploadedAtUtc` DATETIME NOT NULL,
+            `CompletedAtUtc` DATETIME NULL,
+            `UploadedByUserId` INT NOT NULL,
+            `ErrorMessage` VARCHAR(1000) NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        MySqlCreateIndexIfMissing("product_upload_runs", "IX_product_upload_runs_StoreSlug", "`StoreSlug`"),
+        MySqlCreateIndexIfMissing("product_upload_runs", "IX_product_upload_runs_UploadedAtUtc", "`UploadedAtUtc`"),
+        """
+        CREATE TABLE IF NOT EXISTS `product_history_data` (
+            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `ProductId` INT NULL,
+            `ProductKey` VARCHAR(64) NULL,
+            `Name` VARCHAR(220) NOT NULL,
+            `Description` VARCHAR(1000) NULL,
+            `Price` DECIMAL(10,2) NOT NULL,
+            `ImageUrl` VARCHAR(1000) NULL,
+            `CategoryId` INT NOT NULL,
+            `SupermarketId` INT NOT NULL,
+            `Unit` VARCHAR(50) NULL,
+            `Stock` INT NULL,
+            `IsAvailable` TINYINT(1) NOT NULL,
+            `DataSource` VARCHAR(30) NOT NULL,
+            `ChangeType` VARCHAR(30) NOT NULL,
+            `ChangedAtUtc` DATETIME NOT NULL,
+            `ChangedByUserId` INT NOT NULL,
+            `ImportRunId` INT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        MySqlCreateIndexIfMissing("product_history_data", "IX_product_history_data_ProductId", "`ProductId`"),
+        MySqlCreateIndexIfMissing("product_history_data", "IX_product_history_data_SupermarketId", "`SupermarketId`"),
+        MySqlCreateIndexIfMissing("product_history_data", "IX_product_history_data_ChangedAtUtc", "`ChangedAtUtc`"),
         """
         CREATE TABLE IF NOT EXISTS `carts` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,

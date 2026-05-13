@@ -13,6 +13,7 @@ public record PasswordResetRequestResponse(string Message, string? ResetCode);
 public record UpdateUserRoleRequest(string Role);
 public record DeleteUserResponse(int UserId, string Message);
 public record AdminUserListItemDto(int Id, string Email, string FirstName, string LastName, string? Phone, string? CreatedAt, IReadOnlyCollection<string> Roles);
+public record OrderAlertCountDto(int Count);
 public record AdminOrderSummaryDto(
 	int Id,
 	int UserId,
@@ -49,6 +50,9 @@ public record UpdateAddressRequest(string? Label, string Street, string HouseNum
 public record CategoryDto(int Id, string Name, string Slug, string? Icon);
 public record SupermarketDto(int Id, string Name, string Slug, string? LogoUrl, string? Color);
 public record ProductDto(int Id, string Name, string? Description, decimal Price, string? ImageUrl, int CategoryId, CategoryDto? Category, int SupermarketId, SupermarketDto? Supermarket, string? Unit, int? Stock, bool IsAvailable);
+public record ProductManagementProductDto(int Id, string? ProductKey, string Name, decimal Price, string? ImageUrl, int CategoryId, CategoryDto? Category, int SupermarketId, SupermarketDto? Supermarket, string? Unit, int? Stock, bool IsAvailable, string DataSource, string? UpdatedAt);
+public record ProductUploadRunDto(int Id, string StoreSlug, string OriginalFileName, string StoredFileUrl, string Status, int TotalRows, int InsertedCount, int UpdatedCount, int UnchangedCount, int DeactivatedCount, string UploadedAt, string? CompletedAt, string? UploadedByName, string? ErrorMessage);
+public record ProductHistoryDataDto(int Id, int? ProductId, string? ProductKey, string Name, decimal Price, string? ImageUrl, int CategoryId, CategoryDto? Category, int SupermarketId, SupermarketDto? Supermarket, string? Unit, int? Stock, bool IsAvailable, string DataSource, string ChangeType, string ChangedAt, string? ChangedByName, int? ImportRunId);
 public record UpdateProductRequest(string Name, string? Description, decimal Price, string? ImageUrl, int CategoryId, int SupermarketId, string? Unit, int? Stock, bool IsAvailable);
 public record PagedResultDto<T>(IReadOnlyCollection<T> Items, int TotalCount, int Page, int PageSize);
 
@@ -84,3 +88,30 @@ public record OrderDto(
 	string? DeliveredAt,
 	string? CashCollectedAt,
 	string? CompletedAt);
+
+public record OrderInsightsStoreSpendDto(string Store, decimal Spend);
+public record OrderInsightsMonthlyStoreSpendDto(string MonthKey, string MonthLabel, IReadOnlyCollection<OrderInsightsStoreSpendDto> Stores);
+public record OrderInsightsCategoryDto(string Category, string Segment, decimal Spend, int OrderCount);
+public record OrderInsightsHeatmapCellDto(string Store, string Category, string Segment, decimal Spend);
+public record OrderInsightsReorderedProductDto(int ProductId, string ProductName, string? ProductImageUrl, string Store, int Quantity, int RepeatCount, decimal Spend);
+
+public record OrderInsightsDto(
+	decimal TotalSpend,
+	int TotalOrders,
+	decimal AverageBasket,
+	decimal PreviousTotalSpend,
+	int PreviousTotalOrders,
+	decimal PreviousAverageBasket,
+	string FavoriteStore,
+	decimal FavoriteStoreSpend,
+	decimal FavoriteStoreShare,
+	string FavoriteCategory,
+	decimal FavoriteCategorySpend,
+	decimal FavoriteCategoryShare,
+	decimal GroceryShare,
+	decimal DrugstoreShare,
+	IReadOnlyCollection<OrderInsightsStoreSpendDto> StoreSpend,
+	IReadOnlyCollection<OrderInsightsMonthlyStoreSpendDto> MonthlySpend,
+	IReadOnlyCollection<OrderInsightsCategoryDto> TopCategories,
+	IReadOnlyCollection<OrderInsightsHeatmapCellDto> Heatmap,
+	IReadOnlyCollection<OrderInsightsReorderedProductDto> TopReorderedProducts);

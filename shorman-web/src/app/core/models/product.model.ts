@@ -51,6 +51,7 @@ export interface ProductFilters {
   search?: string;
   categoryId?: number;
   supermarketId?: number;
+  supermarketIds?: number[];
   supermarketSlug?: string;
   categorySlug?: string;
   page?: number;

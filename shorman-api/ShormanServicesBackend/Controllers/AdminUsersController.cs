@@ -22,6 +22,11 @@ public class AdminUsersController(IMediator mediator) : ControllerBase
     public Task<IReadOnlyCollection<AdminOrderSummaryDto>> GetOrderSummary(CancellationToken cancellationToken) =>
         mediator.Send(new GetAdminOrderSummariesQuery(), cancellationToken);
 
+    [HttpGet("order-summary/awaiting-pickup-count")]
+    [Authorize(Roles = $"{RoleNames.SuperAdmin},{RoleNames.Admin},{RoleNames.Rider}")]
+    public Task<OrderAlertCountDto> GetAwaitingPickupCount(CancellationToken cancellationToken) =>
+        mediator.Send(new GetAdminAwaitingPickupCountQuery(), cancellationToken);
+
     [HttpPut("{id:int}/role")]
     [Authorize(Roles = RoleNames.SuperAdmin)]
     public async Task<ActionResult<AdminUserListItemDto>> UpdateRole(int id, [FromBody] UpdateUserRoleRequest request, CancellationToken cancellationToken)

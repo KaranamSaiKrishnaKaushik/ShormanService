@@ -28,9 +28,11 @@ import { OrderAlertService } from '../../../core/services/order-alert.service';
           <a routerLink="/products" routerLinkActive="active" class="nav-link">Products</a>
           <ng-container *ngIf="auth.isLoggedIn$ | async">
             <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="nav-link">Orders</a>
+            <a *ngIf="showHistoryStats()" routerLink="/history-stats" routerLinkActive="active" class="nav-link">History Stats</a>
             <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="nav-link">Addresses</a>
             <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="nav-link">Checkout</a>
             <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="nav-link">Rider Dashboard</a>
+            <a *ngIf="showProductManagement()" routerLink="/product-management" routerLinkActive="active" class="nav-link">Product Management</a>
             <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="nav-link">User Management</a>
           </ng-container>
         </div>
@@ -89,9 +91,11 @@ import { OrderAlertService } from '../../../core/services/order-alert.service';
         <a routerLink="/products" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Products</a>
         <ng-container *ngIf="auth.isLoggedIn$ | async">
           <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Orders</a>
+          <a *ngIf="showHistoryStats()" routerLink="/history-stats" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">History Stats</a>
           <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Addresses</a>
           <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Checkout</a>
           <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Rider Dashboard</a>
+          <a *ngIf="showProductManagement()" routerLink="/product-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Product Management</a>
           <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">User Management</a>
         </ng-container>
       </div>
@@ -455,7 +459,15 @@ export class NavbarComponent {
     return (this.auth.hasRole('Customer') || this.auth.hasRole('Rider')) && this.menuPermissions.hasPermission('orders');
   }
 
+  showHistoryStats(): boolean {
+    return this.auth.hasRole('Customer') || this.auth.hasRole('Admin') || this.auth.hasRole('SuperAdmin');
+  }
+
   showUserManagement(): boolean {
     return this.menuPermissions.hasAnyPermission(USER_MANAGEMENT_MENU_KEYS);
+  }
+
+  showProductManagement(): boolean {
+    return (this.auth.hasRole('Admin') || this.auth.hasRole('SuperAdmin')) && this.menuPermissions.hasPermission('product-management');
   }
 }
