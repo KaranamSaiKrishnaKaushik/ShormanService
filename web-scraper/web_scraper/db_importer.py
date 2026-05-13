@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .openfoodfacts import DEFAULT_SOURCE, get_file_prefix
+
 DEFAULT_PRICE = 0
+MYSQL_INSERT_BATCH_SIZE = 200
 IMPORTED_CATEGORY_SLUG = "imported-products"
 IMPORTED_CATEGORY_NAME = "Imported Products"
 IMPORTED_CATEGORY_ICON = "box"
-CATEGORY_METADATA = {
+GROCERY_CATEGORY_METADATA = {
     "eggs-dairy": {"name": "Eggs & Dairy", "icon": "egg"},
     "meat": {"name": "Meat", "icon": "meat"},
     "fruits-vegetables": {"name": "Fruits & Vegetables", "icon": "leaf"},
@@ -17,7 +20,19 @@ CATEGORY_METADATA = {
     "beverages": {"name": "Beverages", "icon": "cup"},
     "snacks": {"name": "Snacks", "icon": "popcorn"},
 }
-CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+BEAUTY_CATEGORY_METADATA = {
+    "hair-care": {"name": "Hair Care", "icon": "sparkles"},
+    "skin-care": {"name": "Skin Care", "icon": "sun"},
+    "body-bath": {"name": "Body & Bath", "icon": "droplets"},
+    "makeup-fragrance": {"name": "Makeup & Fragrance", "icon": "palette"},
+    "health-wellness": {"name": "Health & Wellness", "icon": "heart-pulse"},
+    "baby-kids": {"name": "Baby & Kids", "icon": "baby"},
+}
+CATEGORY_METADATA = {
+    **GROCERY_CATEGORY_METADATA,
+    **BEAUTY_CATEGORY_METADATA,
+}
+GROCERY_CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("eggs-dairy", ("milk", "cheese", "yogurt", "yoghurt", "butter", "cream", "egg", "eggs", "mozzarella", "quark", "kefir", "skyr", "gouda", "brie", "camembert")),
     ("meat", ("chicken", "beef", "pork", "meat", "sausage", "salami", "ham", "bacon", "turkey", "lamb", "veal", "steak", "mince", "ground beef", "salmon", "fish", "tuna")),
     ("fruits-vegetables", ("apple", "apples", "banana", "bananas", "tomato", "tomatoes", "potato", "potatoes", "onion", "carrot", "lettuce", "salad", "cucumber", "pepper", "broccoli", "fruit", "vegetable", "avocado", "orange", "lemon", "lime", "grape", "berries", "berry", "mango")),
@@ -25,13 +40,24 @@ CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("beverages", ("water", "juice", "cola", "soda", "drink", "tea", "coffee", "espresso", "latte", "beer", "wine", "smoothie", "lemonade", "energy drink", "sparkling", "still water")),
     ("snacks", ("chips", "crisps", "chocolate", "candy", "cookie", "cookies", "biscuit", "biscuits", "cracker", "pretzel", "nuts", "nut", "popcorn", "snack", "wafer", "bar", "granola")),
 )
+BEAUTY_CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("baby-kids", ("baby", "babydream", "kids", "kid", "child", "children", "newborn", "infant", "diaper", "diapers", "nappy", "nappies", "wipes", "baby wash", "baby shampoo", "baby lotion", "baby oil", "baby cream", "baby food", "teether", "soother")),
+    ("hair-care", ("shampoo", "conditioner", "conditioners", "hair mask", "hair treatment", "hair oil", "hair serum", "styling", "hairspray", "hair spray", "hair gel", "hair wax", "hair mousse", "dry shampoo", "hair color", "hair colour", "hair dye", "developer", "bleach", "leave-in", "scalp", "curl cream", "curl gel")),
+    ("skin-care", ("cleanser", "cleanser", "face wash", "facial wash", "moisturizer", "moisturiser", "serum", "serums", "mask", "masks", "sunscreen", "sun cream", "sun lotion", "spf", "face cream", "day cream", "night cream", "toner", "micellar", "micellar water", "exfoliant", "scrub", "peeling", "lip balm", "eye cream", "eye serum", "face oil")),
+    ("makeup-fragrance", ("lipstick", "mascara", "foundation", "concealer", "blush", "bronzer", "eyeliner", "eyeshadow", "eye shadow", "brow", "powder", "primer", "makeup", "make-up", "nail polish", "perfume", "fragrance", "eau de parfum", "eau de toilette", "cologne", "body mist", "setting spray", "highlighter")),
+    ("body-bath", ("shower gel", "body wash", "body lotion", "body cream", "deodorant", "antiperspirant", "hand soap", "liquid soap", "soap", "bath", "bubble bath", "body scrub", "hand cream", "foot cream", "oral care", "toothpaste", "toothbrush", "mouthwash", "mouth wash", "dental floss", "intimate wash")),
+    ("health-wellness", ("vitamin", "vitamins", "supplement", "supplements", "magnesium", "zinc", "omega", "probiotic", "protein", "medical", "medicine", "first aid", "bandage", "plaster", "thermometer", "pain relief", "period", "tampon", "tampons", "pad", "pads", "pantyliner", "menstrual", "intimate care", "condom", "oral rehydration")),
+)
 STORE_METADATA = {
     "rewe": {"name": "REWE", "color": "#CC0000"},
     "aldi": {"name": "ALDI", "color": "#00519C"},
     "edeka": {"name": "EDEKA", "color": "#003A70"},
     "penny": {"name": "PENNY", "color": "#CC0000"},
     "lidl": {"name": "LIDL", "color": "#0050AA"},
+    "dm": {"name": "dm", "color": "#003E91"},
+    "rossmann": {"name": "ROSSMANN", "color": "#C3002F"},
 }
+BEAUTY_STORE_SLUGS = frozenset({"dm", "rossmann"})
 
 
 REQUESTED_DB_FIELDS = (
@@ -96,6 +122,7 @@ class StoreStatus:
 
 def import_store_json(
     *,
+    catalog: str = DEFAULT_SOURCE,
     store: str,
     input_file: Path,
     appsettings_path: Path,
@@ -103,7 +130,7 @@ def import_store_json(
     connection_string: str | None,
     dry_run: bool,
 ) -> ImportSummary:
-    resolved_input_file = _resolve_input_file(store=store, input_file=input_file)
+    resolved_input_file = _resolve_input_file(catalog=catalog, store=store, input_file=input_file)
     records = _load_records(resolved_input_file)
     settings = _resolve_database_settings(
         appsettings_path=appsettings_path,
@@ -136,11 +163,12 @@ def import_store_json(
     )
 
 
-def _resolve_input_file(*, store: str, input_file: Path) -> Path:
+def _resolve_input_file(*, catalog: str, store: str, input_file: Path) -> Path:
     if input_file.exists():
         return input_file
 
-    snapshot_pattern = f"openfoodfacts_{store}_*.json"
+    file_prefix = get_file_prefix(catalog)
+    snapshot_pattern = f"{file_prefix}_{store}_*.json"
     sibling_snapshots = sorted(
         path for path in input_file.parent.glob(snapshot_pattern) if path.name != input_file.name
     )
@@ -148,8 +176,8 @@ def _resolve_input_file(*, store: str, input_file: Path) -> Path:
         return sibling_snapshots[-1]
 
     raise FileNotFoundError(
-        f"Input JSON file not found: {input_file}. Run 'python main.py off-store --store {store} --format json --verbose' first. "
-        f"That command will create the folder and write openfoodfacts_{store}_latest.json automatically."
+        f"Input JSON file not found: {input_file}. Run 'python main.py off-store --catalog {catalog} --store {store} --format json --verbose' first. "
+        f"That command will create the folder and write {file_prefix}_{store}_latest.json automatically."
     )
 
 
@@ -175,6 +203,13 @@ def _to_text(value: object) -> str:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _chunked(items: list[tuple[object, ...]], chunk_size: int) -> list[list[tuple[object, ...]]]:
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than 0")
+
+    return [items[index:index + chunk_size] for index in range(0, len(items), chunk_size)]
 
 
 def _resolve_database_settings(
@@ -396,17 +431,18 @@ def _import_mysql(*, store: str, input_file: Path, connection_string: str, recor
         cursor.execute("DELETE FROM off_store_products WHERE StoreSlug = %s", (store,))
         rows = [_record_tuple(record, store=store, run_id=run_id, imported_at=now) for record in records]
         if rows:
-            cursor.executemany(
-                """
-                INSERT INTO off_store_products (
-                    ImportRunId, StoreSlug, Code, Url, Creator, CreatedDatetime, LastModifiedDatetime,
-                    LastUpdatedDatetime, ProductName, Brands, Origins, Stores, Countries, CountriesTags,
-                    CountriesEn, IngredientsText, IngredientsTags, IngredientsAnalysisTags, Price, ImageUrl,
-                    ImageSmallUrl, ImportedAtUtc
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                rows,
-            )
+            for batch in _chunked(rows, MYSQL_INSERT_BATCH_SIZE):
+                cursor.executemany(
+                    """
+                    INSERT INTO off_store_products (
+                        ImportRunId, StoreSlug, Code, Url, Creator, CreatedDatetime, LastModifiedDatetime,
+                        LastUpdatedDatetime, ProductName, Brands, Origins, Stores, Countries, CountriesTags,
+                        CountriesEn, IngredientsText, IngredientsTags, IngredientsAnalysisTags, Price, ImageUrl,
+                        ImageSmallUrl, ImportedAtUtc
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    batch,
+                )
         cursor.execute(
             "UPDATE off_import_runs SET CompletedAtUtc = %s, Status = %s, RecordCount = %s WHERE Id = %s",
             (now, "completed", len(records), run_id),
@@ -544,6 +580,7 @@ def promote_staged_products(
 
 def get_store_statuses(
     *,
+    catalog: str = DEFAULT_SOURCE,
     stores: list[str],
     output_dir: Path,
     appsettings_path: Path,
@@ -556,7 +593,7 @@ def get_store_statuses(
         connection_string=connection_string,
     )
 
-    latest_files = {store: _resolve_latest_file_metadata(output_dir / store, store) for store in stores}
+    latest_files = {store: _resolve_latest_file_metadata(output_dir / store, store, catalog) for store in stores}
 
     if settings.provider == "sqlserver":
         return _get_sqlserver_statuses(stores=stores, latest_files=latest_files, connection_string=settings.connection_string)
@@ -804,6 +841,7 @@ def _upsert_sqlserver_products(cursor: object, store: str, staged_rows: list[tup
         cursor.execute("SELECT ProductId FROM off_product_links WHERE StoreSlug = ? AND Code = ?", store, code)
         link_row = cursor.fetchone()
         prepared = _prepare_product_payload(
+            store=store,
             code=code,
             product_name=product_name,
             ingredients_text=ingredients_text,
@@ -866,6 +904,7 @@ def _upsert_mysql_products(cursor: object, store: str, staged_rows: list[tuple],
         cursor.execute("SELECT ProductId FROM off_product_links WHERE StoreSlug = %s AND Code = %s", (store, code))
         link_row = cursor.fetchone()
         prepared = _prepare_product_payload(
+            store=store,
             code=code,
             product_name=product_name,
             ingredients_text=ingredients_text,
@@ -904,6 +943,7 @@ def _upsert_mysql_products(cursor: object, store: str, staged_rows: list[tuple],
 
 def _prepare_product_payload(
     *,
+    store: str,
     code: str,
     product_name: str | None,
     ingredients_text: str | None,
@@ -914,7 +954,14 @@ def _prepare_product_payload(
     image_small_url: str | None,
     price: object,
 ) -> dict[str, object]:
-    category_slug = _classify_category_slug(product_name, ingredients_text, brands, origins, countries_en)
+    category_slug = _classify_category_slug(
+        store=store,
+        product_name=product_name,
+        ingredients_text=ingredients_text,
+        brands=brands,
+        origins=origins,
+        countries_en=countries_en,
+    )
     return {
         "name": _truncate_text(product_name or code, 220) or code,
         "description": _truncate_text(_first_nonempty(ingredients_text, brands, origins, countries_en), 1000),
@@ -924,11 +971,30 @@ def _prepare_product_payload(
     }
 
 
-def _classify_category_slug(*values: object) -> str:
-    haystack = " ".join(_to_text(value).lower() for value in values if value is not None)
+def _classify_category_slug(
+    *,
+    store: str,
+    product_name: str | None,
+    ingredients_text: str | None,
+    brands: str | None,
+    origins: str | None,
+    countries_en: str | None,
+) -> str:
+    haystack = " ".join(
+        _to_text(value).lower()
+        for value in (product_name, ingredients_text, brands, origins, countries_en)
+        if value is not None
+    )
     normalized = " ".join(haystack.replace("/", " ").replace("-", " ").replace(",", " ").split())
 
-    for slug, keywords in CATEGORY_KEYWORDS:
+    if store in BEAUTY_STORE_SLUGS:
+        for slug, keywords in BEAUTY_CATEGORY_KEYWORDS:
+            if any(keyword in normalized for keyword in keywords):
+                return slug
+
+        return IMPORTED_CATEGORY_SLUG
+
+    for slug, keywords in GROCERY_CATEGORY_KEYWORDS:
         if any(keyword in normalized for keyword in keywords):
             return slug
 
@@ -949,11 +1015,12 @@ def _truncate_text(value: str, limit: int) -> str | None:
     return value[:limit]
 
 
-def _resolve_latest_file_metadata(store_dir: Path, store: str) -> tuple[Path | None, datetime | None, int]:
-    latest = store_dir / f"openfoodfacts_{store}_latest.json"
+def _resolve_latest_file_metadata(store_dir: Path, store: str, catalog: str) -> tuple[Path | None, datetime | None, int]:
+    file_prefix = get_file_prefix(catalog)
+    latest = store_dir / f"{file_prefix}_{store}_latest.json"
     candidate = latest if latest.exists() else None
     if candidate is None and store_dir.exists():
-        snapshots = sorted(store_dir.glob(f"openfoodfacts_{store}_*.json"))
+        snapshots = sorted(store_dir.glob(f"{file_prefix}_{store}_*.json"))
         candidate = snapshots[-1] if snapshots else None
 
     if candidate is None:

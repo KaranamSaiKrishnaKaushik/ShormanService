@@ -85,3 +85,6 @@ Thumbs.db
 ### TypeScript cache
 ### ========================
 *.tsbuildinfo
+
+# Ignore compiled Python files
+web-scraper/web_scraper/__pycache__/

@@ -24,6 +24,7 @@ public static class RoleNames
 public static class MenuPermissionKeys
 {
     public const string Products = "products";
+    public const string ProductManagement = "product-management";
     public const string Checkout = "checkout";
     public const string Orders = "orders";
     public const string Addresses = "addresses";
@@ -36,6 +37,7 @@ public static class MenuPermissionKeys
     public static readonly string[] All =
     [
         Products,
+        ProductManagement,
         Checkout,
         Orders,
         Addresses,
@@ -55,6 +57,7 @@ public static class MenuPermissionKeys
             RoleNames.Admin =>
             [
                 Products,
+                ProductManagement,
                 Checkout,
                 Addresses,
                 ProductData,

@@ -90,6 +90,7 @@ public class ApiSupermarket
 public class ApiProduct
 {
     public int Id { get; set; }
+    public string? ProductKey { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public decimal Price { get; set; }
@@ -99,10 +100,52 @@ public class ApiProduct
     public string? Unit { get; set; }
     public int? Stock { get; set; }
     public bool IsAvailable { get; set; } = true;
+    public string DataSource { get; set; } = "manual";
+    public DateTime? UpdatedAtUtc { get; set; }
+    public int? LastImportRunId { get; set; }
 
     public ApiCategory Category { get; set; } = null!;
     public ApiSupermarket Supermarket { get; set; } = null!;
     public ICollection<ApiCartItem> CartItems { get; set; } = [];
+}
+
+public class ApiProductUploadRun
+{
+    public int Id { get; set; }
+    public string StoreSlug { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string StoredFilePath { get; set; } = string.Empty;
+    public string Status { get; set; } = "processing";
+    public int TotalRows { get; set; }
+    public int InsertedCount { get; set; }
+    public int UpdatedCount { get; set; }
+    public int UnchangedCount { get; set; }
+    public int DeactivatedCount { get; set; }
+    public DateTime UploadedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAtUtc { get; set; }
+    public int UploadedByUserId { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+public class ApiProductHistoryData
+{
+    public int Id { get; set; }
+    public int? ProductId { get; set; }
+    public string? ProductKey { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public decimal Price { get; set; }
+    public string? ImageUrl { get; set; }
+    public int CategoryId { get; set; }
+    public int SupermarketId { get; set; }
+    public string? Unit { get; set; }
+    public int? Stock { get; set; }
+    public bool IsAvailable { get; set; }
+    public string DataSource { get; set; } = "manual";
+    public string ChangeType { get; set; } = string.Empty;
+    public DateTime ChangedAtUtc { get; set; } = DateTime.UtcNow;
+    public int ChangedByUserId { get; set; }
+    public int? ImportRunId { get; set; }
 }
 
 public class ApiCart

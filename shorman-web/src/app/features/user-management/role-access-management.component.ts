@@ -136,7 +136,7 @@ export class RoleAccessManagementComponent implements OnInit {
     { key: 'orders', label: 'Orders', description: 'Allow order history and order detail pages.' },
     { key: 'addresses', label: 'Addresses', description: 'Allow address management pages.' },
     { key: 'rider-dashboard', label: 'Rider Dashboard', description: 'Allow the rider workspace entry in navigation and routing.' },
-    { key: 'user-management.product-data', label: 'Product Data Admin', description: 'Allow the catalog grid for editing and deleting product records.' },
+    { key: 'product-management', label: 'Product Management', description: 'Allow the product import workspace with uploads, history, and catalog review.' },
     { key: 'user-management.order-summary', label: 'Order History Admin', description: 'Allow the admin order-history tab inside user management.' },
     { key: 'user-management.user-list', label: 'User List Admin', description: 'Allow the registered-user list and role assignment view.' },
     { key: 'user-management.role-access', label: 'Role Access Admin', description: 'Allow editing the menu-permission matrix itself.' }

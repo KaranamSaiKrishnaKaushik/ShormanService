@@ -9,6 +9,7 @@ namespace ShormanServicesBackend.Api.Features;
 
 public record GetAdminUsersQuery() : IRequest<IReadOnlyCollection<AdminUserListItemDto>>;
 public record GetAdminOrderSummariesQuery() : IRequest<IReadOnlyCollection<AdminOrderSummaryDto>>;
+public record GetAdminAwaitingPickupCountQuery() : IRequest<OrderAlertCountDto>;
 public record UpdateUserRoleCommand(int UserId, string Role) : IRequest<AdminUserListItemDto?>;
 public record DeleteUserCommand(int UserId, int RequestedByUserId) : IRequest<DeleteUserResponse?>;
 public record GetRoleMenuPermissionsQuery() : IRequest<IReadOnlyCollection<RoleMenuPermissionsDto>>;
@@ -119,6 +120,18 @@ public class GetAdminOrderSummariesQueryHandler(ApiDbContext dbContext) : IReque
             .ToListAsync(cancellationToken);
 
         return orders.Select(AdminUsersFeatureMappings.MapAdminOrderSummary).ToArray();
+    }
+}
+
+public class GetAdminAwaitingPickupCountQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetAdminAwaitingPickupCountQuery, OrderAlertCountDto>
+{
+    public async Task<OrderAlertCountDto> Handle(GetAdminAwaitingPickupCountQuery request, CancellationToken cancellationToken)
+    {
+        var count = await dbContext.Orders
+            .AsNoTracking()
+            .CountAsync(x => x.Status == OrderStatuses.AwaitingPickup, cancellationToken);
+
+        return new OrderAlertCountDto(count);
     }
 }
 

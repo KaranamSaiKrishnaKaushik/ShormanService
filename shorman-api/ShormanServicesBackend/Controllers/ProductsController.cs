@@ -16,10 +16,11 @@ public class ProductsController(IMediator mediator) : ControllerBase
         [FromQuery] string? search,
         [FromQuery] int? categoryId,
         [FromQuery] int? supermarketId,
+        [FromQuery] int[]? supermarketIds,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30,
         CancellationToken cancellationToken = default) =>
-        mediator.Send(new GetProductsQuery(search, categoryId, supermarketId, page, pageSize), cancellationToken);
+        mediator.Send(new GetProductsQuery(search, categoryId, supermarketId, supermarketIds, page, pageSize), cancellationToken);
 
     [HttpGet("admin")]
     [Authorize(Roles = $"{RoleNames.SuperAdmin},{RoleNames.Admin}")]
@@ -27,10 +28,11 @@ public class ProductsController(IMediator mediator) : ControllerBase
         [FromQuery] string? search,
         [FromQuery] int? categoryId,
         [FromQuery] int? supermarketId,
+        [FromQuery] int[]? supermarketIds,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default) =>
-        mediator.Send(new GetAdminProductsQuery(search, categoryId, supermarketId, page, pageSize), cancellationToken);
+        mediator.Send(new GetAdminProductsQuery(search, categoryId, supermarketId, supermarketIds, page, pageSize), cancellationToken);
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ProductDto>> GetProduct(int id, CancellationToken cancellationToken)

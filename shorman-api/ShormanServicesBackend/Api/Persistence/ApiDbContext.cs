@@ -13,6 +13,8 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
     public DbSet<ApiCategory> Categories => Set<ApiCategory>();
     public DbSet<ApiSupermarket> Supermarkets => Set<ApiSupermarket>();
     public DbSet<ApiProduct> Products => Set<ApiProduct>();
+    public DbSet<ApiProductUploadRun> ProductUploadRuns => Set<ApiProductUploadRun>();
+    public DbSet<ApiProductHistoryData> ProductHistoryData => Set<ApiProductHistoryData>();
     public DbSet<ApiCart> Carts => Set<ApiCart>();
     public DbSet<ApiCartItem> CartItems => Set<ApiCartItem>();
     public DbSet<ApiOrder> Orders => Set<ApiOrder>();
@@ -96,13 +98,45 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
         {
             entity.ToTable("products");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.ProductKey).HasMaxLength(64);
             entity.Property(x => x.Name).HasMaxLength(220).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(1000);
             entity.Property(x => x.Price).HasPrecision(10, 2);
             entity.Property(x => x.ImageUrl).HasMaxLength(1000);
             entity.Property(x => x.Unit).HasMaxLength(50);
+            entity.Property(x => x.DataSource).HasMaxLength(30).IsRequired();
             entity.HasOne(x => x.Category).WithMany(x => x.Products).HasForeignKey(x => x.CategoryId);
             entity.HasOne(x => x.Supermarket).WithMany(x => x.Products).HasForeignKey(x => x.SupermarketId);
+        });
+
+        modelBuilder.Entity<ApiProductUploadRun>(entity =>
+        {
+            entity.ToTable("product_upload_runs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.StoreSlug).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.OriginalFileName).HasMaxLength(260).IsRequired();
+            entity.Property(x => x.StoredFilePath).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.ErrorMessage).HasMaxLength(1000);
+            entity.HasIndex(x => x.StoreSlug);
+            entity.HasIndex(x => x.UploadedAtUtc);
+        });
+
+        modelBuilder.Entity<ApiProductHistoryData>(entity =>
+        {
+            entity.ToTable("product_history_data");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ProductKey).HasMaxLength(64);
+            entity.Property(x => x.Name).HasMaxLength(220).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.Price).HasPrecision(10, 2);
+            entity.Property(x => x.ImageUrl).HasMaxLength(1000);
+            entity.Property(x => x.Unit).HasMaxLength(50);
+            entity.Property(x => x.DataSource).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.ChangeType).HasMaxLength(30).IsRequired();
+            entity.HasIndex(x => x.ProductId);
+            entity.HasIndex(x => x.SupermarketId);
+            entity.HasIndex(x => x.ChangedAtUtc);
         });
 
         modelBuilder.Entity<ApiCart>(entity =>
@@ -137,6 +171,8 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.Property(x => x.Total).HasPrecision(10, 2);
             entity.HasIndex(x => x.AssignedRiderId);
             entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.Status, x.CreatedAtUtc });
             entity.HasOne(x => x.User).WithMany(x => x.Orders).HasForeignKey(x => x.UserId);
             entity.HasOne(x => x.Address).WithMany().HasForeignKey(x => x.AddressId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.AssignedRider).WithMany(x => x.AssignedOrders).HasForeignKey(x => x.AssignedRiderId).OnDelete(DeleteBehavior.Restrict);
@@ -151,7 +187,13 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.Property(x => x.SupermarketName).HasMaxLength(100);
             entity.Property(x => x.UnitPrice).HasPrecision(10, 2);
             entity.Property(x => x.TotalPrice).HasPrecision(10, 2);
+            entity.HasIndex(x => x.OrderId);
+            entity.HasIndex(x => x.ProductId);
             entity.HasOne(x => x.Order).WithMany(x => x.Items).HasForeignKey(x => x.OrderId);
         });
+
+        modelBuilder.Entity<ApiProduct>()
+            .HasIndex(x => new { x.SupermarketId, x.ProductKey })
+            .HasFilter(null);
     }
 }
