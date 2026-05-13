@@ -517,6 +517,10 @@ export class AuthService {
       return '/user-management';
     }
 
+    if (this.hasRole('Admin')) {
+      return '/product-management';
+    }
+
     if (this.hasRole('Rider')) {
       return '/rider';
     }

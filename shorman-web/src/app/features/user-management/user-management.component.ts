@@ -162,7 +162,6 @@ export class UserManagementComponent implements OnInit {
     const candidates: Array<{ path: string; label: string; menuKey: MenuPermissionKey; roles: AppRole[] }> = [
       { path: 'user-list', label: 'User List', menuKey: 'user-management.user-list', roles: ['SuperAdmin'] },
       { path: 'role-access', label: 'Role Access', menuKey: 'user-management.role-access', roles: ['SuperAdmin'] },
-      { path: 'product-data', label: 'Product Data', menuKey: 'user-management.product-data', roles: ['SuperAdmin', 'Admin'] },
       { path: 'order-summary', label: 'Order History', menuKey: 'user-management.order-summary', roles: ['SuperAdmin', 'Admin', 'Rider'] }
     ];
 

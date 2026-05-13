@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ public record MarkRiderOrderOutForDeliveryCommand(int RiderUserId, int OrderId) 
 public record MarkRiderOrderDeliveredCommand(int RiderUserId, int OrderId) : IRequest<OrderDto>;
 public record MarkRiderOrderCashCollectedCommand(int RiderUserId, int OrderId) : IRequest<OrderDto>;
 public record CompleteRiderOrderCommand(int RiderUserId, int OrderId) : IRequest<OrderDto>;
+public record GetOrderInsightsQuery(int UserId, string Range) : IRequest<OrderInsightsDto>;
 
 internal static class OrderStatuses
 {
@@ -404,5 +406,231 @@ internal static class RiderOrderLoads
     {
         var order = await RiderOrderStateTransitions.LoadOwnedOrderAsync(dbContext, riderUserId, orderId, cancellationToken);
         return GetOrdersQueryHandler.Map(order);
+    }
+}
+
+public class GetOrderInsightsQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetOrderInsightsQuery, OrderInsightsDto>
+{
+    private sealed record InsightRow(
+        int OrderId,
+        DateTime CreatedAtUtc,
+        int ProductId,
+        string ProductName,
+        string? ProductImageUrl,
+        string Store,
+        string Category,
+        int Quantity,
+        decimal Spend);
+
+    public async Task<OrderInsightsDto> Handle(GetOrderInsightsQuery request, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var periodStart = ResolvePeriodStart(request.Range, now);
+        var periodEnd = now;
+        var periodDays = Math.Max(1, (int)Math.Ceiling((periodEnd - periodStart).TotalDays));
+        var previousPeriodEnd = periodStart;
+        var previousPeriodStart = previousPeriodEnd.AddDays(-periodDays);
+
+        var currentOrders = await dbContext.Orders
+            .AsNoTracking()
+            .Where(x => x.UserId == request.UserId
+                && x.Status != OrderStatuses.Cancelled
+                && x.CreatedAtUtc >= periodStart
+                && x.CreatedAtUtc <= periodEnd)
+            .Select(x => new { x.Id, x.Total, x.CreatedAtUtc })
+            .ToListAsync(cancellationToken);
+
+        var previousOrders = await dbContext.Orders
+            .AsNoTracking()
+            .Where(x => x.UserId == request.UserId
+                && x.Status != OrderStatuses.Cancelled
+                && x.CreatedAtUtc >= previousPeriodStart
+                && x.CreatedAtUtc < previousPeriodEnd)
+            .Select(x => x.Total)
+            .ToListAsync(cancellationToken);
+
+        var rows = await (
+            from order in dbContext.Orders.AsNoTracking()
+            where order.UserId == request.UserId
+                && order.Status != OrderStatuses.Cancelled
+                && order.CreatedAtUtc >= periodStart
+                && order.CreatedAtUtc <= periodEnd
+            join item in dbContext.OrderItems.AsNoTracking() on order.Id equals item.OrderId
+            join product in dbContext.Products.AsNoTracking() on item.ProductId equals product.Id into productGroup
+            from product in productGroup.DefaultIfEmpty()
+            join category in dbContext.Categories.AsNoTracking() on product.CategoryId equals category.Id into categoryGroup
+            from category in categoryGroup.DefaultIfEmpty()
+            select new InsightRow(
+                order.Id,
+                order.CreatedAtUtc,
+                item.ProductId,
+                item.ProductName,
+                item.ProductImageUrl,
+                string.IsNullOrWhiteSpace(item.SupermarketName) ? "Unknown" : item.SupermarketName!,
+                category != null && !string.IsNullOrWhiteSpace(category.Name) ? category.Name : "Uncategorized",
+                item.Quantity,
+                item.TotalPrice))
+            .ToListAsync(cancellationToken);
+
+        var totalSpend = currentOrders.Sum(x => x.Total);
+        var totalOrders = currentOrders.Count;
+        var averageBasket = totalOrders > 0 ? totalSpend / totalOrders : 0m;
+
+        var previousTotalSpend = previousOrders.Sum();
+        var previousTotalOrders = previousOrders.Count;
+        var previousAverageBasket = previousTotalOrders > 0 ? previousTotalSpend / previousTotalOrders : 0m;
+
+        var storeSpend = rows
+            .GroupBy(x => x.Store, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new OrderInsightsStoreSpendDto(group.Key, Math.Round(group.Sum(x => x.Spend), 2)))
+            .OrderByDescending(x => x.Spend)
+            .ToArray();
+
+        var months = BuildMonthBuckets(periodStart, periodEnd);
+        var monthlySpend = months
+            .Select(month =>
+            {
+                var monthStores = rows
+                    .Where(x => x.CreatedAtUtc >= month.Start && x.CreatedAtUtc < month.End)
+                    .GroupBy(x => x.Store, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => new OrderInsightsStoreSpendDto(group.Key, Math.Round(group.Sum(x => x.Spend), 2)))
+                    .OrderByDescending(x => x.Spend)
+                    .ToArray();
+
+                return new OrderInsightsMonthlyStoreSpendDto(month.Key, month.Label, monthStores);
+            })
+            .ToArray();
+
+        var topCategories = rows
+            .GroupBy(x => x.Category, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var spend = group.Sum(x => x.Spend);
+                var orderCount = group.Select(x => x.OrderId).Distinct().Count();
+                var segment = ResolveSegment(group.First().Store);
+                return new OrderInsightsCategoryDto(group.Key, segment, Math.Round(spend, 2), orderCount);
+            })
+            .OrderByDescending(x => x.Spend)
+            .ToArray();
+
+        var heatmap = rows
+            .GroupBy(x => new
+            {
+                Store = x.Store.Trim(),
+                StoreKey = x.Store.Trim().ToLowerInvariant(),
+                Category = x.Category.Trim(),
+                CategoryKey = x.Category.Trim().ToLowerInvariant()
+            })
+            .Select(group => new OrderInsightsHeatmapCellDto(
+                group.Key.Store,
+                group.Key.Category,
+                ResolveSegment(group.Key.Store),
+                Math.Round(group.Sum(x => x.Spend), 2)))
+            .OrderBy(x => x.Store)
+            .ThenByDescending(x => x.Spend)
+            .ToArray();
+
+        var topReorderedProducts = rows
+            .GroupBy(x => new
+            {
+                x.ProductId,
+                ProductName = x.ProductName.Trim(),
+                ProductNameKey = x.ProductName.Trim().ToLowerInvariant(),
+                x.ProductImageUrl,
+                Store = x.Store.Trim(),
+                StoreKey = x.Store.Trim().ToLowerInvariant()
+            })
+            .Select(group => new OrderInsightsReorderedProductDto(
+                group.Key.ProductId,
+                group.Key.ProductName,
+                group.Key.ProductImageUrl,
+                group.Key.Store,
+                group.Sum(x => x.Quantity),
+                group.Select(x => x.OrderId).Distinct().Count(),
+                Math.Round(group.Sum(x => x.Spend), 2)))
+            .OrderByDescending(x => x.RepeatCount)
+            .ThenByDescending(x => x.Quantity)
+            .Take(10)
+            .ToArray();
+
+        var favoriteStore = storeSpend.FirstOrDefault();
+        var favoriteCategory = topCategories.FirstOrDefault();
+
+        var grocerySpend = storeSpend.Where(x => ResolveSegment(x.Store) == "grocery").Sum(x => x.Spend);
+        var drugstoreSpend = storeSpend.Where(x => ResolveSegment(x.Store) == "drugstore").Sum(x => x.Spend);
+
+        var favoriteStoreShare = totalSpend > 0m && favoriteStore is not null ? (favoriteStore.Spend / totalSpend) * 100m : 0m;
+        var favoriteCategoryShare = totalSpend > 0m && favoriteCategory is not null ? (favoriteCategory.Spend / totalSpend) * 100m : 0m;
+        var groceryShare = totalSpend > 0m ? (grocerySpend / totalSpend) * 100m : 0m;
+        var drugstoreShare = totalSpend > 0m ? (drugstoreSpend / totalSpend) * 100m : 0m;
+
+        return new OrderInsightsDto(
+            Math.Round(totalSpend, 2),
+            totalOrders,
+            Math.Round(averageBasket, 2),
+            Math.Round(previousTotalSpend, 2),
+            previousTotalOrders,
+            Math.Round(previousAverageBasket, 2),
+            favoriteStore?.Store ?? "N/A",
+            Math.Round(favoriteStore?.Spend ?? 0m, 2),
+            Math.Round(favoriteStoreShare, 2),
+            favoriteCategory?.Category ?? "N/A",
+            Math.Round(favoriteCategory?.Spend ?? 0m, 2),
+            Math.Round(favoriteCategoryShare, 2),
+            Math.Round(groceryShare, 2),
+            Math.Round(drugstoreShare, 2),
+            storeSpend,
+            monthlySpend,
+            topCategories,
+            heatmap,
+            topReorderedProducts);
+    }
+
+    private static string ResolveSegment(string store)
+    {
+        var normalized = store.Trim().ToLowerInvariant();
+        return normalized is "dm" or "rossmann" ? "drugstore" : "grocery";
+    }
+
+    private static DateTime ResolvePeriodStart(string? range, DateTime now)
+    {
+        var normalized = (range ?? "1y").Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "30d" => now.AddDays(-30),
+            "6m" => now.AddMonths(-6),
+            "all" => now.AddYears(-5),
+            _ => now.AddYears(-1)
+        };
+    }
+
+    private static IReadOnlyCollection<(DateTime Start, DateTime End, string Key, string Label)> BuildMonthBuckets(DateTime start, DateTime end)
+    {
+        var first = new DateTime(start.Year, start.Month, 1);
+        var last = new DateTime(end.Year, end.Month, 1);
+        var months = new List<(DateTime Start, DateTime End, string Key, string Label)>();
+
+        while (first <= last)
+        {
+            var next = first.AddMonths(1);
+            months.Add((
+                first,
+                next,
+                first.ToString("yyyy-MM", CultureInfo.InvariantCulture),
+                first.ToString("MMM", CultureInfo.InvariantCulture)));
+            first = next;
+        }
+
+        if (months.Count == 1)
+        {
+            var previous = months[0].Start.AddMonths(-1);
+            months.Insert(0, (
+                previous,
+                months[0].Start,
+                previous.ToString("yyyy-MM", CultureInfo.InvariantCulture),
+                previous.ToString("MMM", CultureInfo.InvariantCulture)));
+        }
+
+        return months;
     }
 }

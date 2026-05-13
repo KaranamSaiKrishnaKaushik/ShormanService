@@ -1,0 +1,177 @@
+<section class="stats-shell">
+  <header class="page-head">
+    <div>
+      <p class="crumb">History Stats - {{ currentName }}</p>
+      <h1>Where your money goes</h1>
+      <p class="sub">{{ profileSubtitle() }}</p>
+    </div>
+    <div class="range-pill" role="tablist" aria-label="History range">
+      <button
+        type="button"
+        *ngFor="let range of rangeOptions"
+        [class.on]="selectedRange === range.key"
+        (click)="selectRange(range.key)">
+        {{ range.label }}
+      </button>
+    </div>
+  </header>
+
+  <section class="kpis">
+    <article class="kpi" [class.up]="spendDeltaPct() >= 0" [class.down]="spendDeltaPct() < 0">
+      <p class="label">Total spend</p>
+      <p class="value">EUR {{ totalSpend | number:'1.2-2' }}</p>
+      <p class="delta" [class.down]="spendDeltaPct() < 0">
+        {{ deltaArrow(spendDeltaPct()) }} {{ signedDelta(spendDeltaPct(), 1) }}% {{ comparisonSuffix() }}
+      </p>
+    </article>
+    <article class="kpi" [class.up]="totalOrders >= previousTotalOrders" [class.down]="totalOrders < previousTotalOrders">
+      <p class="label">Total orders</p>
+      <p class="value">{{ totalOrders | number }}</p>
+      <p class="delta" [class.down]="totalOrders < previousTotalOrders">
+        {{ deltaArrow(totalOrders - previousTotalOrders) }} {{ signedDelta(totalOrders - previousTotalOrders, 0) }} more orders
+      </p>
+    </article>
+    <article class="kpi" [class.up]="avgBasketDelta() >= 0" [class.down]="avgBasketDelta() < 0">
+      <p class="label">Avg basket</p>
+      <p class="value">EUR {{ averageBasket | number:'1.2-2' }}</p>
+      <p class="delta" [class.down]="avgBasketDelta() < 0">
+        {{ deltaArrow(avgBasketDelta()) }} EUR {{ signedDelta(avgBasketDelta(), 2) }}
+      </p>
+    </article>
+    <article class="kpi" [class.up]="favoriteStoreShare >= 50" [class.down]="favoriteStoreShare < 50">
+      <p class="label">Favorite store</p>
+      <p class="value">{{ favoriteStore }}</p>
+      <p class="delta">
+        <span class="bubble" [class.red]="favoriteStoreShare < 30">
+          EUR {{ favoriteStoreSpend | number:'1.2-2' }} - {{ favoriteStoreShare | number:'1.0-0' }}%
+        </span>
+      </p>
+    </article>
+    <article class="kpi" [class.up]="favoriteCategoryShare >= 20" [class.down]="favoriteCategoryShare < 20">
+      <p class="label">Favorite category</p>
+      <p class="value">{{ favoriteCategory }}</p>
+      <p class="delta">
+        <span class="bubble" [class.red]="favoriteCategoryShare < 20">
+          EUR {{ favoriteCategorySpend | number:'1.2-2' }} - {{ favoriteCategoryShare | number:'1.0-0' }}%
+        </span>
+      </p>
+    </article>
+    <article class="kpi" [class.up]="groceryShare >= drugstoreShare" [class.down]="groceryShare < drugstoreShare">
+      <p class="label">Grocery vs drugstore</p>
+      <p class="value">{{ groceryShare | number:'1.0-0' }}% - {{ drugstoreShare | number:'1.0-0' }}%</p>
+      <div class="split">
+        <span class="g" [style.flex]="groceryShare"></span>
+        <span class="d" [style.flex]="drugstoreShare"></span>
+      </div>
+    </article>
+  </section>
+
+  <section class="grid two-left">
+    <article class="card">
+      <header>
+        <h2>Spend over time</h2>
+        <p>Monthly euros stacked by store</p>
+      </header>
+      <div class="chart-wrap"><canvas #areaCanvas></canvas></div>
+      <div class="legend-row">
+        <span class="lg" *ngFor="let item of spendByStore">
+          <i [style.background]="storeColor(item.store)"></i>
+          {{ item.store }}
+        </span>
+      </div>
+    </article>
+
+    <article class="card">
+      <header>
+        <h2>Spend by store</h2>
+        <p>Share of total spend</p>
+      </header>
+      <div class="chart-wrap"><canvas #donutCanvas></canvas></div>
+      <div class="legend-list">
+        <span class="lg" *ngFor="let item of spendByStore">
+          <i [style.background]="storeColor(item.store)"></i>
+            {{ item.store }} - EUR {{ item.spend | number:'1.0-0' }}
+        </span>
+      </div>
+    </article>
+  </section>
+
+  <section class="grid two-right">
+    <article class="card">
+      <header>
+        <h2>Top categories</h2>
+        <p>Green = groceries, magenta = drugstore</p>
+      </header>
+      <div class="chart-wrap tall"><canvas #categoryCanvas></canvas></div>
+      <ul class="category-meta">
+        <li *ngFor="let category of categories">
+          <span>{{ category.name }}</span>
+          <small>{{ category.orderCount }} orders</small>
+        </li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <header>
+        <h2>Store x Category heatmap</h2>
+        <p>Darker means more spend</p>
+      </header>
+
+      <div class="heat">
+        <p class="group-title grocery">Groceries</p>
+        <div class="heat-row head" [style.gridTemplateColumns]="heatGridCols(groceryCategoryAxis.length)">
+          <span></span>
+          <span *ngFor="let key of groceryCategoryAxis">{{ key }}</span>
+        </div>
+        <div class="heat-row" [style.gridTemplateColumns]="heatGridCols(groceryCategoryAxis.length)" *ngFor="let row of heatmapGroceries">
+          <span class="store">{{ row.store }}</span>
+          <span class="cell grocery" *ngFor="let key of groceryCategoryAxis"
+            [style.opacity]="heatOpacity(row.values[key], maxHeatValue(heatmapGroceries))">
+                  {{ row.values[key] > 0 ? ('EUR ' + row.values[key]) : '-' }}
+          </span>
+        </div>
+
+        <p class="group-title drugstore">Drugstore</p>
+        <div class="heat-row head drug" [style.gridTemplateColumns]="heatGridCols(drugstoreCategoryAxis.length)">
+          <span></span>
+          <span *ngFor="let key of drugstoreCategoryAxis">{{ key }}</span>
+        </div>
+        <div class="heat-row drug" [style.gridTemplateColumns]="heatGridCols(drugstoreCategoryAxis.length)" *ngFor="let row of heatmapDrugstore">
+          <span class="store">{{ row.store }}</span>
+          <span class="cell drugstore" *ngFor="let key of drugstoreCategoryAxis"
+            [style.opacity]="heatOpacity(row.values[key], maxHeatValue(heatmapDrugstore))">
+                  {{ row.values[key] > 0 ? ('EUR ' + row.values[key]) : '-' }}
+          </span>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <article class="card">
+    <header>
+      <h2>Top reordered products</h2>
+      <p>Your 10 most ordered items</p>
+    </header>
+
+    <section class="reorder-grid">
+      <div class="re-item" *ngFor="let item of reorderedProducts">
+        <div class="thumb">
+          <img *ngIf="item.imageUrl" [src]="item.imageUrl" [alt]="item.name" />
+          <span *ngIf="!item.imageUrl">{{ item.name.slice(0, 1) }}</span>
+        </div>
+        <div class="content">
+          <p class="name">{{ item.name }}</p>
+          <p class="meta">
+            <span class="badge" [style.background]="storeColor(item.store)">{{ item.store }}</span>
+              x{{ item.quantity }} bought
+          </p>
+          <div class="progress"><i [style.width.%]="reorderPercent(item.repeatCount)"></i></div>
+        </div>
+            <p class="repeat">{{ item.repeatCount }}x - EUR {{ item.spend | number:'1.0-0' }}</p>
+      </div>
+    </section>
+  </article>
+
+  <p *ngIf="loading" class="state-note">Loading history insights...</p>
+  <p *ngIf="!loading && errorMsg" class="state-note warn">{{ errorMsg }}</p>
+</section>

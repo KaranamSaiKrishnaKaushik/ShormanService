@@ -1,10 +1,11 @@
-import { ChangeDetectorRef, Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NgFor, NgIf, NgClass, CurrencyPipe, AsyncPipe } from '@angular/common';
+import { NgFor, NgIf, CurrencyPipe, AsyncPipe, NgStyle } from '@angular/common';
+import { Observable, forkJoin, map } from 'rxjs';
 import { ProductService } from '../../core/services/product.service';
 import { CartService } from '../../core/services/cart.service';
 import { DeliveryCheckResult, DeliveryService } from '../../core/services/delivery.service';
-import { Product, Category, Supermarket } from '../../core/models/product.model';
+import { Product, Category, Supermarket, ProductPage } from '../../core/models/product.model';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 
 interface SupermarketTab {
@@ -12,6 +13,20 @@ interface SupermarketTab {
   name: string;
   color: string;
   bgColor: string;
+}
+
+type ProductMode = 'groceries' | 'beauty';
+
+interface ProductModeOption {
+  slug: ProductMode;
+  label: string;
+  accent: string;
+  surface: string;
+  stores: string[];
+  title: string;
+  allStoresLabel: string;
+  sidebarTitle: string;
+  allCategoriesLabel: string;
 }
 
 const SUPERMARKET_TABS: SupermarketTab[] = [
@@ -22,15 +37,79 @@ const SUPERMARKET_TABS: SupermarketTab[] = [
   { slug: 'lidl', name: 'LIDL', color: '#FFD600', bgColor: '#0050AA' },
 ];
 
+const MODE_OPTIONS: ProductModeOption[] = [
+  {
+    slug: 'groceries',
+    label: 'Groceries',
+    accent: '#2E7D32',
+    surface: '#E8F5E9',
+    stores: ['rewe', 'aldi', 'penny', 'lidl', 'edeka'],
+    title: 'Groceries',
+    allStoresLabel: 'All groceries',
+    sidebarTitle: 'Grocery categories',
+    allCategoriesLabel: 'All groceries'
+  },
+  {
+    slug: 'beauty',
+    label: 'Drugstore & Beauty',
+    accent: '#B83280',
+    surface: '#FCE7F3',
+    stores: ['dm', 'rossmann'],
+    title: 'Drugstore & Beauty',
+    allStoresLabel: 'All drugstore',
+    sidebarTitle: 'Drugstore categories',
+    allCategoriesLabel: 'All drugstore'
+  }
+];
+
+const BEAUTY_CATEGORY_SLUGS = new Set([
+  'hair-care',
+  'skin-care',
+  'body-bath',
+  'makeup-fragrance',
+  'health-wellness',
+  'baby-kids'
+]);
+
+const CATEGORY_ICON_MAP: Record<string, string> = {
+  'all': '🛍️',
+  'bakery': '🍞',
+  'beverages': '🥤',
+  'eggs-dairy': '🥚',
+  'fruits-vegetables': '🥦',
+  'meat': '🥩',
+  'snacks': '🍿',
+  'hair-care': '🧴',
+  'skin-care': '✨',
+  'body-bath': '🫧',
+  'makeup-fragrance': '💄',
+  'health-wellness': '🩹',
+  'baby-kids': '🧸',
+  'imported-products': '📦',
+  'sparkles': '✨',
+  'sun': '☀️',
+  'droplets': '🫧',
+  'palette': '🎨',
+  'heart-pulse': '🩹',
+  'baby': '🧸',
+  'box': '📦',
+  'egg': '🥚',
+  'leaf': '🥦',
+  'bread': '🍞',
+  'cup': '🥤',
+  'popcorn': '🍿'
+};
+
 @Component({
   selector: 'app-products',
   standalone: true,
-  imports: [FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe, LoadingSpinnerComponent],
+  imports: [FormsModule, NgFor, NgIf, CurrencyPipe, AsyncPipe, NgStyle, LoadingSpinnerComponent],
   templateUrl: './products.component.html',
   styleUrls: ['./products.component.scss']
 })
 export class ProductsComponent implements OnInit {
   private static readonly PAGE_SIZE = 30;
+  private static readonly MODE_FETCH_PAGE_SIZE = 120;
 
   private productService = inject(ProductService);
   private cdr = inject(ChangeDetectorRef);
@@ -45,6 +124,8 @@ export class ProductsComponent implements OnInit {
   currentPage = 1;
   totalPages = 0;
 
+  readonly productModes = MODE_OPTIONS;
+  activeMode: ProductMode = 'groceries';
   activeSupermarket = 'all';
   activeCategory = 'all';
   searchQuery = '';
@@ -63,12 +144,8 @@ export class ProductsComponent implements OnInit {
 
   cartOpen$ = this.cartService.isOpen$;
 
-  private smColorMap: Record<number, string> = {
-    1: '#CC0000',
-    2: '#00519C',
-    3: '#CC0000',
-    4: '#0050AA'
-  };
+  private smColorMap: Record<number, string> = {};
+  private requestSequence = 0;
 
   private placeholderColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4'];
 
@@ -80,6 +157,35 @@ export class ProductsComponent implements OnInit {
     return count;
   }
 
+  get currentMode(): ProductModeOption {
+    return this.productModes.find(mode => mode.slug === this.activeMode) ?? this.productModes[0];
+  }
+
+  get modeHeading(): string {
+    return `${this.currentMode.title} · ${this.totalProducts} product${this.totalProducts !== 1 ? 's' : ''}`;
+  }
+
+  get visibleSupermarketTabs(): SupermarketTab[] {
+    const modeStores = new Set(this.currentMode.stores);
+    return this.supermarketTabs
+      .filter(tab => tab.slug === 'all' || modeStores.has(tab.slug))
+      .map(tab => tab.slug === 'all'
+        ? { ...tab, name: this.currentMode.allStoresLabel.toUpperCase() }
+        : tab);
+  }
+
+  get visibleCategories(): Category[] {
+    return this.categories.filter(category => this.getModeForCategory(category.slug) === this.activeMode);
+  }
+
+  get isMobileFiltersActive(): boolean {
+    return this.mobileFiltersOpen;
+  }
+
+  get isModeWideSelection(): boolean {
+    return this.activeSupermarket === 'all';
+  }
+
   ngOnInit(): void {
     this.productService.pingHealth().subscribe(isUp => {
       console.log('Backend health check:', isUp ? 'OK' : 'FAILED');
@@ -87,6 +193,25 @@ export class ProductsComponent implements OnInit {
 
     this.loadSupermarkets();
     this.loadCategories();
+    this.loadProducts(true);
+  }
+
+  setMode(mode: ProductMode): void {
+    if (this.activeMode === mode) {
+      return;
+    }
+
+    this.activeMode = mode;
+
+    if (this.activeSupermarket !== 'all' && this.getModeForStore(this.activeSupermarket) !== mode) {
+      this.activeSupermarket = 'all';
+    }
+
+    if (this.activeCategory !== 'all' && this.getModeForCategory(this.activeCategory) !== mode) {
+      this.activeCategory = 'all';
+    }
+
+    this.closeMobileFilters();
     this.loadProducts(true);
   }
 
@@ -146,6 +271,25 @@ export class ProductsComponent implements OnInit {
 
   getSupermarketColor(smId: number): string {
     return this.smColorMap[smId] || '#555';
+  }
+
+  getCategoryGlyph(category: Category | 'all'): string {
+    if (category === 'all') {
+      return CATEGORY_ICON_MAP['all'];
+    }
+
+    return CATEGORY_ICON_MAP[category.slug] || CATEGORY_ICON_MAP[category.icon ?? ''] || '•';
+  }
+
+  getStoreBadgeStyle(product: Product): Record<string, string> {
+    const supermarketColor = product.supermarket?.color || this.getSupermarketColor(product.supermarketId);
+    const mode = this.getModeForStore(product.supermarket?.slug ?? '');
+    const accent = this.productModes.find(option => option.slug === mode)?.accent ?? supermarketColor;
+
+    return {
+      background: supermarketColor,
+      boxShadow: `0 0 0 2px ${accent}`
+    };
   }
 
   getPlaceholderColor(smId: number): string {
@@ -209,6 +353,10 @@ export class ProductsComponent implements OnInit {
   private loadSupermarkets(): void {
     this.productService.getSupermarkets().subscribe(supermarkets => {
       this.supermarkets = supermarkets;
+      this.smColorMap = supermarkets.reduce<Record<number, string>>((map, supermarket) => {
+        map[supermarket.id] = supermarket.color || '#555';
+        return map;
+      }, {});
       const dynamicTabs = supermarkets.map(supermarket => ({
         slug: supermarket.slug,
         name: supermarket.name,
@@ -223,7 +371,9 @@ export class ProductsComponent implements OnInit {
   private loadCategories(): void {
     this.productService.getCategories().subscribe(cats => {
       this.categories = cats.filter(category => category.slug !== 'imported-products');
-      console.log('Categories loaded:', cats);
+      if (this.activeCategory !== 'all' && !this.categories.some(category => category.slug === this.activeCategory && this.getModeForCategory(category.slug) === this.activeMode)) {
+        this.activeCategory = 'all';
+      }
     });
   }
 
@@ -231,23 +381,44 @@ export class ProductsComponent implements OnInit {
     if (reset) {
       this.currentPage = 1;
     }
+
+    const requestId = ++this.requestSequence;
     this.loading = true;
+    this.filteredProducts = [];
+    this.totalProducts = 0;
+    this.totalPages = 0;
+    this.cdr.detectChanges();
+
+    const scopedCategories = this.visibleCategories;
+    const scopedSupermarkets = this.supermarkets.filter(supermarket => this.getModeForStore(supermarket.slug) === this.activeMode);
 
     const activeCategoryId = this.activeCategory === 'all'
       ? undefined
-      : this.categories.find(category => category.slug === this.activeCategory)?.id;
+      : scopedCategories.find(category => category.slug === this.activeCategory)?.id;
     const activeSupermarketId = this.activeSupermarket === 'all'
       ? undefined
-      : this.supermarkets.find(supermarket => supermarket.slug === this.activeSupermarket)?.id;
+      : scopedSupermarkets.find(supermarket => supermarket.slug === this.activeSupermarket)?.id;
+    const activeSupermarketIds = this.activeSupermarket === 'all'
+      ? scopedSupermarkets.map(supermarket => supermarket.id)
+      : undefined;
 
-    this.productService.getProducts({
-      search: this.searchQuery.trim() || undefined,
-      categoryId: activeCategoryId,
-      supermarketId: activeSupermarketId,
-      page: this.currentPage,
-      pageSize: ProductsComponent.PAGE_SIZE
-    }).subscribe({
+    const productRequest = this.activeSupermarket === 'all' && scopedSupermarkets.length > 1
+      ? this.getModeProductsPage(scopedSupermarkets, this.searchQuery.trim() || undefined, activeCategoryId)
+      : this.productService.getProducts({
+          search: this.searchQuery.trim() || undefined,
+          categoryId: activeCategoryId,
+          supermarketId: activeSupermarketId,
+          supermarketIds: activeSupermarketId ? undefined : activeSupermarketIds,
+          page: this.currentPage,
+          pageSize: ProductsComponent.PAGE_SIZE
+        });
+
+    productRequest.subscribe({
       next: (page) => {
+        if (requestId !== this.requestSequence) {
+          return;
+        }
+
         const items = Array.isArray(page.items) ? page.items : [];
         this.totalProducts = page.totalCount;
         this.totalPages = Math.max(1, Math.ceil(this.totalProducts / ProductsComponent.PAGE_SIZE));
@@ -257,6 +428,10 @@ export class ProductsComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: () => {
+        if (requestId !== this.requestSequence) {
+          return;
+        }
+
         this.filteredProducts = [];
         this.totalProducts = 0;
         this.totalPages = 0;
@@ -272,5 +447,52 @@ export class ProductsComponent implements OnInit {
     }
 
     return backgroundColor.toLowerCase() === '#ffd600' ? '#333' : '#fff';
+  }
+
+  private getModeProductsPage(supermarkets: Supermarket[], search: string | undefined, categoryId: number | undefined): Observable<ProductPage> {
+    const requiredItems = this.currentPage * ProductsComponent.PAGE_SIZE;
+    const requiredPages = Math.max(1, Math.ceil(requiredItems / ProductsComponent.MODE_FETCH_PAGE_SIZE));
+    const perStoreRequests = supermarkets.map(supermarket =>
+      forkJoin(
+        Array.from({ length: requiredPages }, (_, index) =>
+          this.productService.getProducts({
+            search,
+            categoryId,
+            supermarketId: supermarket.id,
+            page: index + 1,
+            pageSize: ProductsComponent.MODE_FETCH_PAGE_SIZE
+          })
+        )
+      )
+    );
+
+    return forkJoin(perStoreRequests).pipe(
+      map(storePages => {
+        const totalCount = storePages.reduce((sum, pages) => sum + (pages[0]?.totalCount ?? 0), 0);
+        const combinedItems = storePages
+          .flatMap(pages => pages.flatMap(page => page.items ?? []))
+          .sort((left, right) => left.name.localeCompare(right.name));
+        const startIndex = (this.currentPage - 1) * ProductsComponent.PAGE_SIZE;
+
+        return {
+          items: combinedItems.slice(startIndex, startIndex + ProductsComponent.PAGE_SIZE),
+          totalCount,
+          page: this.currentPage,
+          pageSize: ProductsComponent.PAGE_SIZE
+        };
+      })
+    );
+  }
+
+  private getModeForStore(storeSlug: string): ProductMode {
+    return this.currentMode.stores.includes(storeSlug)
+      ? this.currentMode.slug
+      : BEAUTY_CATEGORY_SLUGS.has(storeSlug)
+        ? 'beauty'
+        : this.productModes.find(mode => mode.stores.includes(storeSlug))?.slug ?? 'groceries';
+  }
+
+  private getModeForCategory(categorySlug: string): ProductMode {
+    return BEAUTY_CATEGORY_SLUGS.has(categorySlug) ? 'beauty' : 'groceries';
   }
 }

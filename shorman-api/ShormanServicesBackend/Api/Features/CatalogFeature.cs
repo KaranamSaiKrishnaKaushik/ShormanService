@@ -5,11 +5,11 @@ using ShormanServicesBackend.Api.Persistence;
 
 namespace ShormanServicesBackend.Api.Features;
 
-public record GetProductsQuery(string? Search, int? CategoryId, int? SupermarketId, int Page = 1, int PageSize = 30) : IRequest<PagedResultDto<ProductDto>>;
+public record GetProductsQuery(string? Search, int? CategoryId, int? SupermarketId, IReadOnlyCollection<int>? SupermarketIds, int Page = 1, int PageSize = 30) : IRequest<PagedResultDto<ProductDto>>;
 public record GetProductByIdQuery(int Id) : IRequest<ProductDto?>;
 public record GetCategoriesQuery() : IRequest<IReadOnlyCollection<CategoryDto>>;
 public record GetSupermarketsQuery() : IRequest<IReadOnlyCollection<SupermarketDto>>;
-public record GetAdminProductsQuery(string? Search, int? CategoryId, int? SupermarketId, int Page = 1, int PageSize = 50) : IRequest<PagedResultDto<ProductDto>>;
+public record GetAdminProductsQuery(string? Search, int? CategoryId, int? SupermarketId, IReadOnlyCollection<int>? SupermarketIds, int Page = 1, int PageSize = 50) : IRequest<PagedResultDto<ProductDto>>;
 public record UpdateProductCommand(int Id, UpdateProductRequest Request) : IRequest<ProductDto?>;
 public record DeleteProductCommand(int Id) : IRequest<bool>;
 
@@ -45,6 +45,10 @@ public class GetProductsQueryHandler(ApiDbContext dbContext) : IRequestHandler<G
         if (request.SupermarketId.HasValue)
         {
             query = query.Where(x => x.SupermarketId == request.SupermarketId.Value);
+        }
+        else if (request.SupermarketIds is { Count: > 0 })
+        {
+            query = query.Where(x => request.SupermarketIds.Contains(x.SupermarketId));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -143,6 +147,10 @@ public class GetAdminProductsQueryHandler(ApiDbContext dbContext) : IRequestHand
         if (request.SupermarketId.HasValue)
         {
             query = query.Where(x => x.SupermarketId == request.SupermarketId.Value);
+        }
+        else if (request.SupermarketIds is { Count: > 0 })
+        {
+            query = query.Where(x => request.SupermarketIds.Contains(x.SupermarketId));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
