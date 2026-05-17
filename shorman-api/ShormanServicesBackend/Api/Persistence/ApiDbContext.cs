@@ -15,10 +15,15 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
     public DbSet<ApiProduct> Products => Set<ApiProduct>();
     public DbSet<ApiProductUploadRun> ProductUploadRuns => Set<ApiProductUploadRun>();
     public DbSet<ApiProductHistoryData> ProductHistoryData => Set<ApiProductHistoryData>();
+    public DbSet<ApiPricingPolicyVersion> PricingPolicyVersions => Set<ApiPricingPolicyVersion>();
+    public DbSet<ApiPricingPolicyAuditEvent> PricingPolicyAuditEvents => Set<ApiPricingPolicyAuditEvent>();
     public DbSet<ApiCart> Carts => Set<ApiCart>();
     public DbSet<ApiCartItem> CartItems => Set<ApiCartItem>();
     public DbSet<ApiOrder> Orders => Set<ApiOrder>();
     public DbSet<ApiOrderItem> OrderItems => Set<ApiOrderItem>();
+    public DbSet<ApiPaymentMethod> PaymentMethods => Set<ApiPaymentMethod>();
+    public DbSet<ApiPaymentTransaction> PaymentTransactions => Set<ApiPaymentTransaction>();
+    public DbSet<ApiOrderStatusHistory> OrderStatusHistory => Set<ApiOrderStatusHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -139,6 +144,36 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.HasIndex(x => x.ChangedAtUtc);
         });
 
+        modelBuilder.Entity<ApiPricingPolicyVersion>(entity =>
+        {
+            entity.ToTable("pricing_policy_versions");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.VersionNo).IsUnique();
+            entity.HasIndex(x => new { x.IsActive, x.EffectiveFromUtc });
+            entity.Property(x => x.XFactorPercent).HasPrecision(8, 4);
+            entity.Property(x => x.YFactorAmount).HasPrecision(10, 2);
+            entity.Property(x => x.DeliveryCharge).HasPrecision(10, 2);
+            entity.Property(x => x.Reason).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<ApiPricingPolicyAuditEvent>(entity =>
+        {
+            entity.ToTable("pricing_policy_audit_events");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ActionType).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.OldXFactorPercent).HasPrecision(8, 4);
+            entity.Property(x => x.NewXFactorPercent).HasPrecision(8, 4);
+            entity.Property(x => x.OldYFactorAmount).HasPrecision(10, 2);
+            entity.Property(x => x.NewYFactorAmount).HasPrecision(10, 2);
+            entity.Property(x => x.OldDeliveryCharge).HasPrecision(10, 2);
+            entity.Property(x => x.NewDeliveryCharge).HasPrecision(10, 2);
+            entity.Property(x => x.CorrelationId).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.MetadataJson).HasMaxLength(4000);
+            entity.HasIndex(x => x.PolicyVersionId);
+            entity.HasIndex(x => x.ChangedAtUtc);
+            entity.HasIndex(x => new { x.ChangedByUserId, x.ChangedAtUtc });
+        });
+
         modelBuilder.Entity<ApiCart>(entity =>
         {
             entity.ToTable("carts");
@@ -191,6 +226,63 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.HasIndex(x => x.ProductId);
             entity.HasOne(x => x.Order).WithMany(x => x.Items).HasForeignKey(x => x.OrderId);
         });
+
+        modelBuilder.Entity<ApiPaymentMethod>(entity =>
+        {
+            entity.ToTable("payment_methods");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Type).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Provider).HasMaxLength(50);
+            entity.Property(x => x.ProviderPaymentMethodRef).HasMaxLength(200);
+            entity.Property(x => x.DisplayLabel).HasMaxLength(120);
+            entity.Property(x => x.Last4).HasMaxLength(4);
+            entity.Property(x => x.Country).HasMaxLength(8);
+            entity.Property(x => x.Fingerprint).HasMaxLength(120);
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => new { x.UserId, x.Provider, x.ProviderPaymentMethodRef }).IsUnique();
+            entity.HasOne(x => x.User).WithMany(x => x.PaymentMethods).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ApiPaymentTransaction>(entity =>
+        {
+            entity.ToTable("payment_transactions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Provider).HasMaxLength(50);
+            entity.Property(x => x.PaymentType).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(10, 2);
+            entity.Property(x => x.Currency).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.ProviderRef).HasMaxLength(200);
+            entity.Property(x => x.ProviderPaymentIntentRef).HasMaxLength(200);
+            entity.Property(x => x.ProviderSessionRef).HasMaxLength(200);
+            entity.Property(x => x.ProviderChargeRef).HasMaxLength(200);
+            entity.Property(x => x.FeeAmount).HasPrecision(10, 2);
+            entity.Property(x => x.NetAmount).HasPrecision(10, 2);
+            entity.Property(x => x.RawProviderStatus).HasMaxLength(60);
+            entity.Property(x => x.FailureCode).HasMaxLength(100);
+            entity.Property(x => x.FailureMessage).HasMaxLength(500);
+            entity.Property(x => x.MetadataJson).HasMaxLength(4000);
+            entity.HasIndex(x => x.OrderId);
+            entity.HasIndex(x => x.ProviderRef);
+            entity.HasIndex(x => x.ProviderSessionRef);
+            entity.HasOne(x => x.Order).WithMany(x => x.PaymentTransactions).HasForeignKey(x => x.OrderId);
+            entity.HasOne(x => x.PaymentMethod).WithMany(x => x.PaymentTransactions).HasForeignKey(x => x.PaymentMethodId);
+        });
+
+        modelBuilder.Entity<ApiOrderStatusHistory>(entity =>
+        {
+            entity.ToTable("order_status_history");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Note).HasMaxLength(500);
+            entity.HasIndex(x => x.OrderId);
+            entity.HasOne(x => x.Order).WithMany(x => x.StatusHistory).HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ApiProduct>()
+            .HasIndex(x => x.ProductKey)
+            .HasDatabaseName("IX_products_ProductKey")
+            .HasFilter(null);
 
         modelBuilder.Entity<ApiProduct>()
             .HasIndex(x => new { x.SupermarketId, x.ProductKey })

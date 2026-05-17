@@ -53,6 +53,9 @@ public record ProductDto(int Id, string Name, string? Description, decimal Price
 public record ProductManagementProductDto(int Id, string? ProductKey, string Name, decimal Price, string? ImageUrl, int CategoryId, CategoryDto? Category, int SupermarketId, SupermarketDto? Supermarket, string? Unit, int? Stock, bool IsAvailable, string DataSource, string? UpdatedAt);
 public record ProductUploadRunDto(int Id, string StoreSlug, string OriginalFileName, string StoredFileUrl, string Status, int TotalRows, int InsertedCount, int UpdatedCount, int UnchangedCount, int DeactivatedCount, string UploadedAt, string? CompletedAt, string? UploadedByName, string? ErrorMessage);
 public record ProductHistoryDataDto(int Id, int? ProductId, string? ProductKey, string Name, decimal Price, string? ImageUrl, int CategoryId, CategoryDto? Category, int SupermarketId, SupermarketDto? Supermarket, string? Unit, int? Stock, bool IsAvailable, string DataSource, string ChangeType, string ChangedAt, string? ChangedByName, int? ImportRunId);
+public record PricingPolicyVersionDto(int Id, int VersionNo, decimal XFactorPercent, decimal YFactorAmount, decimal DeliveryCharge, bool IsActive, string EffectiveFrom, string? EffectiveTo, string? Reason, int CreatedByUserId, string? CreatedByName, string CreatedAt);
+public record PricingPolicyAuditEventDto(int Id, int PolicyVersionId, string ActionType, decimal? OldXFactorPercent, decimal NewXFactorPercent, decimal? OldYFactorAmount, decimal NewYFactorAmount, decimal? OldDeliveryCharge, decimal NewDeliveryCharge, int ChangedByUserId, string? ChangedByName, string ChangedAt, string CorrelationId, string? MetadataJson);
+public record ApplyPricingPolicyRequest(decimal XFactorPercent, decimal YFactorAmount, decimal DeliveryCharge, string? Reason);
 public record UpdateProductRequest(string Name, string? Description, decimal Price, string? ImageUrl, int CategoryId, int SupermarketId, string? Unit, int? Stock, bool IsAvailable);
 public record PagedResultDto<T>(IReadOnlyCollection<T> Items, int TotalCount, int Page, int PageSize);
 
@@ -65,6 +68,7 @@ public record UpdateCartItemRequest(int Quantity);
 
 public record CreateOrderItemRequest(int ProductId, int Quantity);
 public record CreateOrderRequest(int AddressId, string PaymentMethod, IReadOnlyCollection<CreateOrderItemRequest> Items);
+public record CheckoutSessionResponse(int OrderId, string PaymentMethod, string PaymentStatus, string CheckoutUrl, string SessionId);
 public record OrderItemDto(int Id, int ProductId, string ProductName, string? ProductImageUrl, string? SupermarketName, int Quantity, decimal UnitPrice, decimal TotalPrice);
 public record OrderDto(
 	int Id,

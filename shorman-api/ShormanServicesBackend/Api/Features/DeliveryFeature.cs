@@ -82,7 +82,10 @@ public sealed class DeliveryGeocodingService(IHttpClientFactory httpClientFactor
         [property: JsonPropertyName("lon")] string Longitude);
 }
 
-public class CheckDeliveryQueryHandler(IDeliveryGeocodingService geocodingService, IOptions<DeliveryZoneOptions> options) : IRequestHandler<CheckDeliveryQuery, DeliveryCheckResult>
+public class CheckDeliveryQueryHandler(
+    IDeliveryGeocodingService geocodingService,
+    IOptions<DeliveryZoneOptions> options,
+    IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<CheckDeliveryQuery, DeliveryCheckResult>
 {
     public async Task<DeliveryCheckResult> Handle(CheckDeliveryQuery request, CancellationToken cancellationToken)
     {
@@ -96,12 +99,13 @@ public class CheckDeliveryQueryHandler(IDeliveryGeocodingService geocodingServic
         var distanceKm = CalculateDistanceKm(zone.CenterLatitude, zone.CenterLongitude, location.Value.Latitude, location.Value.Longitude);
         var roundedDistance = Math.Round(distanceKm, 1);
         var eligible = distanceKm <= zone.RadiusKm;
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
         return new DeliveryCheckResult(
             eligible,
             eligible
                 ? $"Delivery available. This address is about {roundedDistance:0.0} km from our {zone.CenterLabel} delivery zone center."
                 : $"This address is about {roundedDistance:0.0} km from our {zone.CenterLabel} delivery zone center, outside our {zone.RadiusKm:0.#} km delivery radius.",
-            eligible ? zone.DeliveryFee : null);
+            eligible ? activePolicy.DeliveryCharge : null);
     }
 
     private static double CalculateDistanceKm(double centerLatitude, double centerLongitude, double addressLatitude, double addressLongitude)

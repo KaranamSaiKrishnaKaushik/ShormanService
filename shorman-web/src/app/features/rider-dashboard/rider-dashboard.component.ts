@@ -73,7 +73,7 @@ import { TranslateModule } from '@ngx-translate/core';
               <span class="status-pill" [ngClass]="statusClass(order.status)">{{ formatStatus(order.status) }}</span>
             </div>
             <div class="queue-meta">
-              <span>{{ order.paymentMethod }}</span>
+              <span>{{ formatPaymentMethod(order.paymentMethod) }}</span>
               <span>{{ formatPaymentStatus(order.paymentStatus) }}</span>
             </div>
             <div class="queue-address">{{ order.deliveryAddress }}</div>
@@ -98,7 +98,7 @@ import { TranslateModule } from '@ngx-translate/core';
               <span class="status-pill" [ngClass]="statusClass(order.status)">{{ formatStatus(order.status) }}</span>
             </div>
             <div class="queue-meta">
-              <span>{{ order.paymentMethod }}</span>
+              <span>{{ formatPaymentMethod(order.paymentMethod) }}</span>
               <span>{{ order.total | currency:'EUR' }}</span>
             </div>
             <div class="queue-address">{{ order.deliveryAddress }}</div>
@@ -125,7 +125,7 @@ import { TranslateModule } from '@ngx-translate/core';
             </div>
             <div>
               <span class="label">{{ 'rider.paymentMethod' | translate }}</span>
-              <strong>{{ order.paymentMethod }}</strong>
+              <strong>{{ formatPaymentMethod(order.paymentMethod) }}</strong>
             </div>
             <div>
               <span class="label">{{ 'rider.total' | translate }}</span>
@@ -138,7 +138,7 @@ import { TranslateModule } from '@ngx-translate/core';
             <button *ngIf="order.status === 'ASSIGNED_TO_RIDER'" type="button" class="primary-btn" (click)="markPickedUp(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.markPickedUp' | translate }}</button>
             <button *ngIf="order.status === 'PICKED_UP'" type="button" class="primary-btn" (click)="markOutForDelivery(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.outForDelivery' | translate }}</button>
             <button *ngIf="order.status === 'OUT_FOR_DELIVERY'" type="button" class="primary-btn" (click)="markDelivered(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.markDelivered' | translate }}</button>
-            <button *ngIf="order.status === 'DELIVERED' && order.paymentStatus === 'CASH_PENDING'" type="button" class="primary-btn" (click)="markCashCollected(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.cashCollected' | translate }}</button>
+            <button *ngIf="isCashCollectionRequired(order)" type="button" class="primary-btn" (click)="markCashCollected(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.cashCollected' | translate }}</button>
             <button *ngIf="canComplete(order)" type="button" class="success-btn" (click)="completeOrder(order)" [disabled]="actionOrderId === order.id">{{ 'rider.actions.completeOrder' | translate }}</button>
           </div>
 
@@ -147,7 +147,7 @@ import { TranslateModule } from '@ngx-translate/core';
             <span *ngIf="order.pickedUpAt">Picked up {{ order.pickedUpAt | date:'short' }}</span>
             <span *ngIf="order.outForDeliveryAt">Out for delivery {{ order.outForDeliveryAt | date:'short' }}</span>
             <span *ngIf="order.deliveredAt">Delivered {{ order.deliveredAt | date:'short' }}</span>
-            <span *ngIf="order.cashCollectedAt">Cash collected {{ order.cashCollectedAt | date:'short' }}</span>
+            <span *ngIf="order.cashCollectedAt && isCashOnDelivery(order)">Cash collected {{ order.cashCollectedAt | date:'short' }}</span>
             <span *ngIf="order.completedAt">Completed {{ order.completedAt | date:'short' }}</span>
           </div>
 
@@ -532,6 +532,24 @@ export class RiderDashboardComponent implements OnInit {
     return this.formatStatus(status);
   }
 
+  formatPaymentMethod(paymentMethod: string): string {
+    switch (paymentMethod) {
+      case 'STRIPE_CARD':
+        return 'Card (Stripe)';
+      case 'STRIPE_SEPA_DEBIT':
+        return 'SEPA Debit (Stripe)';
+      case 'STRIPE_KLARNA':
+        return 'Klarna (Stripe)';
+      case 'STRIPE_PAYPAL':
+      case 'STRIPE_PAYPAL_GERMANY':
+        return 'PayPal';
+      case 'CASH_ON_DELIVERY':
+        return 'Cash on delivery';
+      default:
+        return this.formatStatus(paymentMethod);
+    }
+  }
+
   displayProductName(name: string): string {
     const textarea = document.createElement('textarea');
     textarea.innerHTML = name;
@@ -567,6 +585,14 @@ export class RiderDashboardComponent implements OnInit {
 
   canComplete(order: Order): boolean {
     return order.status === 'DELIVERED' && (order.paymentStatus === 'PAID' || order.paymentStatus === 'CASH_COLLECTED');
+  }
+
+  isCashCollectionRequired(order: Order): boolean {
+    return order.status === 'DELIVERED' && this.isCashOnDelivery(order) && order.paymentStatus === 'CASH_PENDING';
+  }
+
+  isCashOnDelivery(order: Order): boolean {
+    return order.paymentMethod === 'CASH_ON_DELIVERY';
   }
 
   acceptOrder(order: Order): void {

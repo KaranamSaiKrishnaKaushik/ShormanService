@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, HostListener, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AsyncPipe, NgIf } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -82,7 +82,7 @@ import { LanguageService } from '../../../core/services/language.service';
           </button>
 
           <ng-container *ngIf="auth.isLoggedIn$ | async; else loginBtn">
-            <div class="user-menu">
+            <div class="user-menu desktop-user-menu">
               <span class="user-name">{{ (auth.currentUser$ | async)?.firstName }}</span>
               <button class="btn-logout" (click)="auth.logout()">{{ 'navbar.logout' | translate }}</button>
             </div>
@@ -104,6 +104,7 @@ import { LanguageService } from '../../../core/services/language.service';
           <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.riderDashboard' | translate }}</a>
           <a *ngIf="showProductManagement()" routerLink="/product-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.productManagement' | translate }}</a>
           <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.userManagement' | translate }}</a>
+          <button type="button" class="mobile-nav-link mobile-logout-btn" (click)="logoutFromMobileMenu()">{{ 'navbar.logout' | translate }}</button>
         </ng-container>
       </div>
     </nav>
@@ -372,6 +373,14 @@ import { LanguageService } from '../../../core/services/language.service';
       border-left: 3px solid transparent;
     }
 
+    .mobile-logout-btn {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+    }
+
     .mobile-nav-link:hover,
     .mobile-nav-link.active {
       color: #2E7D32;
@@ -404,6 +413,7 @@ import { LanguageService } from '../../../core/services/language.service';
       .mobile-menu { display: block; }
       .mobile-backdrop { display: block; }
       .user-name { display: none; }
+      .desktop-user-menu { display: none; }
       .brand-sub { display: none; }
       .btn-login { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
       .order-dropdown {
@@ -454,6 +464,25 @@ export class NavbarComponent {
     this.orderDropdownOpen = !this.orderDropdownOpen;
   }
 
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.orderDropdownOpen) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (!target) {
+      this.closeOrderDropdown();
+      return;
+    }
+
+    if (target.closest('.order-dropdown') || target.closest('.order-inbox-btn')) {
+      return;
+    }
+
+    this.closeOrderDropdown();
+  }
+
   closeMobileMenu() {
     this.mobileMenuOpen = false;
   }
@@ -471,7 +500,7 @@ export class NavbarComponent {
   }
 
   orderAlertTarget(): string {
-    if (this.auth.hasRole('Rider')) {
+    if (this.prefersRiderInbox()) {
       return '/rider';
     }
 
@@ -479,20 +508,20 @@ export class NavbarComponent {
   }
 
   orderDropdownTitle(): string {
-    return this.auth.hasRole('Rider')
+    return this.prefersRiderInbox()
       ? this.translate.instant('navbar.riderQueue')
       : this.translate.instant('navbar.orderAlerts');
   }
 
   orderDropdownMessage(): string {
     return this.orderAlert.currentNotification?.message
-      ?? (this.auth.hasRole('Rider')
+      ?? (this.prefersRiderInbox()
         ? this.translate.instant('navbar.riderMessage')
         : this.translate.instant('navbar.adminMessage'));
   }
 
   orderDropdownActionLabel(): string {
-    return this.auth.hasRole('Rider')
+    return this.orderAlertTarget() === '/rider'
       ? this.translate.instant('navbar.openRiderDashboard')
       : this.translate.instant('navbar.openOrderHistory');
   }
@@ -515,5 +544,14 @@ export class NavbarComponent {
 
   showProductManagement(): boolean {
     return (this.auth.hasRole('Admin') || this.auth.hasRole('SuperAdmin')) && this.menuPermissions.hasPermission('product-management');
+  }
+
+  private prefersRiderInbox(): boolean {
+    return this.auth.hasAnyRole(this.riderRoles) && this.menuPermissions.hasPermission('rider-dashboard');
+  }
+
+  logoutFromMobileMenu(): void {
+    this.closeMobileMenu();
+    this.auth.logout();
   }
 }

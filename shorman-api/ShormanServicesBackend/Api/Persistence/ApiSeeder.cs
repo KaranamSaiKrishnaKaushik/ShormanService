@@ -75,6 +75,7 @@ public static class ApiSeeder
         }
 
         await SeedUserRoleAssignmentsAsync(dbContext);
+        await SeedPricingPolicyAsync(dbContext);
 
         // ── 4. Addresses (resolve demo user ID) ────────────────────────────────
         if (!await dbContext.Addresses.AnyAsync())
@@ -116,10 +117,33 @@ public static class ApiSeeder
             await dbContext.SaveChangesAsync();
         }
 
-        var hasSeededOrders = await dbContext.Orders
-            .AnyAsync(x => x.UserId == targetUser.Id && x.PaymentMethod == "SEEDED_INSIGHTS");
-        if (hasSeededOrders)
+        var seededOrderIds = await dbContext.Orders
+            .Where(x => x.UserId == targetUser.Id && x.PaymentMethod == "SEEDED_INSIGHTS")
+            .Select(x => x.Id)
+            .ToArrayAsync();
+
+        if (seededOrderIds.Length > 0)
         {
+            var nowForMigration = DateTime.UtcNow;
+
+            await dbContext.Orders
+                .Where(x => seededOrderIds.Contains(x.Id))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.PaymentMethod, "STRIPE_CARD"));
+
+            await dbContext.Orders
+                .Where(x => seededOrderIds.Contains(x.Id) && x.CreatedAtUtc > nowForMigration)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.CreatedAtUtc, nowForMigration.AddDays(-1))
+                    .SetProperty(x => x.UpdatedAtUtc, nowForMigration.AddDays(-1))
+                    .SetProperty(x => x.CompletedAtUtc, nowForMigration.AddDays(-1)));
+
+            await dbContext.PaymentTransactions
+                .Where(x => seededOrderIds.Contains(x.OrderId))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.PaymentType, "STRIPE_CARD"));
+
+            await dbContext.SaveChangesAsync();
             return;
         }
 
@@ -251,13 +275,19 @@ public static class ApiSeeder
                         .AddDays(orderNo == 0 ? 8 : 20)
                         .AddHours(10 + ((i + orderNo) % 5));
 
+                    // Keep demo history in the past so seeded rows never look like newly placed live orders.
+                    if (createdAt > now)
+                    {
+                        createdAt = now.AddDays(-(orderNo + 1)).AddHours(-(i % 6));
+                    }
+
                     var order = new ApiOrder
                     {
                         UserId = targetUser.Id,
                         CustomerNameSnapshot = $"{targetUser.FirstName} {targetUser.LastName}".Trim(),
                         CustomerEmailSnapshot = targetUser.Email,
                         Status = "COMPLETED",
-                        PaymentMethod = "SEEDED_INSIGHTS",
+                        PaymentMethod = "STRIPE_CARD",
                         PaymentStatus = "PAID",
                         AddressId = userAddress.Id,
                         Subtotal = perOrderSpend,
@@ -436,6 +466,54 @@ public static class ApiSeeder
         }
 
         dbContext.Roles.AddRange(missingRoles);
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedPricingPolicyAsync(ApiDbContext dbContext)
+    {
+        if (await dbContext.PricingPolicyVersions.AnyAsync())
+        {
+            return;
+        }
+
+        var seedUserId = await dbContext.Users
+            .OrderBy(x => x.Id)
+            .Select(x => x.Id)
+            .FirstOrDefaultAsync();
+
+        var now = DateTime.UtcNow;
+        var version = new ApiPricingPolicyVersion
+        {
+            VersionNo = 1,
+            XFactorPercent = 0m,
+            YFactorAmount = 0m,
+            DeliveryCharge = 2.99m,
+            IsActive = true,
+            EffectiveFromUtc = now,
+            Reason = "Initial baseline policy",
+            CreatedByUserId = seedUserId,
+            CreatedAtUtc = now
+        };
+
+        dbContext.PricingPolicyVersions.Add(version);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.PricingPolicyAuditEvents.Add(new ApiPricingPolicyAuditEvent
+        {
+            PolicyVersionId = version.Id,
+            ActionType = "created",
+            OldXFactorPercent = null,
+            NewXFactorPercent = version.XFactorPercent,
+            OldYFactorAmount = null,
+            NewYFactorAmount = version.YFactorAmount,
+            OldDeliveryCharge = null,
+            NewDeliveryCharge = version.DeliveryCharge,
+            ChangedByUserId = seedUserId,
+            ChangedAtUtc = now,
+            CorrelationId = Guid.NewGuid().ToString("N"),
+            MetadataJson = "Seeded initial baseline policy"
+        });
+
         await dbContext.SaveChangesAsync();
     }
 
