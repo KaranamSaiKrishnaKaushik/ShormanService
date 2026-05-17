@@ -27,21 +27,21 @@
     <ng-template #compactDeliveryZone>
       <div class="delivery-zone-compact" *ngIf="deliveryCheckResult as result">
         <div class="delivery-zone-compact-copy">
-          <span class="delivery-zone-kicker">Delivery</span>
+          <span class="delivery-zone-kicker">{{ 'products.delivery.kicker' | translate }}</span>
           <strong [class.ineligible]="!result.eligible">
             {{ result.eligible ? ('products.delivery.available' | translate) : ('products.delivery.notAvailable' | translate) }}
           </strong>
           <span>{{ deliverySummary }}</span>
         </div>
         <button type="button" class="delivery-zone-compact-btn" (click)="expandDeliveryCheck()">
-          Check another address
+          {{ 'products.delivery.checkAnotherAddress' | translate }}
         </button>
       </div>
     </ng-template>
   </section>
 
   <div class="delivery-prereq" *ngIf="!deliveryCheckCompleted">
-    <p>Check delivery address first to unlock products and filters.</p>
+    <p>{{ 'products.delivery.unlockPrompt' | translate }}</p>
   </div>
 
   <ng-container *ngIf="deliveryCheckCompleted">

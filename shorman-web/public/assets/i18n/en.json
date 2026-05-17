@@ -126,6 +126,8 @@
       "city": "City",
       "checking": "Checking...",
       "checkAddress": "Check Address",
+      "checkAnotherAddress": "Check another address",
+      "unlockPrompt": "Check delivery address first to unlock products and filters.",
       "available": "Available",
       "notAvailable": "Not available yet"
     },

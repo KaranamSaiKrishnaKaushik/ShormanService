@@ -126,6 +126,8 @@
       "city": "Stadt",
       "checking": "Prüfung...",
       "checkAddress": "Adresse prüfen",
+      "checkAnotherAddress": "Andere Adresse prüfen",
+      "unlockPrompt": "Prüfe zuerst die Lieferadresse, um Produkte und Filter freizuschalten.",
       "available": "Verfügbar",
       "notAvailable": "Noch nicht verfügbar"
     },
@@ -307,7 +309,7 @@
       "correlation": "Korrelation",
       "previous": "Zurueck",
       "next": "Weiter",
-      "page": "Seite"
+      "page": "Seite",
       "markDelivered": "Als zugestellt markieren",
       "cashCollected": "Bargeld erhalten",
       "completeOrder": "Bestellung abschließen"

@@ -1,13 +1,14 @@
-import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgFor, NgIf, CurrencyPipe, AsyncPipe, NgStyle } from '@angular/common';
-import { Observable, forkJoin, map } from 'rxjs';
+import { Observable, Subscription, forkJoin, map } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductService } from '../../core/services/product.service';
 import { CartService } from '../../core/services/cart.service';
 import { DeliveryCheckResult, DeliveryService } from '../../core/services/delivery.service';
 import { Product, Category, Supermarket, ProductPage } from '../../core/models/product.model';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { LanguageService } from '../../core/services/language.service';
 
 interface SupermarketTab {
   slug: string;
@@ -108,7 +109,7 @@ const CATEGORY_ICON_MAP: Record<string, string> = {
   templateUrl: './products.component.html',
   styleUrls: ['./products.component.scss']
 })
-export class ProductsComponent implements OnInit {
+export class ProductsComponent implements OnInit, OnDestroy {
   private static readonly PAGE_SIZE = 30;
   private static readonly MODE_FETCH_PAGE_SIZE = 120;
   private static readonly DELIVERY_STATE_KEY = 'products-delivery-state-v1';
@@ -117,6 +118,7 @@ export class ProductsComponent implements OnInit {
   private translate = inject(TranslateService);
   private cdr = inject(ChangeDetectorRef);
   private deliveryService = inject(DeliveryService);
+  private languageService = inject(LanguageService);
   cartService = inject(CartService);
 
   supermarketTabs = SUPERMARKET_TABS;
@@ -152,6 +154,7 @@ export class ProductsComponent implements OnInit {
 
   private smColorMap: Record<number, string> = {};
   private requestSequence = 0;
+  private languageSub?: Subscription;
 
   private placeholderColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4'];
 
@@ -207,6 +210,14 @@ export class ProductsComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.languageSub = this.languageService.currentLanguage$.subscribe(() => {
+      if (this.deliveryCheckResult) {
+        this.deliverySummary = this.getDeliverySummary();
+      }
+
+      this.cdr.detectChanges();
+    });
+
     this.restoreDeliveryState();
 
     this.productService.pingHealth().subscribe(isUp => {
@@ -216,6 +227,10 @@ export class ProductsComponent implements OnInit {
     this.loadSupermarkets();
     this.loadCategories();
     this.loadProducts(true);
+  }
+
+  ngOnDestroy(): void {
+    this.languageSub?.unsubscribe();
   }
 
   setMode(mode: ProductMode): void {
