@@ -38,7 +38,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AngularClient", policy =>
     {
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(origin => IsAllowedOrigin(origin, allowedOrigins))
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -118,4 +118,19 @@ static string GetProductManagementRequestPath(string requestPath)
     }
 
     return requestPath.StartsWith('/') ? requestPath.TrimEnd('/') : "/" + requestPath.Trim('/');
+}
+
+static bool IsAllowedOrigin(string origin, IReadOnlyCollection<string> allowedOrigins)
+{
+    if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+    {
+        return false;
+    }
+
+    return uri.Host.EndsWith(".azurestaticapps.net", StringComparison.OrdinalIgnoreCase);
 }
