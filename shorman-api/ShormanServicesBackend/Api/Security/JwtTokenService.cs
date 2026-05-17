@@ -25,6 +25,7 @@ public static class MenuPermissionKeys
 {
     public const string Products = "products";
     public const string ProductManagement = "product-management";
+    public const string ProductManagementPricing = "product-management.pricing";
     public const string Checkout = "checkout";
     public const string Orders = "orders";
     public const string Addresses = "addresses";
@@ -38,6 +39,7 @@ public static class MenuPermissionKeys
     [
         Products,
         ProductManagement,
+        ProductManagementPricing,
         Checkout,
         Orders,
         Addresses,

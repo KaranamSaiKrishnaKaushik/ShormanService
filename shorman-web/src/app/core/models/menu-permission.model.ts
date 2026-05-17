@@ -7,6 +7,7 @@ export type MenuPermissionKey =
   | 'addresses'
   | 'rider-dashboard'
   | 'product-management'
+  | 'product-management.pricing'
   | 'user-management.user-list'
   | 'user-management.role-access'
   | 'user-management.order-summary';

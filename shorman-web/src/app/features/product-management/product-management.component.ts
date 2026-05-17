@@ -4,16 +4,20 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { Category, Supermarket } from '../../core/models/product.model';
 import {
+  ApplyPricingPolicyRequest,
   ManagedProduct,
   PagedResult,
+  PricingPolicyAuditEvent,
+  PricingPolicyVersion,
   ProductHistoryEntry,
   ProductUploadRun
 } from '../../core/models/product-management.model';
 import { ProductService } from '../../core/services/product.service';
 import { ProductManagementService } from '../../core/services/product-management.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AuthService } from '../../core/services/auth.service';
 
-type ProductManagementSection = 'catalog' | 'uploads' | 'history';
+type ProductManagementSection = 'catalog' | 'uploads' | 'history' | 'pricing';
 
 @Component({
   selector: 'app-product-management',
@@ -68,6 +72,7 @@ type ProductManagementSection = 'catalog' | 'uploads' | 'history';
         <button type="button" class="section-link" [ngClass]="{ active: section === 'catalog' }" (click)="setSection('catalog')">{{ 'productManagement.sections.currentProducts' | translate }}</button>
         <button type="button" class="section-link" [ngClass]="{ active: section === 'uploads' }" (click)="setSection('uploads')">{{ 'productManagement.sections.uploadRuns' | translate }}</button>
         <button type="button" class="section-link" [ngClass]="{ active: section === 'history' }" (click)="setSection('history')">{{ 'productManagement.sections.history' | translate }}</button>
+        <button *ngIf="canManagePricing" type="button" class="section-link" [ngClass]="{ active: section === 'pricing' }" (click)="setSection('pricing')">{{ 'productManagement.sections.pricing' | translate }}</button>
       </section>
 
       <ng-container *ngIf="section === 'catalog'">
@@ -262,6 +267,128 @@ type ProductManagementSection = 'catalog' | 'uploads' | 'history';
           <p>History appears here after uploads change or deactivate catalog entries.</p>
         </section>
       </ng-container>
+
+      <ng-container *ngIf="section === 'pricing' && canManagePricing">
+        <section class="toolbar-card pricing-grid">
+          <div class="pricing-field">
+            <label>{{ 'productManagement.pricing.xFactor' | translate }}</label>
+            <input type="number" step="0.01" [(ngModel)]="pricingForm.xFactorPercent" />
+          </div>
+          <div class="pricing-field">
+            <label>{{ 'productManagement.pricing.yFactor' | translate }}</label>
+            <input type="number" step="0.01" [(ngModel)]="pricingForm.yFactorAmount" />
+          </div>
+          <div class="pricing-field">
+            <label>{{ 'productManagement.pricing.deliveryCharge' | translate }}</label>
+            <input type="number" step="0.01" [(ngModel)]="pricingForm.deliveryCharge" />
+          </div>
+          <div class="pricing-field pricing-field-wide">
+            <label>{{ 'productManagement.pricing.reason' | translate }}</label>
+            <input type="text" maxlength="500" [(ngModel)]="pricingForm.reason" [placeholder]="'productManagement.pricing.reasonPlaceholder' | translate" />
+          </div>
+          <div class="pricing-preview">
+            <strong>{{ 'productManagement.pricing.preview' | translate }}</strong>
+            <span>{{ 'productManagement.pricing.basePrice' | translate }}</span>
+            <span>{{ 'productManagement.pricing.newPrice' | translate }}: {{ previewPrice | number:'1.2-2' }} EUR</span>
+          </div>
+          <button type="button" class="primary-btn" [disabled]="applyingPricing" (click)="applyPricingPolicy()">
+            {{ applyingPricing ? ('productManagement.pricing.applying' | translate) : ('productManagement.pricing.apply' | translate) }}
+          </button>
+        </section>
+
+        <p *ngIf="pricingErrorMsg" class="error-msg">{{ pricingErrorMsg }}</p>
+        <p *ngIf="pricingMessage" class="success-msg">{{ pricingMessage }}</p>
+
+        <section *ngIf="currentPricingPolicy" class="state-card">
+          <h2>{{ 'productManagement.pricing.currentActiveTitle' | translate }}</h2>
+          <p>
+            {{ 'productManagement.pricing.version' | translate }} {{ currentPricingPolicy.versionNo }} |
+            {{ 'productManagement.pricing.xShort' | translate }} {{ currentPricingPolicy.xFactorPercent | number:'1.2-2' }}% |
+            {{ 'productManagement.pricing.yShort' | translate }} {{ currentPricingPolicy.yFactorAmount | number:'1.2-2' }} EUR |
+            {{ 'productManagement.pricing.deliveryShort' | translate }} {{ currentPricingPolicy.deliveryCharge | number:'1.2-2' }} EUR
+          </p>
+          <p>
+            {{ 'productManagement.pricing.effectiveFrom' | translate }} {{ currentPricingPolicy.effectiveFrom | date:'medium' }} {{ 'productManagement.pricing.by' | translate }} {{ currentPricingPolicy.createdByName || ('productManagement.pricing.unknown' | translate) }}
+          </p>
+        </section>
+
+        <section *ngIf="loadingPricingHistory" class="state-card">
+          <h2>{{ 'productManagement.pricing.loadingHistoryTitle' | translate }}</h2>
+          <p>{{ 'productManagement.pricing.loadingHistorySubtitle' | translate }}</p>
+        </section>
+
+        <section *ngIf="!loadingPricingHistory && pricingHistoryPage as policyHistory" class="table-card">
+          <h2>{{ 'productManagement.pricing.policyVersionsTitle' | translate }}</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>{{ 'productManagement.pricing.version' | translate }}</th>
+                <th>{{ 'productManagement.pricing.xFactorPercent' | translate }}</th>
+                <th>{{ 'productManagement.pricing.yFactor' | translate }}</th>
+                <th>{{ 'productManagement.pricing.delivery' | translate }}</th>
+                <th>{{ 'productManagement.pricing.status' | translate }}</th>
+                <th>{{ 'productManagement.pricing.effective' | translate }}</th>
+                <th>{{ 'productManagement.pricing.by' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let version of policyHistory.items">
+                <td>{{ version.versionNo }}</td>
+                <td>{{ version.xFactorPercent | number:'1.2-2' }}</td>
+                <td>{{ version.yFactorAmount | number:'1.2-2' }} EUR</td>
+                <td>{{ version.deliveryCharge | number:'1.2-2' }} EUR</td>
+                <td>{{ version.isActive ? ('productManagement.pricing.active' | translate) : ('productManagement.pricing.inactive' | translate) }}</td>
+                <td>{{ version.effectiveFrom | date:'short' }}</td>
+                <td>{{ version.createdByName || ('productManagement.pricing.unknown' | translate) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pager-row">
+            <button type="button" class="ghost-btn" [disabled]="policyHistory.page <= 1" (click)="goToPricingHistoryPage(policyHistory.page - 1)">{{ 'productManagement.pricing.previous' | translate }}</button>
+            <span>{{ 'productManagement.pricing.page' | translate }} {{ policyHistory.page }} / {{ totalPages(policyHistory) }}</span>
+            <button type="button" class="ghost-btn" [disabled]="policyHistory.page >= totalPages(policyHistory)" (click)="goToPricingHistoryPage(policyHistory.page + 1)">{{ 'productManagement.pricing.next' | translate }}</button>
+          </div>
+        </section>
+
+        <section *ngIf="!loadingPricingHistory && pricingAuditPage as policyAudit" class="table-card">
+          <h2>{{ 'productManagement.pricing.auditEventsTitle' | translate }}</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>{{ 'productManagement.pricing.changed' | translate }}</th>
+                <th>{{ 'productManagement.pricing.action' | translate }}</th>
+                <th>{{ 'productManagement.pricing.oldValues' | translate }}</th>
+                <th>{{ 'productManagement.pricing.newValues' | translate }}</th>
+                <th>{{ 'productManagement.pricing.by' | translate }}</th>
+                <th>{{ 'productManagement.pricing.correlation' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let event of policyAudit.items">
+                <td>{{ event.changedAt | date:'medium' }}</td>
+                <td>{{ event.actionType }}</td>
+                <td>
+                  <small>X: {{ event.oldXFactorPercent ?? '-' }}</small>
+                  <small>Y: {{ event.oldYFactorAmount ?? '-' }}</small>
+                  <small>D: {{ event.oldDeliveryCharge ?? '-' }}</small>
+                </td>
+                <td>
+                  <small>X: {{ event.newXFactorPercent }}</small>
+                  <small>Y: {{ event.newYFactorAmount }}</small>
+                  <small>D: {{ event.newDeliveryCharge }}</small>
+                </td>
+                <td>{{ event.changedByName || ('productManagement.pricing.unknown' | translate) }}</td>
+                <td>{{ event.correlationId }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pager-row">
+            <button type="button" class="ghost-btn" [disabled]="policyAudit.page <= 1" (click)="goToPricingAuditPage(policyAudit.page - 1)">{{ 'productManagement.pricing.previous' | translate }}</button>
+            <span>{{ 'productManagement.pricing.page' | translate }} {{ policyAudit.page }} / {{ totalPages(policyAudit) }}</span>
+            <button type="button" class="ghost-btn" [disabled]="policyAudit.page >= totalPages(policyAudit)" (click)="goToPricingAuditPage(policyAudit.page + 1)">{{ 'productManagement.pricing.next' | translate }}</button>
+          </div>
+        </section>
+      </ng-container>
     </section>
   `,
   styles: [`
@@ -383,6 +510,31 @@ type ProductManagementSection = 'catalog' | 'uploads' | 'history';
     .compact-toolbar {
       grid-template-columns: minmax(220px, 320px) auto auto;
     }
+    .pricing-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: end;
+    }
+    .pricing-field {
+      display: grid;
+      gap: 0.35rem;
+    }
+    .pricing-field label {
+      font-size: 0.82rem;
+      color: #4e6557;
+      font-weight: 700;
+    }
+    .pricing-field-wide {
+      grid-column: span 2;
+    }
+    .pricing-preview {
+      display: grid;
+      gap: 0.2rem;
+      padding: 0.7rem 0.85rem;
+      border: 1px dashed #c7d6cd;
+      border-radius: 12px;
+      background: #f7fbf8;
+      color: #1f4e33;
+    }
     input,
     select {
       border: 1px solid #cad6cc;
@@ -451,6 +603,12 @@ type ProductManagementSection = 'catalog' | 'uploads' | 'history';
       .compact-toolbar {
         grid-template-columns: 1fr;
       }
+      .pricing-grid {
+        grid-template-columns: 1fr;
+      }
+      .pricing-field-wide {
+        grid-column: auto;
+      }
       .summary-grid {
         grid-template-columns: 1fr;
       }
@@ -462,6 +620,7 @@ export class ProductManagementComponent implements OnInit {
   private readonly productService = inject(ProductService);
   private readonly translate = inject(TranslateService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly auth = inject(AuthService);
 
   readonly templateUrl = '/templates/rewe-product-upload-template.xlsx';
 
@@ -484,7 +643,9 @@ export class ProductManagementComponent implements OnInit {
   loadingProducts = true;
   loadingUploads = true;
   loadingHistory = true;
+  loadingPricingHistory = true;
   uploading = false;
+  applyingPricing = false;
 
   selectedFile: File | null = null;
   selectedFileName = '';
@@ -494,11 +655,36 @@ export class ProductManagementComponent implements OnInit {
   productsErrorMsg = '';
   uploadsErrorMsg = '';
   historyErrorMsg = '';
+  pricingErrorMsg = '';
+  pricingMessage = '';
   isExporting = false;
+
+  currentPricingPolicy: PricingPolicyVersion | null = null;
+  pricingHistoryPage: PagedResult<PricingPolicyVersion> | null = null;
+  pricingAuditPage: PagedResult<PricingPolicyAuditEvent> | null = null;
+  pricingForm: ApplyPricingPolicyRequest = {
+    xFactorPercent: 0,
+    yFactorAmount: 0,
+    deliveryCharge: 2.99,
+    reason: ''
+  };
 
   private productsRequestId = 0;
   private uploadsRequestId = 0;
   private historyRequestId = 0;
+  private pricingHistoryRequestId = 0;
+  private pricingAuditRequestId = 0;
+
+  get canManagePricing(): boolean {
+    return this.auth.hasRole('SuperAdmin');
+  }
+
+  get previewPrice(): number {
+    const basePrice = 1;
+    const withPercent = basePrice * (1 + (this.pricingForm.xFactorPercent / 100));
+    const adjusted = withPercent + this.pricingForm.yFactorAmount;
+    return Math.max(0, Number(adjusted.toFixed(2)));
+  }
 
   ngOnInit(): void {
     this.productService.getCategories().subscribe(categories => {
@@ -514,6 +700,12 @@ export class ProductManagementComponent implements OnInit {
     this.loadProducts();
     this.loadUploads();
     this.loadHistory();
+
+    if (this.canManagePricing) {
+      this.loadCurrentPricingPolicy();
+      this.loadPricingHistory();
+      this.loadPricingAudit();
+    }
   }
 
   getCategoryLabel(category: Category | undefined | null): string {
@@ -527,7 +719,46 @@ export class ProductManagementComponent implements OnInit {
   }
 
   setSection(section: ProductManagementSection): void {
+    if (section === 'pricing' && !this.canManagePricing) {
+      return;
+    }
+
     this.section = section;
+  }
+
+  applyPricingPolicy(): void {
+    if (!this.canManagePricing || this.applyingPricing) {
+      return;
+    }
+
+    this.applyingPricing = true;
+    this.pricingErrorMsg = '';
+    this.pricingMessage = '';
+
+    this.productManagementService.applyPricingPolicy(this.pricingForm).subscribe({
+      next: policy => {
+        this.applyingPricing = false;
+        this.currentPricingPolicy = policy;
+        this.pricingMessage = this.translate.instant('productManagement.pricing.applySuccess', { versionNo: policy.versionNo });
+        this.loadPricingHistory(1);
+        this.loadPricingAudit(1);
+        this.loadProducts(this.productsPage?.page ?? 1);
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        this.applyingPricing = false;
+        this.pricingErrorMsg = err?.error?.message || this.translate.instant('productManagement.pricing.applyError');
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  goToPricingHistoryPage(page: number): void {
+    this.loadPricingHistory(page);
+  }
+
+  goToPricingAuditPage(page: number): void {
+    this.loadPricingAudit(page);
   }
 
   totalPages(page: PagedResult<unknown> | null): number {
@@ -820,6 +1051,71 @@ export class ProductManagementComponent implements OnInit {
 
         this.historyErrorMsg = err?.error?.message || 'Failed to load product history.';
         this.loadingHistory = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  private loadCurrentPricingPolicy(): void {
+    this.productManagementService.getCurrentPricingPolicy().subscribe({
+      next: policy => {
+        this.currentPricingPolicy = policy;
+        this.pricingForm.xFactorPercent = policy.xFactorPercent;
+        this.pricingForm.yFactorAmount = policy.yFactorAmount;
+        this.pricingForm.deliveryCharge = policy.deliveryCharge;
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        this.pricingErrorMsg = err?.error?.message || 'Failed to load current pricing policy.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  private loadPricingHistory(page = this.pricingHistoryPage?.page ?? 1): void {
+    const requestId = ++this.pricingHistoryRequestId;
+    this.loadingPricingHistory = true;
+
+    this.productManagementService.getPricingPolicyHistory(page, 10).subscribe({
+      next: response => {
+        if (requestId !== this.pricingHistoryRequestId) {
+          return;
+        }
+
+        this.pricingHistoryPage = response;
+        this.loadingPricingHistory = false;
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        if (requestId !== this.pricingHistoryRequestId) {
+          return;
+        }
+
+        this.loadingPricingHistory = false;
+        this.pricingErrorMsg = err?.error?.message || 'Failed to load pricing history.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  private loadPricingAudit(page = this.pricingAuditPage?.page ?? 1): void {
+    const requestId = ++this.pricingAuditRequestId;
+
+    this.productManagementService.getPricingPolicyAudit(page, 10).subscribe({
+      next: response => {
+        if (requestId !== this.pricingAuditRequestId) {
+          return;
+        }
+
+        this.pricingAuditPage = response;
+        this.cdr.detectChanges();
+      },
+      error: err => {
+        if (requestId !== this.pricingAuditRequestId) {
+          return;
+        }
+
+        this.pricingErrorMsg = err?.error?.message || 'Failed to load pricing audit events.';
         this.cdr.detectChanges();
       }
     });

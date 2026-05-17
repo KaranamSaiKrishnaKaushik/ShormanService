@@ -10,7 +10,7 @@ namespace ShormanServicesBackend.Controllers;
 
 [ApiController]
 [Route("api/orders")]
-[Authorize(Roles = RoleNames.Customer)]
+[Authorize(Roles = $"{RoleNames.SuperAdmin},{RoleNames.Admin},{RoleNames.Customer}")]
 public class OrdersController(IMediator mediator) : ControllerBase
 {
     [HttpGet]
@@ -31,6 +31,32 @@ public class OrdersController(IMediator mediator) : ControllerBase
         {
             var result = await mediator.Send(new CreateOrderCommand(GetUserId(), request), cancellationToken);
             return CreatedAtAction(nameof(GetOrder), new { id = result.Id }, result);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("checkout-session")]
+    public async Task<ActionResult<CheckoutSessionResponse>> CreateCheckoutSession([FromBody] CreateOrderRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await mediator.Send(new CreateCheckoutSessionCommand(GetUserId(), request), cancellationToken));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("{id:int}/payment-cancelled")]
+    public async Task<ActionResult<OrderDto>> CancelPendingPayment(int id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await mediator.Send(new CancelPendingOrderPaymentCommand(GetUserId(), id), cancellationToken));
         }
         catch (InvalidOperationException exception)
         {

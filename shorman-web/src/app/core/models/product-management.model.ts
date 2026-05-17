@@ -82,3 +82,42 @@ export interface ProductUploadRunFilters {
   page?: number;
   pageSize?: number;
 }
+
+export interface PricingPolicyVersion {
+  id: number;
+  versionNo: number;
+  xFactorPercent: number;
+  yFactorAmount: number;
+  deliveryCharge: number;
+  isActive: boolean;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  reason?: string;
+  createdByUserId: number;
+  createdByName?: string;
+  createdAt: string;
+}
+
+export interface PricingPolicyAuditEvent {
+  id: number;
+  policyVersionId: number;
+  actionType: string;
+  oldXFactorPercent?: number;
+  newXFactorPercent: number;
+  oldYFactorAmount?: number;
+  newYFactorAmount: number;
+  oldDeliveryCharge?: number;
+  newDeliveryCharge: number;
+  changedByUserId: number;
+  changedByName?: string;
+  changedAt: string;
+  correlationId: string;
+  metadataJson?: string;
+}
+
+export interface ApplyPricingPolicyRequest {
+  xFactorPercent: number;
+  yFactorAmount: number;
+  deliveryCharge: number;
+  reason?: string;
+}

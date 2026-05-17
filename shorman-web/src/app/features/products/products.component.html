@@ -1,4 +1,50 @@
 <div class="products-page">
+  <section class="delivery-zone-banner" [class.compact]="isDeliveryBannerCompact">
+    <div class="delivery-zone-inner" *ngIf="!isDeliveryBannerCompact; else compactDeliveryZone">
+      <div class="delivery-zone-copy">
+        <span class="delivery-zone-kicker">{{ 'products.delivery.kicker' | translate }}</span>
+        <h2>{{ 'products.delivery.title' | translate }}</h2>
+        <p>{{ 'products.delivery.subtitle' | translate }}</p>
+      </div>
+
+      <form class="delivery-zone-form" (ngSubmit)="checkDeliveryZone()">
+        <input type="text" [(ngModel)]="deliveryCheck.street" name="deliveryStreet" placeholder="{{ 'products.delivery.street' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.houseNumber" name="deliveryHouseNumber" placeholder="{{ 'products.delivery.houseNumber' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.postalCode" name="deliveryPostalCode" placeholder="{{ 'products.delivery.postalCode' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.city" name="deliveryCity" placeholder="{{ 'products.delivery.city' | translate }}" />
+        <button type="submit" class="delivery-zone-btn" [disabled]="checkingDelivery">
+          {{ checkingDelivery ? ('products.delivery.checking' | translate) : ('products.delivery.checkAddress' | translate) }}
+        </button>
+      </form>
+
+      <p class="delivery-zone-error" *ngIf="deliveryCheckError">{{ deliveryCheckError }}</p>
+      <div class="delivery-zone-result" *ngIf="deliveryCheckResult as result" [class.ineligible]="!result.eligible">
+        <strong>{{ result.eligible ? ('products.delivery.available' | translate) : ('products.delivery.notAvailable' | translate) }}</strong>
+        <span>{{ result.message }}</span>
+      </div>
+    </div>
+
+    <ng-template #compactDeliveryZone>
+      <div class="delivery-zone-compact" *ngIf="deliveryCheckResult as result">
+        <div class="delivery-zone-compact-copy">
+          <span class="delivery-zone-kicker">Delivery</span>
+          <strong [class.ineligible]="!result.eligible">
+            {{ result.eligible ? ('products.delivery.available' | translate) : ('products.delivery.notAvailable' | translate) }}
+          </strong>
+          <span>{{ deliverySummary }}</span>
+        </div>
+        <button type="button" class="delivery-zone-compact-btn" (click)="expandDeliveryCheck()">
+          Check another address
+        </button>
+      </div>
+    </ng-template>
+  </section>
+
+  <div class="delivery-prereq" *ngIf="!deliveryCheckCompleted">
+    <p>Check delivery address first to unlock products and filters.</p>
+  </div>
+
+  <ng-container *ngIf="deliveryCheckCompleted">
   <div class="page-header">
     <div class="header-inner">
       <div class="mode-switch" role="tablist" aria-label="Product mode">
@@ -50,32 +96,6 @@
       </button>
     </div>
   </div>
-
-  <section class="delivery-zone-banner">
-    <div class="delivery-zone-inner">
-      <div class="delivery-zone-copy">
-        <span class="delivery-zone-kicker">{{ 'products.delivery.kicker' | translate }}</span>
-        <h2>{{ 'products.delivery.title' | translate }}</h2>
-        <p>{{ 'products.delivery.subtitle' | translate }}</p>
-      </div>
-
-      <form class="delivery-zone-form" (ngSubmit)="checkDeliveryZone()">
-        <input type="text" [(ngModel)]="deliveryCheck.street" name="deliveryStreet" placeholder="{{ 'products.delivery.street' | translate }}" />
-        <input type="text" [(ngModel)]="deliveryCheck.houseNumber" name="deliveryHouseNumber" placeholder="{{ 'products.delivery.houseNumber' | translate }}" />
-        <input type="text" [(ngModel)]="deliveryCheck.postalCode" name="deliveryPostalCode" placeholder="{{ 'products.delivery.postalCode' | translate }}" />
-        <input type="text" [(ngModel)]="deliveryCheck.city" name="deliveryCity" placeholder="{{ 'products.delivery.city' | translate }}" />
-        <button type="submit" class="delivery-zone-btn" [disabled]="checkingDelivery">
-          {{ checkingDelivery ? ('products.delivery.checking' | translate) : ('products.delivery.checkAddress' | translate) }}
-        </button>
-      </form>
-
-      <p class="delivery-zone-error" *ngIf="deliveryCheckError">{{ deliveryCheckError }}</p>
-      <div class="delivery-zone-result" *ngIf="deliveryCheckResult as result" [class.ineligible]="!result.eligible">
-        <strong>{{ result.eligible ? ('products.delivery.available' | translate) : ('products.delivery.notAvailable' | translate) }}</strong>
-        <span>{{ result.message }}</span>
-      </div>
-    </div>
-  </section>
 
   <div class="products-layout" [class.filters-open]="isMobileFiltersActive">
     <!-- Mobile Filter Overlay -->
@@ -190,6 +210,7 @@
     <span class="cart-text">{{ 'products.cart' | translate }}</span>
     <span class="cart-badge">{{ count }}</span>
   </button>
+  </ng-container>
 </div>
 
 <!-- Cart Sidebar Overlay -->

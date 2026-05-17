@@ -3,9 +3,12 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, catchError, retry, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  ApplyPricingPolicyRequest,
   ManagedProduct,
   ManagedProductFilters,
   PagedResult,
+  PricingPolicyAuditEvent,
+  PricingPolicyVersion,
   ProductHistoryEntry,
   ProductHistoryFilters,
   ProductUploadRun,
@@ -50,6 +53,37 @@ export class ProductManagementService {
 
     return this.http.post<ProductUploadRun>(`${this.baseUrl}/upload`, formData)
       .pipe(catchError(error => throwError(() => error)));
+  }
+
+  getCurrentPricingPolicy(): Observable<PricingPolicyVersion> {
+    return this.http.get<PricingPolicyVersion>(`${this.baseUrl}/pricing/current`).pipe(
+      retry({ count: 1, delay: 300 }),
+      catchError(error => throwError(() => error))
+    );
+  }
+
+  getPricingPolicyHistory(page = 1, pageSize = 25): Observable<PagedResult<PricingPolicyVersion>> {
+    return this.http.get<PagedResult<PricingPolicyVersion>>(`${this.baseUrl}/pricing/history`, {
+      params: this.buildParams({ page, pageSize })
+    }).pipe(
+      retry({ count: 1, delay: 300 }),
+      catchError(error => throwError(() => error))
+    );
+  }
+
+  getPricingPolicyAudit(page = 1, pageSize = 25): Observable<PagedResult<PricingPolicyAuditEvent>> {
+    return this.http.get<PagedResult<PricingPolicyAuditEvent>>(`${this.baseUrl}/pricing/audit`, {
+      params: this.buildParams({ page, pageSize })
+    }).pipe(
+      retry({ count: 1, delay: 300 }),
+      catchError(error => throwError(() => error))
+    );
+  }
+
+  applyPricingPolicy(request: ApplyPricingPolicyRequest): Observable<PricingPolicyVersion> {
+    return this.http.post<PricingPolicyVersion>(`${this.baseUrl}/pricing/apply`, request).pipe(
+      catchError(error => throwError(() => error))
+    );
   }
 
   private buildParams(filters: object): HttpParams {

@@ -111,6 +111,7 @@ const CATEGORY_ICON_MAP: Record<string, string> = {
 export class ProductsComponent implements OnInit {
   private static readonly PAGE_SIZE = 30;
   private static readonly MODE_FETCH_PAGE_SIZE = 120;
+  private static readonly DELIVERY_STATE_KEY = 'products-delivery-state-v1';
 
   private productService = inject(ProductService);
   private translate = inject(TranslateService);
@@ -143,6 +144,9 @@ export class ProductsComponent implements OnInit {
   deliveryCheckResult: DeliveryCheckResult | null = null;
   checkingDelivery = false;
   deliveryCheckError = '';
+  deliveryCheckCompleted = false;
+  isDeliveryBannerCompact = false;
+  deliverySummary = '';
 
   cartOpen$ = this.cartService.isOpen$;
 
@@ -203,6 +207,8 @@ export class ProductsComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.restoreDeliveryState();
+
     this.productService.pingHealth().subscribe(isUp => {
       console.log('Backend health check:', isUp ? 'OK' : 'FAILED');
     });
@@ -343,6 +349,10 @@ export class ProductsComponent implements OnInit {
     this.deliveryService.checkDelivery(this.deliveryCheck).subscribe({
       next: result => {
         this.deliveryCheckResult = result;
+        this.deliveryCheckCompleted = true;
+        this.isDeliveryBannerCompact = true;
+        this.deliverySummary = this.getDeliverySummary();
+        this.persistDeliveryState();
         this.checkingDelivery = false;
         this.cdr.detectChanges();
       },
@@ -353,6 +363,10 @@ export class ProductsComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  expandDeliveryCheck(): void {
+    this.isDeliveryBannerCompact = false;
   }
 
   get visiblePageNumbers(): number[] {
@@ -520,5 +534,63 @@ export class ProductsComponent implements OnInit {
 
   private getModeForCategory(categorySlug: string): ProductMode {
     return BEAUTY_CATEGORY_SLUGS.has(categorySlug) ? 'beauty' : 'groceries';
+  }
+
+  private getDeliverySummary(): string {
+    const parts = [
+      this.deliveryCheck.street.trim(),
+      this.deliveryCheck.houseNumber.trim(),
+      this.deliveryCheck.postalCode.trim(),
+      this.deliveryCheck.city.trim()
+    ].filter(part => !!part);
+
+    return parts.join(', ');
+  }
+
+  private restoreDeliveryState(): void {
+    const raw = localStorage.getItem(ProductsComponent.DELIVERY_STATE_KEY);
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        deliveryCheck?: {
+          street?: string;
+          houseNumber?: string;
+          postalCode?: string;
+          city?: string;
+          country?: string;
+        };
+        deliveryCheckResult?: DeliveryCheckResult | null;
+        deliveryCheckCompleted?: boolean;
+        deliverySummary?: string;
+      };
+
+      if (parsed.deliveryCheck) {
+        this.deliveryCheck = {
+          ...this.deliveryCheck,
+          ...parsed.deliveryCheck
+        };
+      }
+
+      this.deliveryCheckResult = parsed.deliveryCheckResult ?? null;
+      this.deliveryCheckCompleted = !!parsed.deliveryCheckCompleted;
+      this.isDeliveryBannerCompact = this.deliveryCheckCompleted;
+      this.deliverySummary = parsed.deliverySummary || this.getDeliverySummary();
+    } catch {
+      localStorage.removeItem(ProductsComponent.DELIVERY_STATE_KEY);
+    }
+  }
+
+  private persistDeliveryState(): void {
+    const state = {
+      deliveryCheck: this.deliveryCheck,
+      deliveryCheckResult: this.deliveryCheckResult,
+      deliveryCheckCompleted: this.deliveryCheckCompleted,
+      deliverySummary: this.deliverySummary
+    };
+
+    localStorage.setItem(ProductsComponent.DELIVERY_STATE_KEY, JSON.stringify(state));
   }
 }

@@ -42,6 +42,28 @@ export class OrdersComponent implements OnInit {
     return this.isRider ? 'Loading your rider orders...' : 'Loading your orders...';
   }
 
+  formatPaymentMethod(paymentMethod: string): string {
+    switch (paymentMethod) {
+      case 'STRIPE_CARD':
+        return 'Card (Stripe)';
+      case 'STRIPE_SEPA_DEBIT':
+        return 'SEPA Debit (Stripe)';
+      case 'STRIPE_KLARNA':
+        return 'Klarna (Stripe)';
+      case 'STRIPE_PAYPAL':
+      case 'STRIPE_PAYPAL_GERMANY':
+        return 'PayPal';
+      case 'CASH_ON_DELIVERY':
+        return 'Cash on delivery';
+      default:
+        return paymentMethod.replaceAll('_', ' ');
+    }
+  }
+
+  formatPaymentStatus(paymentStatus: string): string {
+    return paymentStatus.replaceAll('_', ' ');
+  }
+
   ngOnInit(): void {
     this.loadOrders();
   }

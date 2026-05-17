@@ -12,7 +12,7 @@
     <div *ngIf="errorMsg && !loading" class="error-state">
       <div class="error-icon">⚠️</div>
       <p>{{ errorMsg }}</p>
-      <button class="btn-retry" (click)="loadOrders()">Retry</button>
+      <button type="button" class="btn-retry" (click)="loadOrders()">Retry</button>
     </div>
 
     <!-- Empty State -->
@@ -29,6 +29,7 @@
         <span class="order-status" [ngClass]="'status-' + order.status.toLowerCase()">
           {{ order.status }}
         </span>
+        <span class="order-payment">{{ formatPaymentMethod(order.paymentMethod) }}</span>
         <span class="order-date">{{ order.createdAt | date:'mediumDate' }}</span>
       </div>
 
@@ -42,6 +43,9 @@
       <div class="order-footer">
         <span class="delivery-address" *ngIf="order.deliveryAddress">
           📍 {{ order.deliveryAddress }}
+        </span>
+        <span class="delivery-address">
+          💳 {{ formatPaymentMethod(order.paymentMethod) }} · {{ formatPaymentStatus(order.paymentStatus) }}
         </span>
         <div class="order-total">
           Total: <strong>{{ order.total | currency:'EUR' }}</strong>

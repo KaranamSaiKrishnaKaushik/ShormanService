@@ -5,6 +5,7 @@ import { MenuPermissionService } from './menu-permission.service';
 import { OrderService } from './order.service';
 import { UserManagementService } from './user-management.service';
 import { Order } from '../models/order.model';
+import { RIDER_ROLES } from '../models/user.model';
 
 export interface OrderAlertNotification {
   count: number;
@@ -51,7 +52,7 @@ export class OrderAlertService {
 
     await this.menuPermissions.ensureLoaded();
 
-    if (this.auth.hasRole('Rider') && this.menuPermissions.hasPermission('rider-dashboard')) {
+    if (this.auth.hasAnyRole(RIDER_ROLES) && this.menuPermissions.hasPermission('rider-dashboard')) {
       this.startPolling(
         () => this.orderService.getAvailableRiderOrders().pipe(map(orders => this.countAwaitingPickup(orders))),
         (count, hasIncrease) => ({

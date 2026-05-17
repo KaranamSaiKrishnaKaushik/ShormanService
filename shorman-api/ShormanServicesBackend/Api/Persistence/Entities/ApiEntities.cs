@@ -20,6 +20,7 @@ public class ApiUser
     public ICollection<ApiAddress> Addresses { get; set; } = [];
     public ICollection<ApiCart> Carts { get; set; } = [];
     public ICollection<ApiOrder> Orders { get; set; } = [];
+    public ICollection<ApiPaymentMethod> PaymentMethods { get; set; } = [];
     public ICollection<ApiOrder> AssignedOrders { get; set; } = [];
     public ICollection<ApiUserRole> UserRoles { get; set; } = [];
 }
@@ -148,6 +149,38 @@ public class ApiProductHistoryData
     public int? ImportRunId { get; set; }
 }
 
+public class ApiPricingPolicyVersion
+{
+    public int Id { get; set; }
+    public int VersionNo { get; set; }
+    public decimal XFactorPercent { get; set; }
+    public decimal YFactorAmount { get; set; }
+    public decimal DeliveryCharge { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime EffectiveFromUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? EffectiveToUtc { get; set; }
+    public string? Reason { get; set; }
+    public int CreatedByUserId { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public class ApiPricingPolicyAuditEvent
+{
+    public int Id { get; set; }
+    public int PolicyVersionId { get; set; }
+    public string ActionType { get; set; } = string.Empty;
+    public decimal? OldXFactorPercent { get; set; }
+    public decimal NewXFactorPercent { get; set; }
+    public decimal? OldYFactorAmount { get; set; }
+    public decimal NewYFactorAmount { get; set; }
+    public decimal? OldDeliveryCharge { get; set; }
+    public decimal NewDeliveryCharge { get; set; }
+    public int ChangedByUserId { get; set; }
+    public DateTime ChangedAtUtc { get; set; } = DateTime.UtcNow;
+    public string CorrelationId { get; set; } = Guid.NewGuid().ToString("N");
+    public string? MetadataJson { get; set; }
+}
+
 public class ApiCart
 {
     public int Id { get; set; }
@@ -198,6 +231,8 @@ public class ApiOrder
     public ApiAddress Address { get; set; } = null!;
     public ApiUser? AssignedRider { get; set; }
     public ICollection<ApiOrderItem> Items { get; set; } = [];
+    public ICollection<ApiPaymentTransaction> PaymentTransactions { get; set; } = [];
+    public ICollection<ApiOrderStatusHistory> StatusHistory { get; set; } = [];
 }
 
 public class ApiOrderItem
@@ -211,6 +246,65 @@ public class ApiOrderItem
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
+
+    public ApiOrder Order { get; set; } = null!;
+}
+
+public class ApiPaymentMethod
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string? Provider { get; set; }
+    public string? ProviderPaymentMethodRef { get; set; }
+    public string? DisplayLabel { get; set; }
+    public string? Last4 { get; set; }
+    public byte? ExpiryMonth { get; set; }
+    public short? ExpiryYear { get; set; }
+    public string? Country { get; set; }
+    public string? Fingerprint { get; set; }
+    public bool IsDefault { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAtUtc { get; set; }
+
+    public ApiUser User { get; set; } = null!;
+    public ICollection<ApiPaymentTransaction> PaymentTransactions { get; set; } = [];
+}
+
+public class ApiPaymentTransaction
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public int? PaymentMethodId { get; set; }
+    public string? Provider { get; set; }
+    public string PaymentType { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } = "EUR";
+    public string Status { get; set; } = "PENDING";
+    public string? ProviderRef { get; set; }
+    public string? ProviderPaymentIntentRef { get; set; }
+    public string? ProviderSessionRef { get; set; }
+    public string? ProviderChargeRef { get; set; }
+    public decimal? FeeAmount { get; set; }
+    public decimal? NetAmount { get; set; }
+    public string? RawProviderStatus { get; set; }
+    public string? FailureCode { get; set; }
+    public string? FailureMessage { get; set; }
+    public string? MetadataJson { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAtUtc { get; set; }
+
+    public ApiOrder Order { get; set; } = null!;
+    public ApiPaymentMethod? PaymentMethod { get; set; }
+}
+
+public class ApiOrderStatusHistory
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? Note { get; set; }
+    public DateTime ChangedAtUtc { get; set; } = DateTime.UtcNow;
 
     public ApiOrder Order { get; set; } = null!;
 }
