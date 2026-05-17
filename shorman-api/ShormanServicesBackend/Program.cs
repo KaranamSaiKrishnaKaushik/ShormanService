@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using ShormanServicesBackend.Api;
@@ -8,6 +9,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration
     .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.Local.json", optional: true, reloadOnChange: true);
+
+var keyVaultUri = builder.Configuration["KeyVault:VaultUri"]
+    ?? Environment.GetEnvironmentVariable("KEYVAULT_URI");
+
+if (!string.IsNullOrWhiteSpace(keyVaultUri))
+{
+    builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), new DefaultAzureCredential());
+}
 
 var dbProvider = builder.Configuration["Database:Provider"];
 var defaultConn = builder.Configuration.GetConnectionString("DefaultConnection");

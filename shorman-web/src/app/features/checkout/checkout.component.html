@@ -153,7 +153,7 @@
               [disabled]="placing || cart.items.length === 0 || !selectedAddressId || !selectedAddressEligible()"
               (click)="placeOrder(cart)">
               <span *ngIf="placing" class="btn-spinner"></span>
-              {{ placing ? ('checkout.placingOrder' | translate) : ('checkout.placeOrder' | translate) }}
+              {{ placing ? ('checkout.placingOrder' | translate) : (submitLabelKey() | translate) }}
             </button>
 
             <p class="secure-note">🔒 {{ 'checkout.securePayment' | translate }}</p>

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ShormanServicesBackend.Api.Features;
+using ShormanServicesBackend.Api.Payments;
 using ShormanServicesBackend.Api.Persistence;
 using ShormanServicesBackend.Api.Security;
 
@@ -17,6 +18,7 @@ public static class DependencyInjection
         services.Configure<Auth0Options>(configuration.GetSection(Auth0Options.SectionName));
         services.Configure<DeliveryZoneOptions>(configuration.GetSection(DeliveryZoneOptions.SectionName));
         services.Configure<ProductManagementOptions>(configuration.GetSection(ProductManagementOptions.SectionName));
+        services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
         var auth0Options = configuration.GetSection(Auth0Options.SectionName).Get<Auth0Options>() ?? new Auth0Options();
         var apiConnection = configuration.GetConnectionString("ApiConnection");
@@ -60,9 +62,12 @@ public static class DependencyInjection
         });
 
         services.AddMediatR(typeof(DependencyInjection).Assembly);
+        services.AddMemoryCache();
         services.AddScoped<JwtTokenService>();
         services.AddScoped<IDeliveryGeocodingService, DeliveryGeocodingService>();
         services.AddScoped<IProductManagementImportService, ProductManagementImportService>();
+        services.AddScoped<IPricingPolicyProvider, PricingPolicyProvider>();
+        services.AddScoped<StripePaymentService>();
         services.AddHttpClient("delivery-geocoder", client =>
         {
             client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
@@ -245,6 +250,10 @@ public static class DependencyInjection
         """
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_SupermarketId' AND object_id = OBJECT_ID('products'))
         CREATE INDEX IX_products_SupermarketId ON products (SupermarketId);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_ProductKey' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_ProductKey ON products (ProductKey);
         """,
         """
         IF OBJECT_ID('product_upload_runs', 'U') IS NULL
@@ -506,13 +515,42 @@ public static class DependencyInjection
             UserId INT NOT NULL,
             Type NVARCHAR(30) NOT NULL,
             Provider NVARCHAR(50) NULL,
+            ProviderPaymentMethodRef NVARCHAR(200) NULL,
+            DisplayLabel NVARCHAR(120) NULL,
             Last4 NVARCHAR(4) NULL,
             ExpiryMonth TINYINT NULL,
             ExpiryYear SMALLINT NULL,
+            Country NVARCHAR(8) NULL,
+            Fingerprint NVARCHAR(120) NULL,
             IsDefault BIT NOT NULL DEFAULT 0,
             CreatedAtUtc DATETIME2 NOT NULL,
+            UpdatedAtUtc DATETIME2 NULL,
             CONSTRAINT FK_payment_methods_User FOREIGN KEY (UserId) REFERENCES users(Id) ON DELETE CASCADE
         );
+        """,
+        """
+        IF COL_LENGTH('payment_methods', 'ProviderPaymentMethodRef') IS NULL
+        ALTER TABLE payment_methods ADD ProviderPaymentMethodRef NVARCHAR(200) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_methods', 'DisplayLabel') IS NULL
+        ALTER TABLE payment_methods ADD DisplayLabel NVARCHAR(120) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_methods', 'Country') IS NULL
+        ALTER TABLE payment_methods ADD Country NVARCHAR(8) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_methods', 'Fingerprint') IS NULL
+        ALTER TABLE payment_methods ADD Fingerprint NVARCHAR(120) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_methods', 'UpdatedAtUtc') IS NULL
+        ALTER TABLE payment_methods ADD UpdatedAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_payment_methods_UserId' AND object_id = OBJECT_ID('payment_methods'))
+        CREATE INDEX IX_payment_methods_UserId ON payment_methods (UserId);
         """,
         """
         IF OBJECT_ID('payment_transactions', 'U') IS NULL
@@ -520,15 +558,136 @@ public static class DependencyInjection
             Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
             OrderId INT NOT NULL,
             PaymentMethodId INT NULL,
+            Provider NVARCHAR(50) NULL,
+            PaymentType NVARCHAR(30) NOT NULL CONSTRAINT DF_payment_transactions_PaymentType DEFAULT 'UNKNOWN',
             Amount DECIMAL(10,2) NOT NULL,
             Currency NVARCHAR(10) NOT NULL DEFAULT 'EUR',
             Status NVARCHAR(30) NOT NULL,
             ProviderRef NVARCHAR(200) NULL,
+            ProviderPaymentIntentRef NVARCHAR(200) NULL,
+            ProviderSessionRef NVARCHAR(200) NULL,
+            ProviderChargeRef NVARCHAR(200) NULL,
+            FeeAmount DECIMAL(10,2) NULL,
+            NetAmount DECIMAL(10,2) NULL,
+            RawProviderStatus NVARCHAR(60) NULL,
+            FailureCode NVARCHAR(100) NULL,
+            FailureMessage NVARCHAR(500) NULL,
+            MetadataJson NVARCHAR(4000) NULL,
             CreatedAtUtc DATETIME2 NOT NULL,
             UpdatedAtUtc DATETIME2 NULL,
             CONSTRAINT FK_payment_transactions_Order FOREIGN KEY (OrderId) REFERENCES orders(Id),
             CONSTRAINT FK_payment_transactions_PaymentMethod FOREIGN KEY (PaymentMethodId) REFERENCES payment_methods(Id)
         );
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'Provider') IS NULL
+        ALTER TABLE payment_transactions ADD Provider NVARCHAR(50) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'PaymentType') IS NULL
+        ALTER TABLE payment_transactions ADD PaymentType NVARCHAR(30) NOT NULL CONSTRAINT DF_payment_transactions_PaymentType DEFAULT 'UNKNOWN';
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'ProviderPaymentIntentRef') IS NULL
+        ALTER TABLE payment_transactions ADD ProviderPaymentIntentRef NVARCHAR(200) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'ProviderSessionRef') IS NULL
+        ALTER TABLE payment_transactions ADD ProviderSessionRef NVARCHAR(200) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'ProviderChargeRef') IS NULL
+        ALTER TABLE payment_transactions ADD ProviderChargeRef NVARCHAR(200) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'FeeAmount') IS NULL
+        ALTER TABLE payment_transactions ADD FeeAmount DECIMAL(10,2) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'NetAmount') IS NULL
+        ALTER TABLE payment_transactions ADD NetAmount DECIMAL(10,2) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'RawProviderStatus') IS NULL
+        ALTER TABLE payment_transactions ADD RawProviderStatus NVARCHAR(60) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'FailureCode') IS NULL
+        ALTER TABLE payment_transactions ADD FailureCode NVARCHAR(100) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'FailureMessage') IS NULL
+        ALTER TABLE payment_transactions ADD FailureMessage NVARCHAR(500) NULL;
+        """,
+        """
+        IF COL_LENGTH('payment_transactions', 'MetadataJson') IS NULL
+        ALTER TABLE payment_transactions ADD MetadataJson NVARCHAR(4000) NULL;
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_payment_transactions_OrderId' AND object_id = OBJECT_ID('payment_transactions'))
+        CREATE INDEX IX_payment_transactions_OrderId ON payment_transactions (OrderId);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_payment_transactions_ProviderRef' AND object_id = OBJECT_ID('payment_transactions'))
+        CREATE INDEX IX_payment_transactions_ProviderRef ON payment_transactions (ProviderRef);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_payment_transactions_ProviderSessionRef' AND object_id = OBJECT_ID('payment_transactions'))
+        CREATE INDEX IX_payment_transactions_ProviderSessionRef ON payment_transactions (ProviderSessionRef);
+        """,
+        """
+        IF OBJECT_ID('pricing_policy_versions', 'U') IS NULL
+        CREATE TABLE pricing_policy_versions (
+            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            VersionNo INT NOT NULL,
+            XFactorPercent DECIMAL(8,4) NOT NULL,
+            YFactorAmount DECIMAL(10,2) NOT NULL,
+            DeliveryCharge DECIMAL(10,2) NOT NULL,
+            IsActive BIT NOT NULL DEFAULT 1,
+            EffectiveFromUtc DATETIME2 NOT NULL,
+            EffectiveToUtc DATETIME2 NULL,
+            Reason NVARCHAR(500) NULL,
+            CreatedByUserId INT NOT NULL,
+            CreatedAtUtc DATETIME2 NOT NULL,
+            CONSTRAINT UQ_pricing_policy_versions_VersionNo UNIQUE (VersionNo),
+            CONSTRAINT FK_pricing_policy_versions_User FOREIGN KEY (CreatedByUserId) REFERENCES users(Id)
+        );
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_pricing_policy_versions_Active' AND object_id = OBJECT_ID('pricing_policy_versions'))
+        CREATE UNIQUE INDEX UX_pricing_policy_versions_Active ON pricing_policy_versions (IsActive) WHERE IsActive = 1;
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pricing_policy_versions_IsActive_EffectiveFromUtc' AND object_id = OBJECT_ID('pricing_policy_versions'))
+        CREATE INDEX IX_pricing_policy_versions_IsActive_EffectiveFromUtc ON pricing_policy_versions (IsActive, EffectiveFromUtc DESC);
+        """,
+        """
+        IF OBJECT_ID('pricing_policy_audit_events', 'U') IS NULL
+        CREATE TABLE pricing_policy_audit_events (
+            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            PolicyVersionId INT NOT NULL,
+            ActionType NVARCHAR(30) NOT NULL,
+            OldXFactorPercent DECIMAL(8,4) NULL,
+            NewXFactorPercent DECIMAL(8,4) NOT NULL,
+            OldYFactorAmount DECIMAL(10,2) NULL,
+            NewYFactorAmount DECIMAL(10,2) NOT NULL,
+            OldDeliveryCharge DECIMAL(10,2) NULL,
+            NewDeliveryCharge DECIMAL(10,2) NOT NULL,
+            ChangedByUserId INT NOT NULL,
+            ChangedAtUtc DATETIME2 NOT NULL,
+            CorrelationId NVARCHAR(64) NOT NULL,
+            MetadataJson NVARCHAR(4000) NULL,
+            CONSTRAINT FK_pricing_policy_audit_events_Version FOREIGN KEY (PolicyVersionId) REFERENCES pricing_policy_versions(Id),
+            CONSTRAINT FK_pricing_policy_audit_events_User FOREIGN KEY (ChangedByUserId) REFERENCES users(Id)
+        );
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pricing_policy_audit_events_ChangedAtUtc' AND object_id = OBJECT_ID('pricing_policy_audit_events'))
+        CREATE INDEX IX_pricing_policy_audit_events_ChangedAtUtc ON pricing_policy_audit_events (ChangedAtUtc DESC);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pricing_policy_audit_events_ChangedByUserId_ChangedAtUtc' AND object_id = OBJECT_ID('pricing_policy_audit_events'))
+        CREATE INDEX IX_pricing_policy_audit_events_ChangedByUserId_ChangedAtUtc ON pricing_policy_audit_events (ChangedByUserId, ChangedAtUtc DESC);
         """,
         """
         IF OBJECT_ID('order_status_history', 'U') IS NULL
@@ -658,6 +817,7 @@ public static class DependencyInjection
         MySqlAddColumnIfMissing("products", "DataSource", "VARCHAR(30) NOT NULL DEFAULT 'manual'"),
         MySqlAddColumnIfMissing("products", "UpdatedAtUtc", "DATETIME NULL"),
         MySqlAddColumnIfMissing("products", "LastImportRunId", "INT NULL"),
+        MySqlCreateIndexIfMissing("products", "IX_products_ProductKey", "`ProductKey`"),
         """
         CREATE TABLE IF NOT EXISTS `product_upload_runs` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -849,29 +1009,104 @@ public static class DependencyInjection
             `UserId` INT NOT NULL,
             `Type` VARCHAR(30) NOT NULL,
             `Provider` VARCHAR(50) NULL,
+            `ProviderPaymentMethodRef` VARCHAR(200) NULL,
+            `DisplayLabel` VARCHAR(120) NULL,
             `Last4` VARCHAR(4) NULL,
             `ExpiryMonth` TINYINT NULL,
             `ExpiryYear` SMALLINT NULL,
+            `Country` VARCHAR(8) NULL,
+            `Fingerprint` VARCHAR(120) NULL,
             `IsDefault` TINYINT(1) NOT NULL DEFAULT 0,
             `CreatedAtUtc` DATETIME NOT NULL,
+            `UpdatedAtUtc` DATETIME NULL,
             CONSTRAINT `FK_payment_methods_User` FOREIGN KEY (`UserId`) REFERENCES `users` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
+        MySqlAddColumnIfMissing("payment_methods", "ProviderPaymentMethodRef", "VARCHAR(200) NULL"),
+        MySqlAddColumnIfMissing("payment_methods", "DisplayLabel", "VARCHAR(120) NULL"),
+        MySqlAddColumnIfMissing("payment_methods", "Country", "VARCHAR(8) NULL"),
+        MySqlAddColumnIfMissing("payment_methods", "Fingerprint", "VARCHAR(120) NULL"),
+        MySqlAddColumnIfMissing("payment_methods", "UpdatedAtUtc", "DATETIME NULL"),
+        MySqlCreateIndexIfMissing("payment_methods", "IX_payment_methods_UserId", "`UserId`"),
         """
         CREATE TABLE IF NOT EXISTS `payment_transactions` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `OrderId` INT NOT NULL,
             `PaymentMethodId` INT NULL,
+            `Provider` VARCHAR(50) NULL,
+            `PaymentType` VARCHAR(30) NOT NULL DEFAULT 'UNKNOWN',
             `Amount` DECIMAL(10,2) NOT NULL,
             `Currency` VARCHAR(10) NOT NULL DEFAULT 'EUR',
             `Status` VARCHAR(30) NOT NULL,
             `ProviderRef` VARCHAR(200) NULL,
+            `ProviderPaymentIntentRef` VARCHAR(200) NULL,
+            `ProviderSessionRef` VARCHAR(200) NULL,
+            `ProviderChargeRef` VARCHAR(200) NULL,
+            `FeeAmount` DECIMAL(10,2) NULL,
+            `NetAmount` DECIMAL(10,2) NULL,
+            `RawProviderStatus` VARCHAR(60) NULL,
+            `FailureCode` VARCHAR(100) NULL,
+            `FailureMessage` VARCHAR(500) NULL,
+            `MetadataJson` VARCHAR(4000) NULL,
             `CreatedAtUtc` DATETIME NOT NULL,
             `UpdatedAtUtc` DATETIME NULL,
             CONSTRAINT `FK_payment_transactions_Order` FOREIGN KEY (`OrderId`) REFERENCES `orders` (`Id`),
             CONSTRAINT `FK_payment_transactions_PaymentMethod` FOREIGN KEY (`PaymentMethodId`) REFERENCES `payment_methods` (`Id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
+        MySqlAddColumnIfMissing("payment_transactions", "Provider", "VARCHAR(50) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "PaymentType", "VARCHAR(30) NOT NULL DEFAULT 'UNKNOWN'"),
+        MySqlAddColumnIfMissing("payment_transactions", "ProviderPaymentIntentRef", "VARCHAR(200) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "ProviderSessionRef", "VARCHAR(200) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "ProviderChargeRef", "VARCHAR(200) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "FeeAmount", "DECIMAL(10,2) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "NetAmount", "DECIMAL(10,2) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "RawProviderStatus", "VARCHAR(60) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "FailureCode", "VARCHAR(100) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "FailureMessage", "VARCHAR(500) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "MetadataJson", "VARCHAR(4000) NULL"),
+        MySqlCreateIndexIfMissing("payment_transactions", "IX_payment_transactions_OrderId", "`OrderId`"),
+        MySqlCreateIndexIfMissing("payment_transactions", "IX_payment_transactions_ProviderRef", "`ProviderRef`"),
+        MySqlCreateIndexIfMissing("payment_transactions", "IX_payment_transactions_ProviderSessionRef", "`ProviderSessionRef`"),
+        """
+        CREATE TABLE IF NOT EXISTS `pricing_policy_versions` (
+            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `VersionNo` INT NOT NULL,
+            `XFactorPercent` DECIMAL(8,4) NOT NULL,
+            `YFactorAmount` DECIMAL(10,2) NOT NULL,
+            `DeliveryCharge` DECIMAL(10,2) NOT NULL,
+            `IsActive` TINYINT(1) NOT NULL DEFAULT 1,
+            `EffectiveFromUtc` DATETIME NOT NULL,
+            `EffectiveToUtc` DATETIME NULL,
+            `Reason` VARCHAR(500) NULL,
+            `CreatedByUserId` INT NOT NULL,
+            `CreatedAtUtc` DATETIME NOT NULL,
+            UNIQUE KEY `UQ_pricing_policy_versions_VersionNo` (`VersionNo`),
+            CONSTRAINT `FK_pricing_policy_versions_User` FOREIGN KEY (`CreatedByUserId`) REFERENCES `users` (`Id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        MySqlCreateIndexIfMissing("pricing_policy_versions", "IX_pricing_policy_versions_IsActive_EffectiveFromUtc", "`IsActive`, `EffectiveFromUtc`"),
+        """
+        CREATE TABLE IF NOT EXISTS `pricing_policy_audit_events` (
+            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `PolicyVersionId` INT NOT NULL,
+            `ActionType` VARCHAR(30) NOT NULL,
+            `OldXFactorPercent` DECIMAL(8,4) NULL,
+            `NewXFactorPercent` DECIMAL(8,4) NOT NULL,
+            `OldYFactorAmount` DECIMAL(10,2) NULL,
+            `NewYFactorAmount` DECIMAL(10,2) NOT NULL,
+            `OldDeliveryCharge` DECIMAL(10,2) NULL,
+            `NewDeliveryCharge` DECIMAL(10,2) NOT NULL,
+            `ChangedByUserId` INT NOT NULL,
+            `ChangedAtUtc` DATETIME NOT NULL,
+            `CorrelationId` VARCHAR(64) NOT NULL,
+            `MetadataJson` VARCHAR(4000) NULL,
+            CONSTRAINT `FK_pricing_policy_audit_events_Version` FOREIGN KEY (`PolicyVersionId`) REFERENCES `pricing_policy_versions` (`Id`),
+            CONSTRAINT `FK_pricing_policy_audit_events_User` FOREIGN KEY (`ChangedByUserId`) REFERENCES `users` (`Id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        MySqlCreateIndexIfMissing("pricing_policy_audit_events", "IX_pricing_policy_audit_events_ChangedAtUtc", "`ChangedAtUtc`"),
+        MySqlCreateIndexIfMissing("pricing_policy_audit_events", "IX_pricing_policy_audit_events_ChangedByUserId_ChangedAtUtc", "`ChangedByUserId`, `ChangedAtUtc`"),
         """
         CREATE TABLE IF NOT EXISTS `order_status_history` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -894,7 +1129,10 @@ public static class DependencyInjection
         ("api_carts", "carts"),
         ("api_cart_items", "cart_items"),
         ("api_orders", "orders"),
-        ("api_order_items", "order_items")
+        ("api_order_items", "order_items"),
+        ("api_payment_methods", "payment_methods"),
+        ("api_payment_transactions", "payment_transactions"),
+        ("api_order_status_history", "order_status_history")
     ];
 
     private static async Task MigrateTableNamesAsync(ApiDbContext dbContext)

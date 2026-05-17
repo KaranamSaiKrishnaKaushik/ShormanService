@@ -44,6 +44,7 @@ import { UserManagementService } from '../../core/services/user-management.servi
               </span>
               <span class="order-customer">{{ order.customerName }}</span>
               <span class="order-rider">{{ order.assignedRiderName || 'Unassigned' }}</span>
+              <span class="order-payment">{{ formatPaymentMethod(order.paymentMethod) }}</span>
               <span class="order-total-inline">{{ order.total | currency:'EUR' }}</span>
               <span class="order-date">{{ order.createdAt | date:'mediumDate' }}</span>
             </div>
@@ -63,7 +64,7 @@ import { UserManagementService } from '../../core/services/user-management.servi
               </div>
               <div>
                 <span class="meta-label">Payment</span>
-                <strong>{{ order.paymentMethod.replaceAll('_', ' ') }}</strong>
+                <strong>{{ formatPaymentMethod(order.paymentMethod) }}</strong>
                 <span class="meta-sub">{{ order.total | currency:'EUR' }}</span>
               </div>
             </div>
@@ -210,7 +211,7 @@ import { UserManagementService } from '../../core/services/user-management.servi
     }
     .order-header {
       display: grid;
-      grid-template-columns: auto auto minmax(150px, 1.1fr) minmax(140px, 1fr) auto auto;
+      grid-template-columns: auto auto minmax(150px, 1.1fr) minmax(140px, 1fr) minmax(160px, 1fr) auto auto;
       gap: 0.85rem;
       align-items: center;
     }
@@ -247,7 +248,8 @@ import { UserManagementService } from '../../core/services/user-management.servi
       color: #c62828;
     }
     .order-customer,
-    .order-rider {
+    .order-rider,
+    .order-payment {
       color: #294133;
       font-size: 0.92rem;
       white-space: nowrap;
@@ -385,5 +387,23 @@ export class OrderSummaryManagementComponent implements OnInit {
 
   toggleOrder(orderId: number): void {
     this.expandedOrderId = this.expandedOrderId === orderId ? null : orderId;
+  }
+
+  formatPaymentMethod(paymentMethod: string): string {
+    switch (paymentMethod) {
+      case 'STRIPE_CARD':
+        return 'Card (Stripe)';
+      case 'STRIPE_SEPA_DEBIT':
+        return 'SEPA Debit (Stripe)';
+      case 'STRIPE_KLARNA':
+        return 'Klarna (Stripe)';
+      case 'STRIPE_PAYPAL':
+      case 'STRIPE_PAYPAL_GERMANY':
+        return 'PayPal';
+      case 'CASH_ON_DELIVERY':
+        return 'Cash on delivery';
+      default:
+        return paymentMethod.replaceAll('_', ' ');
+    }
   }
 }

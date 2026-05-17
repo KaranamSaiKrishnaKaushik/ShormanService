@@ -13,7 +13,7 @@ public record GetAdminProductsQuery(string? Search, int? CategoryId, int? Superm
 public record UpdateProductCommand(int Id, UpdateProductRequest Request) : IRequest<ProductDto?>;
 public record DeleteProductCommand(int Id) : IRequest<bool>;
 
-public class GetProductsQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetProductsQuery, PagedResultDto<ProductDto>>
+public class GetProductsQueryHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<GetProductsQuery, PagedResultDto<ProductDto>>
 {
     public async Task<PagedResultDto<ProductDto>> Handle(GetProductsQuery request, CancellationToken cancellationToken)
     {
@@ -53,24 +53,44 @@ public class GetProductsQueryHandler(ApiDbContext dbContext) : IRequestHandler<G
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        var items = await query
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+
+        var baseItems = await query
             .OrderBy(x => x.Name)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(product => new
+            {
+                product.Id,
+                product.Name,
+                product.Description,
+                BasePrice = product.Price,
+                product.ImageUrl,
+                product.CategoryId,
+                Category = new CategoryDto(product.Category.Id, product.Category.Name, product.Category.Slug, product.Category.Icon),
+                product.SupermarketId,
+                Supermarket = new SupermarketDto(product.Supermarket.Id, product.Supermarket.Name, product.Supermarket.Slug, product.Supermarket.LogoUrl, product.Supermarket.Color),
+                product.Unit,
+                product.Stock,
+                product.IsAvailable
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = baseItems
             .Select(product => new ProductDto(
                 product.Id,
                 product.Name,
                 product.Description,
-                product.Price,
+                pricingPolicyProvider.ApplyProductPrice(product.BasePrice, activePolicy),
                 product.ImageUrl,
                 product.CategoryId,
-                new CategoryDto(product.Category.Id, product.Category.Name, product.Category.Slug, product.Category.Icon),
+                product.Category,
                 product.SupermarketId,
-                new SupermarketDto(product.Supermarket.Id, product.Supermarket.Name, product.Supermarket.Slug, product.Supermarket.LogoUrl, product.Supermarket.Color),
+                product.Supermarket,
                 product.Unit,
                 product.Stock,
                 product.IsAvailable))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         return new PagedResultDto<ProductDto>(items, totalCount, page, pageSize);
     }
@@ -91,29 +111,50 @@ public class GetProductsQueryHandler(ApiDbContext dbContext) : IRequestHandler<G
             product.IsAvailable);
 }
 
-public class GetProductByIdQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetProductByIdQuery, ProductDto?>
+public class GetProductByIdQueryHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<GetProductByIdQuery, ProductDto?>
 {
     public async Task<ProductDto?> Handle(GetProductByIdQuery request, CancellationToken cancellationToken)
     {
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+
         var product = await dbContext.Products
             .AsNoTracking()
             .Where(x => x.Id == request.Id)
-            .Select(item => new ProductDto(
+            .Select(item => new
+            {
                 item.Id,
                 item.Name,
                 item.Description,
-                item.Price,
+                BasePrice = item.Price,
                 item.ImageUrl,
                 item.CategoryId,
-                new CategoryDto(item.Category.Id, item.Category.Name, item.Category.Slug, item.Category.Icon),
+                Category = new CategoryDto(item.Category.Id, item.Category.Name, item.Category.Slug, item.Category.Icon),
                 item.SupermarketId,
-                new SupermarketDto(item.Supermarket.Id, item.Supermarket.Name, item.Supermarket.Slug, item.Supermarket.LogoUrl, item.Supermarket.Color),
+                Supermarket = new SupermarketDto(item.Supermarket.Id, item.Supermarket.Name, item.Supermarket.Slug, item.Supermarket.LogoUrl, item.Supermarket.Color),
                 item.Unit,
                 item.Stock,
-                item.IsAvailable))
+                item.IsAvailable
+            })
             .SingleOrDefaultAsync(cancellationToken);
 
-        return product;
+        if (product is null)
+        {
+            return null;
+        }
+
+        return new ProductDto(
+            product.Id,
+            product.Name,
+            product.Description,
+            pricingPolicyProvider.ApplyProductPrice(product.BasePrice, activePolicy),
+            product.ImageUrl,
+            product.CategoryId,
+            product.Category,
+            product.SupermarketId,
+            product.Supermarket,
+            product.Unit,
+            product.Stock,
+            product.IsAvailable);
     }
 }
 

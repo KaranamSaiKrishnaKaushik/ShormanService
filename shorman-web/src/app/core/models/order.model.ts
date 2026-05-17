@@ -1,6 +1,6 @@
 import { CartItem } from './cart.model';
 
-export type PaymentMethod = 'PAYPAL' | 'BANK_TRANSFER' | 'CASH_ON_DELIVERY';
+export type PaymentMethod = 'STRIPE_CARD' | 'STRIPE_SEPA_DEBIT' | 'STRIPE_KLARNA' | 'STRIPE_PAYPAL' | 'STRIPE_PAYPAL_GERMANY' | 'CASH_ON_DELIVERY';
 export type OrderStatus =
   | 'PENDING'
   | 'AWAITING_PICKUP'
@@ -11,7 +11,7 @@ export type OrderStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
-export type PaymentStatus = 'PENDING' | 'PAID' | 'CASH_PENDING' | 'CASH_COLLECTED';
+export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CASH_PENDING' | 'CASH_COLLECTED';
 
 export interface OrderItem {
   id: number;
@@ -57,4 +57,12 @@ export interface CreateOrderRequest {
   addressId: number;
   paymentMethod: PaymentMethod;
   items: { productId: number; quantity: number }[];
+}
+
+export interface CheckoutSessionResponse {
+  orderId: number;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  checkoutUrl: string;
+  sessionId: string;
 }

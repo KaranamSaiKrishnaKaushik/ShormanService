@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, delay, throwError, map, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Order, CreateOrderRequest } from '../models/order.model';
+import { Order, CreateOrderRequest, CheckoutSessionResponse } from '../models/order.model';
 
 // Mock data for development
 let MOCK_ORDERS: Order[] = [
@@ -10,7 +10,7 @@ let MOCK_ORDERS: Order[] = [
     id: 1,
     userId: 1,
     status: 'COMPLETED',
-    paymentMethod: 'PAYPAL',
+    paymentMethod: 'STRIPE_CARD',
     paymentStatus: 'PAID',
     addressId: 1,
     deliveryAddress: 'Hauptstraße 123, 10115 Berlin, Germany',
@@ -90,6 +90,23 @@ export class OrderService {
   private http = inject(HttpClient);
   private useMock = environment.useMockOrders;
 
+  createCheckoutSession(req: CreateOrderRequest): Observable<CheckoutSessionResponse> {
+    if (this.useMock) {
+      const orderId = nextOrderId++;
+      return of({
+        orderId,
+        paymentMethod: req.paymentMethod,
+        paymentStatus: 'PENDING' as const,
+        checkoutUrl: `${window.location.origin}/checkout?payment=success&orderId=${orderId}&session_id=mock_session`,
+        sessionId: 'mock_session'
+      }).pipe(delay(300));
+    }
+
+    return this.http.post<CheckoutSessionResponse>(`${environment.apiUrl}/orders/checkout-session`, req).pipe(
+      timeout(15000)
+    );
+  }
+
   createOrder(req: CreateOrderRequest): Observable<Order> {
     if (this.useMock) {
       // In a real app, you'd fetch product details from ProductService
@@ -120,6 +137,31 @@ export class OrderService {
     }
     return this.http.post<Order>(`${environment.apiUrl}/orders`, req).pipe(
       timeout(15000)
+    );
+  }
+
+  cancelPendingPayment(orderId: number): Observable<Order> {
+    if (this.useMock) {
+      return this.applyMockTransition(orderId, order => ({
+        ...order,
+        status: 'CANCELLED',
+        paymentStatus: 'FAILED',
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    return this.http.post<Order>(`${environment.apiUrl}/orders/${orderId}/payment-cancelled`, {});
+  }
+
+  confirmStripePayment(orderId: number, sessionId: string): Observable<void> {
+    if (this.useMock) {
+      return of(void 0).pipe(delay(150));
+    }
+
+    return this.http.post<void>(
+      `${environment.apiUrl}/payments/stripe/checkout/${orderId}/confirm`,
+      {},
+      { params: { sessionId } }
     );
   }
 

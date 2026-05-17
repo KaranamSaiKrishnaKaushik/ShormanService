@@ -12,16 +12,17 @@ public record UpdateCartItemCommand(int UserId, int ItemId, UpdateCartItemReques
 public record RemoveCartItemCommand(int UserId, int ItemId) : IRequest<CartDto>;
 public record ClearCartCommand(int UserId) : IRequest<CartDto>;
 
-public class GetCartQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetCartQuery, CartDto>
+public class GetCartQueryHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<GetCartQuery, CartDto>
 {
     public async Task<CartDto> Handle(GetCartQuery request, CancellationToken cancellationToken)
     {
         var cart = await CartFeatureShared.GetOrCreateCartAsync(dbContext, request.UserId, cancellationToken);
-        return CartFeatureShared.MapCart(cart);
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+        return CartFeatureShared.MapCart(cart, activePolicy, pricingPolicyProvider);
     }
 }
 
-public class AddCartItemCommandHandler(ApiDbContext dbContext) : IRequestHandler<AddCartItemCommand, CartDto>
+public class AddCartItemCommandHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<AddCartItemCommand, CartDto>
 {
     public async Task<CartDto> Handle(AddCartItemCommand request, CancellationToken cancellationToken)
     {
@@ -38,6 +39,8 @@ public class AddCartItemCommandHandler(ApiDbContext dbContext) : IRequestHandler
 
         var cart = await CartFeatureShared.GetOrCreateCartAsync(dbContext, request.UserId, cancellationToken);
         var item = cart.Items.SingleOrDefault(x => x.ProductId == request.Request.ProductId);
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+        var adjustedPrice = pricingPolicyProvider.ApplyProductPrice(product.Price, activePolicy);
 
         if (item is null)
         {
@@ -45,24 +48,24 @@ public class AddCartItemCommandHandler(ApiDbContext dbContext) : IRequestHandler
             {
                 ProductId = product.Id,
                 Quantity = request.Request.Quantity,
-                UnitPrice = product.Price,
+                UnitPrice = adjustedPrice,
                 Product = product
             });
         }
         else
         {
             item.Quantity += request.Request.Quantity;
-            item.UnitPrice = product.Price;
+            item.UnitPrice = adjustedPrice;
         }
 
         cart.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return CartFeatureShared.MapCart(cart);
+        return CartFeatureShared.MapCart(cart, activePolicy, pricingPolicyProvider);
     }
 }
 
-public class UpdateCartItemCommandHandler(ApiDbContext dbContext) : IRequestHandler<UpdateCartItemCommand, CartDto>
+public class UpdateCartItemCommandHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<UpdateCartItemCommand, CartDto>
 {
     public async Task<CartDto> Handle(UpdateCartItemCommand request, CancellationToken cancellationToken)
     {
@@ -77,18 +80,20 @@ public class UpdateCartItemCommandHandler(ApiDbContext dbContext) : IRequestHand
         else
         {
             item.Quantity = request.Request.Quantity;
-            item.UnitPrice = item.Product.Price;
+            var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+            item.UnitPrice = pricingPolicyProvider.ApplyProductPrice(item.Product.Price, activePolicy);
         }
 
         cart.UpdatedAtUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
 
         cart = await CartFeatureShared.GetOrCreateCartAsync(dbContext, request.UserId, cancellationToken);
-        return CartFeatureShared.MapCart(cart);
+        var latestPolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+        return CartFeatureShared.MapCart(cart, latestPolicy, pricingPolicyProvider);
     }
 }
 
-public class RemoveCartItemCommandHandler(ApiDbContext dbContext) : IRequestHandler<RemoveCartItemCommand, CartDto>
+public class RemoveCartItemCommandHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<RemoveCartItemCommand, CartDto>
 {
     public async Task<CartDto> Handle(RemoveCartItemCommand request, CancellationToken cancellationToken)
     {
@@ -101,11 +106,12 @@ public class RemoveCartItemCommandHandler(ApiDbContext dbContext) : IRequestHand
         await dbContext.SaveChangesAsync(cancellationToken);
 
         cart = await CartFeatureShared.GetOrCreateCartAsync(dbContext, request.UserId, cancellationToken);
-        return CartFeatureShared.MapCart(cart);
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+        return CartFeatureShared.MapCart(cart, activePolicy, pricingPolicyProvider);
     }
 }
 
-public class ClearCartCommandHandler(ApiDbContext dbContext) : IRequestHandler<ClearCartCommand, CartDto>
+public class ClearCartCommandHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<ClearCartCommand, CartDto>
 {
     public async Task<CartDto> Handle(ClearCartCommand request, CancellationToken cancellationToken)
     {
@@ -118,7 +124,8 @@ public class ClearCartCommandHandler(ApiDbContext dbContext) : IRequestHandler<C
         }
 
         cart = await CartFeatureShared.GetOrCreateCartAsync(dbContext, request.UserId, cancellationToken);
-        return CartFeatureShared.MapCart(cart);
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+        return CartFeatureShared.MapCart(cart, activePolicy, pricingPolicyProvider);
     }
 }
 
@@ -156,18 +163,19 @@ internal static class CartFeatureShared
         return await LoadCartQuery(dbContext, userId).SingleAsync(cancellationToken);
     }
 
-    public static CartDto MapCart(ApiCart cart)
+    public static CartDto MapCart(ApiCart cart, ActivePricingPolicy activePolicy, IPricingPolicyProvider pricingPolicyProvider)
     {
         var items = cart.Items
             .OrderBy(x => x.Id)
             .Select(item =>
             {
                 var product = item.Product;
+                var adjustedProductPrice = pricingPolicyProvider.ApplyProductPrice(product.Price, activePolicy);
                 var productDto = new ProductDto(
                     product.Id,
                     product.Name,
                     product.Description,
-                    product.Price,
+                    adjustedProductPrice,
                     product.ImageUrl,
                     product.CategoryId,
                     product.Category is null ? null : new CategoryDto(product.Category.Id, product.Category.Name, product.Category.Slug, product.Category.Icon),
