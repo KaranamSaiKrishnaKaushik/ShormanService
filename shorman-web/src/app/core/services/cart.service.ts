@@ -231,6 +231,11 @@ export class CartService {
       return;
     }
 
+    if (quantity <= 0) {
+      this.removeItem(productId);
+      return;
+    }
+
     this.http.put<ApiCartResponse>(`${environment.apiUrl}/cart/items/${item.id}`, { quantity }).pipe(
       map(response => this.toCart(response)),
       catchError(() => of(this.cart))
