@@ -117,36 +117,6 @@ public static class ApiSeeder
             await dbContext.SaveChangesAsync();
         }
 
-        var seededOrderIds = await dbContext.Orders
-            .Where(x => x.UserId == targetUser.Id && x.PaymentMethod == "SEEDED_INSIGHTS")
-            .Select(x => x.Id)
-            .ToArrayAsync();
-
-        if (seededOrderIds.Length > 0)
-        {
-            var nowForMigration = DateTime.UtcNow;
-
-            await dbContext.Orders
-                .Where(x => seededOrderIds.Contains(x.Id))
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.PaymentMethod, "STRIPE_CARD"));
-
-            await dbContext.Orders
-                .Where(x => seededOrderIds.Contains(x.Id) && x.CreatedAtUtc > nowForMigration)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.CreatedAtUtc, nowForMigration.AddDays(-1))
-                    .SetProperty(x => x.UpdatedAtUtc, nowForMigration.AddDays(-1))
-                    .SetProperty(x => x.CompletedAtUtc, nowForMigration.AddDays(-1)));
-
-            await dbContext.PaymentTransactions
-                .Where(x => seededOrderIds.Contains(x.OrderId))
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.PaymentType, "STRIPE_CARD"));
-
-            await dbContext.SaveChangesAsync();
-            return;
-        }
-
         var userAddress = await dbContext.Addresses
             .Where(x => x.UserId == targetUser.Id)
             .OrderByDescending(x => x.IsDefault)
@@ -233,6 +203,74 @@ public static class ApiSeeder
         }
 
         await dbContext.SaveChangesAsync();
+
+        var seedProductIds = existingProducts.Values
+            .Select(x => x.Id)
+            .ToHashSet();
+
+        var seededOrders = await dbContext.Orders
+            .Include(x => x.Items)
+            .Where(x => x.UserId == targetUser.Id)
+            .Where(x => x.PaymentMethod == "SEEDED_INSIGHTS" || x.Items.Any(item => seedProductIds.Contains(item.ProductId)))
+            .OrderBy(x => x.Id)
+            .ToListAsync();
+
+        if (seededOrders.Count > 0)
+        {
+            var legacySeededOrderIds = seededOrders
+                .Where(x => x.PaymentMethod == "SEEDED_INSIGHTS")
+                .Select(x => x.Id)
+                .ToArray();
+
+            if (legacySeededOrderIds.Length > 0)
+            {
+                var nowForMigration = DateTime.UtcNow;
+
+                await dbContext.Orders
+                    .Where(x => legacySeededOrderIds.Contains(x.Id))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(x => x.PaymentMethod, "STRIPE_CARD"));
+
+                await dbContext.Orders
+                    .Where(x => legacySeededOrderIds.Contains(x.Id) && x.CreatedAtUtc > nowForMigration)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(x => x.CreatedAtUtc, nowForMigration.AddDays(-1))
+                        .SetProperty(x => x.UpdatedAtUtc, nowForMigration.AddDays(-1))
+                        .SetProperty(x => x.CompletedAtUtc, nowForMigration.AddDays(-1)));
+
+                await dbContext.PaymentTransactions
+                    .Where(x => legacySeededOrderIds.Contains(x.OrderId))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(x => x.PaymentType, "STRIPE_CARD"));
+            }
+
+            var duplicateSeededOrderIds = seededOrders
+                .GroupBy(BuildSeededInsightsDuplicateBucketKey)
+                .SelectMany(group => group
+                    .OrderBy(x => x.CreatedAtUtc)
+                    .ThenBy(x => x.Id)
+                    .Skip(2))
+                .Select(x => x.Id)
+                .ToArray();
+
+            if (duplicateSeededOrderIds.Length > 0)
+            {
+                await dbContext.PaymentTransactions
+                    .Where(x => duplicateSeededOrderIds.Contains(x.OrderId))
+                    .ExecuteDeleteAsync();
+
+                await dbContext.OrderItems
+                    .Where(x => duplicateSeededOrderIds.Contains(x.OrderId))
+                    .ExecuteDeleteAsync();
+
+                await dbContext.Orders
+                    .Where(x => duplicateSeededOrderIds.Contains(x.Id))
+                    .ExecuteDeleteAsync();
+            }
+
+            await dbContext.SaveChangesAsync();
+            return;
+        }
 
         var monthlyByStore = new Dictionary<string, decimal[]>
         {
@@ -337,6 +375,18 @@ public static class ApiSeeder
         }
 
         await dbContext.SaveChangesAsync();
+    }
+
+    private static string BuildSeededInsightsDuplicateBucketKey(ApiOrder order)
+    {
+        var itemSignature = string.Join(
+            '|',
+            order.Items
+                .OrderBy(x => x.ProductId)
+                .ThenBy(x => x.Quantity)
+                .Select(x => $"{x.ProductId}:{x.Quantity}:{x.UnitPrice:F2}:{x.TotalPrice:F2}"));
+
+        return $"{order.UserId}:{order.AddressId}:{order.CreatedAtUtc:yyyy-MM}:{order.Total:F2}:{itemSignature}";
     }
 
     private static async Task SeedCategoriesAsync(ApiDbContext dbContext)

@@ -127,8 +127,20 @@ public static class DependencyInjection
             ? GetMySqlCreateScripts()
             : GetSqlServerCreateScripts();
 
-        foreach (var script in scripts)
-            await dbContext.Database.ExecuteSqlRawAsync(script);
+        var previousTimeout = dbContext.Database.GetCommandTimeout();
+        dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
+
+        try
+        {
+            foreach (var script in scripts)
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(script);
+            }
+        }
+        finally
+        {
+            dbContext.Database.SetCommandTimeout(previousTimeout);
+        }
     }
 
     private static IEnumerable<string> GetSqlServerCreateScripts() =>
@@ -254,6 +266,55 @@ public static class DependencyInjection
         """
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_ProductKey' AND object_id = OBJECT_ID('products'))
         CREATE INDEX IX_products_ProductKey ON products (ProductKey);
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_Catalog_Name' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_Catalog_Name
+        ON products (Name)
+        INCLUDE (Price, CategoryId, SupermarketId)
+        WHERE IsAvailable = 1 AND ImageUrl IS NOT NULL AND ImageUrl <> N'';
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_Catalog_Supermarket_Name' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_Catalog_Supermarket_Name
+        ON products (SupermarketId, Name)
+        INCLUDE (Price, CategoryId)
+        WHERE IsAvailable = 1 AND ImageUrl IS NOT NULL AND ImageUrl <> N'';
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_Catalog_Category_Name' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_Catalog_Category_Name
+        ON products (CategoryId, Name)
+        INCLUDE (Price, SupermarketId)
+        WHERE IsAvailable = 1 AND ImageUrl IS NOT NULL AND ImageUrl <> N'';
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_Catalog_Price_Name' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_Catalog_Price_Name
+        ON products (Price, Name)
+        INCLUDE (CategoryId, SupermarketId)
+        WHERE IsAvailable = 1 AND ImageUrl IS NOT NULL AND ImageUrl <> N'';
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_Catalog_Supermarket_Price_Name' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_Catalog_Supermarket_Price_Name
+        ON products (SupermarketId, Price, Name)
+        INCLUDE (CategoryId)
+        WHERE IsAvailable = 1 AND ImageUrl IS NOT NULL AND ImageUrl <> N'';
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_Catalog_PriceDesc_Name' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_Catalog_PriceDesc_Name
+        ON products (Price DESC, Name ASC)
+        INCLUDE (CategoryId, SupermarketId)
+        WHERE IsAvailable = 1 AND ImageUrl IS NOT NULL AND ImageUrl <> N'';
+        """,
+        """
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_products_Catalog_Supermarket_PriceDesc_Name' AND object_id = OBJECT_ID('products'))
+        CREATE INDEX IX_products_Catalog_Supermarket_PriceDesc_Name
+        ON products (SupermarketId, Price DESC, Name ASC)
+        INCLUDE (CategoryId)
+        WHERE IsAvailable = 1 AND ImageUrl IS NOT NULL AND ImageUrl <> N'';
         """,
         """
         IF OBJECT_ID('product_upload_runs', 'U') IS NULL
@@ -817,6 +878,13 @@ public static class DependencyInjection
         MySqlAddColumnIfMissing("products", "DataSource", "VARCHAR(30) NOT NULL DEFAULT 'manual'"),
         MySqlAddColumnIfMissing("products", "UpdatedAtUtc", "DATETIME NULL"),
         MySqlAddColumnIfMissing("products", "LastImportRunId", "INT NULL"),
+        MySqlCreateIndexIfMissing("products", "IX_products_IsAvailable_Name", "`IsAvailable`, `Name`"),
+        MySqlCreateIndexIfMissing("products", "IX_products_Catalog_Supermarket_Name", "`IsAvailable`, `SupermarketId`, `Name`"),
+        MySqlCreateIndexIfMissing("products", "IX_products_Catalog_Category_Name", "`IsAvailable`, `CategoryId`, `Name`"),
+        MySqlCreateIndexIfMissing("products", "IX_products_Catalog_Price_Name", "`IsAvailable`, `Price`, `Name`"),
+        MySqlCreateIndexIfMissing("products", "IX_products_Catalog_Supermarket_Price_Name", "`IsAvailable`, `SupermarketId`, `Price`, `Name`"),
+        MySqlCreateIndexIfMissing("products", "IX_products_Catalog_PriceDesc_Name", "`IsAvailable`, `Price` DESC, `Name` ASC"),
+        MySqlCreateIndexIfMissing("products", "IX_products_Catalog_Supermarket_PriceDesc_Name", "`IsAvailable`, `SupermarketId`, `Price` DESC, `Name` ASC"),
         MySqlCreateIndexIfMissing("products", "IX_products_ProductKey", "`ProductKey`"),
         """
         CREATE TABLE IF NOT EXISTS `product_upload_runs` (

@@ -6,6 +6,7 @@
   "navbar": {
     "products": "Produkte",
     "orders": "Bestellungen",
+    "orderHistory": "Bestellverlauf",
     "historyStats": "Verlaufsstatistik",
     "addresses": "Adressen",
     "checkout": "Kasse",
@@ -137,6 +138,14 @@
       "found": "gefunden",
       "page": "Seite",
       "of": "von"
+    },
+    "sort": {
+      "label": "Sortieren",
+      "options": {
+        "default": "Empfohlen",
+        "priceLowToHigh": "Preis: aufsteigend",
+        "priceHighToLow": "Preis: absteigend"
+      }
     },
     "empty": {
       "title": "Keine Produkte gefunden",

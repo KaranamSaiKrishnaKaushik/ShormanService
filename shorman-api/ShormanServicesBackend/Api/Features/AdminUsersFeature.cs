@@ -285,13 +285,22 @@ public class GetCurrentMenuPermissionsQueryHandler(ApiDbContext dbContext) : IRe
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var enabledKeys = await dbContext.RoleMenuPermissions
+        var defaultKeys = roles
+            .SelectMany(MenuPermissionKeys.GetDefaultEnabledKeys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var storedKeys = await dbContext.RoleMenuPermissions
             .AsNoTracking()
             .Where(x => roles.Contains(x.Role.Name))
             .Where(x => x.IsEnabled)
             .Select(x => x.MenuKey)
             .Distinct()
             .ToArrayAsync(cancellationToken);
+
+        var enabledKeys = defaultKeys
+            .Union(storedKeys, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         return new CurrentMenuPermissionsDto(enabledKeys);
     }

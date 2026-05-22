@@ -61,13 +61,13 @@
       </div>
 
       <button type="button" class="mobile-filter-btn" (click)="toggleMobileFilters()">
-        <span class="filter-icon">☰</span>
+        <span class="app-icon filter-icon">tune</span>
         {{ 'products.filters' | translate }}
         <span class="filter-badge" *ngIf="activeFiltersCount > 0">{{ activeFiltersCount }}</span>
       </button>
 
       <div class="search-bar">
-        <span class="search-icon">🔍</span>
+        <span class="app-icon search-icon">search</span>
         <input
           type="text"
           [(ngModel)]="searchQuery"
@@ -134,16 +134,43 @@
           <h2 class="results-title">{{ modeHeading }}</h2>
           <span class="results-count">{{ totalProducts }} {{ (totalProducts === 1 ? 'products.results.productSingular' : 'products.results.productPlural') | translate }} {{ 'products.results.found' | translate }}</span>
         </div>
-        <span class="results-count" *ngIf="totalPages > 0">
-          {{ 'products.results.page' | translate }} <strong>{{ currentPage }}</strong> {{ 'products.results.of' | translate }} <strong>{{ totalPages }}</strong>
-        </span>
+        <div class="results-tools">
+          <div class="sort-menu" *ngIf="activeMode === 'groceries'" (click)="$event.stopPropagation()">
+            <button
+              type="button"
+              class="sort-trigger"
+              [class.open]="sortMenuOpen"
+              (click)="toggleSortMenu($event)">
+              <span class="sort-trigger-copy">
+                <span class="sort-chip-label">{{ 'products.sort.label' | translate }}</span>
+                <strong>{{ activeSortLabel }}</strong>
+              </span>
+              <span class="sort-trigger-icon" [class.open]="sortMenuOpen">⌄</span>
+            </button>
+
+            <div class="sort-dropdown" *ngIf="sortMenuOpen">
+              <button
+                *ngFor="let option of sortOptions"
+                type="button"
+                class="sort-option"
+                [class.active]="activeSort === option.value"
+                (click)="setSort(option.value)">
+                <span>{{ option.translationKey | translate }}</span>
+                <span class="sort-option-check" *ngIf="activeSort === option.value">✓</span>
+              </button>
+            </div>
+          </div>
+          <span class="results-count" *ngIf="totalPages > 0">
+            {{ 'products.results.page' | translate }} <strong>{{ currentPage }}</strong> {{ 'products.results.of' | translate }} <strong>{{ totalPages }}</strong>
+          </span>
+        </div>
       </div>
 
       <div class="products-scroll-panel">
         <app-loading-spinner *ngIf="loading"></app-loading-spinner>
 
         <div *ngIf="!loading && filteredProducts.length === 0" class="empty-state">
-          <div class="empty-icon">🔍</div>
+          <div class="app-icon empty-icon">search_off</div>
           <h3>{{ 'products.empty.title' | translate }}</h3>
           <p>{{ 'products.empty.subtitle' | translate }}</p>
           <button type="button" class="btn-reset" (click)="resetFilters()">{{ 'products.empty.reset' | translate }}</button>
@@ -206,7 +233,7 @@
   <!-- Mobile Cart Button -->
   <button type="button" class="mobile-cart-btn" (click)="cartService.openCart()"
     *ngIf="(cartService.cart$ | async)?.itemCount as count">
-    <span class="cart-icon">🛒</span>
+    <span class="app-icon cart-icon">shopping_cart</span>
     <span class="cart-text">{{ 'products.cart' | translate }}</span>
     <span class="cart-badge">{{ count }}</span>
   </button>

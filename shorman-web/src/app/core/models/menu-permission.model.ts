@@ -4,6 +4,7 @@ export type MenuPermissionKey =
   | 'products'
   | 'checkout'
   | 'orders'
+  | 'history-stats'
   | 'addresses'
   | 'rider-dashboard'
   | 'product-management'

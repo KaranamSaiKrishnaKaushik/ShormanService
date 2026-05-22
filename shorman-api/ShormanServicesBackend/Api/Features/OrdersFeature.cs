@@ -10,7 +10,7 @@ using ShormanServicesBackend.Api.Persistence.Entities;
 
 namespace ShormanServicesBackend.Api.Features;
 
-public record GetOrdersQuery(int UserId) : IRequest<IReadOnlyCollection<OrderDto>>;
+public record GetOrdersQuery(int UserId, int Page = 1, int PageSize = 20, string? Search = null, string SortDirection = "desc") : IRequest<PagedResultDto<OrderDto>>;
 public record GetOrderByIdQuery(int UserId, int OrderId) : IRequest<OrderDto?>;
 public record CreateOrderCommand(int UserId, CreateOrderRequest Request) : IRequest<OrderDto>;
 public record CreateCheckoutSessionCommand(int UserId, CreateOrderRequest Request) : IRequest<CheckoutSessionResponse>;
@@ -47,20 +47,44 @@ internal static class OrderPaymentStatuses
     public const string CashCollected = "CASH_COLLECTED";
 }
 
-public class GetOrdersQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetOrdersQuery, IReadOnlyCollection<OrderDto>>
+public class GetOrdersQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetOrdersQuery, PagedResultDto<OrderDto>>
 {
-    public async Task<IReadOnlyCollection<OrderDto>> Handle(GetOrdersQuery request, CancellationToken cancellationToken)
+    public async Task<PagedResultDto<OrderDto>> Handle(GetOrdersQuery request, CancellationToken cancellationToken)
     {
-        var orders = await dbContext.Orders
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 100);
+        var normalizedSearch = request.Search?.Trim();
+        var sortAscending = string.Equals(request.SortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+
+        var query = dbContext.Orders
             .AsNoTracking()
+            .Where(x => x.UserId == request.UserId);
+
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            var searchPattern = $"%{normalizedSearch}%";
+            var hasOrderId = int.TryParse(normalizedSearch, out var orderId);
+
+            query = query.Where(x =>
+                (hasOrderId && x.Id == orderId)
+                || x.Items.Any(item => EF.Functions.Like(item.ProductName, searchPattern)));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        query = sortAscending
+            ? query.OrderBy(x => x.CreatedAtUtc).ThenBy(x => x.Id)
+            : query.OrderByDescending(x => x.CreatedAtUtc).ThenByDescending(x => x.Id);
+
+        var orders = await query
             .Include(x => x.Address)
             .Include(x => x.AssignedRider)
             .Include(x => x.Items)
-            .Where(x => x.UserId == request.UserId)
-            .OrderByDescending(x => x.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return orders.Select(Map).ToList();
+        return new PagedResultDto<OrderDto>(orders.Select(Map).ToList(), totalCount, page, pageSize);
     }
 
     internal static OrderDto Map(ApiOrder order)

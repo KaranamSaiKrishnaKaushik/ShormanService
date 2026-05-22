@@ -1,12 +1,12 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgFor, NgIf, CurrencyPipe, AsyncPipe, NgStyle } from '@angular/common';
-import { Observable, Subscription, forkJoin, map } from 'rxjs';
+import { Observable, Subscription, catchError, forkJoin, map } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductService } from '../../core/services/product.service';
 import { CartService } from '../../core/services/cart.service';
 import { DeliveryCheckResult, DeliveryService } from '../../core/services/delivery.service';
-import { Product, Category, Supermarket, ProductPage } from '../../core/models/product.model';
+import { Product, Category, ProductPage, ProductSortOption, Supermarket } from '../../core/models/product.model';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { LanguageService } from '../../core/services/language.service';
 
@@ -31,6 +31,11 @@ interface ProductModeOption {
   allCategoriesLabel: string;
 }
 
+interface SortMenuOption {
+  value: ProductSortOption;
+  translationKey: string;
+}
+
 const SUPERMARKET_TABS: SupermarketTab[] = [
   { slug: 'all', name: 'ALL', color: '#2E7D32', bgColor: '#E8F5E9' },
   { slug: 'rewe', name: 'REWE', color: '#fff', bgColor: '#CC0000' },
@@ -43,8 +48,8 @@ const MODE_OPTIONS: ProductModeOption[] = [
   {
     slug: 'groceries',
     label: 'Groceries',
-    accent: '#2E7D32',
-    surface: '#E8F5E9',
+    accent: 'var(--mode-groceries-accent)',
+    surface: 'var(--mode-groceries-surface)',
     stores: ['rewe', 'aldi', 'penny', 'lidl', 'edeka'],
     title: 'Groceries',
     allStoresLabel: 'All groceries',
@@ -54,8 +59,8 @@ const MODE_OPTIONS: ProductModeOption[] = [
   {
     slug: 'beauty',
     label: 'Drugstore & Beauty',
-    accent: '#B83280',
-    surface: '#FCE7F3',
+    accent: 'var(--mode-beauty-accent)',
+    surface: 'var(--mode-beauty-surface)',
     stores: ['dm', 'rossmann'],
     title: 'Drugstore & Beauty',
     allStoresLabel: 'All drugstore',
@@ -130,9 +135,16 @@ export class ProductsComponent implements OnInit, OnDestroy {
   totalPages = 0;
 
   readonly productModes = MODE_OPTIONS;
+  readonly sortOptions: SortMenuOption[] = [
+    { value: 'default', translationKey: 'products.sort.options.default' },
+    { value: 'priceLowToHigh', translationKey: 'products.sort.options.priceLowToHigh' },
+    { value: 'priceHighToLow', translationKey: 'products.sort.options.priceHighToLow' }
+  ];
   activeMode: ProductMode = 'groceries';
   activeSupermarket = 'all';
   activeCategory = 'all';
+  activeSort: ProductSortOption = 'default';
+  sortMenuOpen = false;
   searchQuery = '';
   loading = true;
   mobileFiltersOpen = false;
@@ -155,6 +167,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
   private smColorMap: Record<number, string> = {};
   private requestSequence = 0;
   private languageSub?: Subscription;
+  private productsLoadSub?: Subscription;
 
   private placeholderColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4'];
 
@@ -209,6 +222,12 @@ export class ProductsComponent implements OnInit, OnDestroy {
     return this.translate.instant(key);
   }
 
+  get activeSortLabel(): string {
+    const key = `products.sort.options.${this.activeSort}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? this.activeSort : translated;
+  }
+
   ngOnInit(): void {
     this.languageSub = this.languageService.currentLanguage$.subscribe(() => {
       if (this.deliveryCheckResult) {
@@ -230,7 +249,13 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.productsLoadSub?.unsubscribe();
     this.languageSub?.unsubscribe();
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.sortMenuOpen = false;
   }
 
   setMode(mode: ProductMode): void {
@@ -248,6 +273,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
       this.activeCategory = 'all';
     }
 
+    this.sortMenuOpen = false;
     this.closeMobileFilters();
     this.loadProducts(true);
   }
@@ -262,6 +288,27 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
+    this.loadProducts(true);
+  }
+
+  toggleSortMenu(event: MouseEvent): void {
+    event.stopPropagation();
+    this.sortMenuOpen = !this.sortMenuOpen;
+  }
+
+  closeSortMenu(event?: MouseEvent): void {
+    event?.stopPropagation();
+    this.sortMenuOpen = false;
+  }
+
+  setSort(sort: ProductSortOption): void {
+    if (this.activeSort === sort) {
+      this.sortMenuOpen = false;
+      return;
+    }
+
+    this.activeSort = sort;
+    this.sortMenuOpen = false;
     this.loadProducts(true);
   }
 
@@ -437,6 +484,8 @@ export class ProductsComponent implements OnInit, OnDestroy {
       this.currentPage = 1;
     }
 
+    this.productsLoadSub?.unsubscribe();
+
     const requestId = ++this.requestSequence;
     this.loading = true;
     this.filteredProducts = [];
@@ -457,18 +506,17 @@ export class ProductsComponent implements OnInit, OnDestroy {
       ? scopedSupermarkets.map(supermarket => supermarket.id)
       : undefined;
 
-    const productRequest = this.activeSupermarket === 'all' && scopedSupermarkets.length > 1
-      ? this.getModeProductsPage(scopedSupermarkets, this.searchQuery.trim() || undefined, activeCategoryId)
-      : this.productService.getProducts({
-          search: this.searchQuery.trim() || undefined,
-          categoryId: activeCategoryId,
-          supermarketId: activeSupermarketId,
-          supermarketIds: activeSupermarketId ? undefined : activeSupermarketIds,
-          page: this.currentPage,
-          pageSize: ProductsComponent.PAGE_SIZE
-        });
+    const productRequest = this.createProductRequest({
+      search: this.searchQuery.trim() || undefined,
+      categoryId: activeCategoryId,
+      supermarketId: activeSupermarketId,
+      supermarketIds: activeSupermarketId ? undefined : activeSupermarketIds,
+      sort: this.activeSort,
+      page: this.currentPage,
+      pageSize: ProductsComponent.PAGE_SIZE
+    });
 
-    productRequest.subscribe({
+    this.productsLoadSub = productRequest.subscribe({
       next: (page) => {
         if (requestId !== this.requestSequence) {
           return;
@@ -496,47 +544,70 @@ export class ProductsComponent implements OnInit, OnDestroy {
     });
   }
 
+  private createProductRequest(filters: {
+    search?: string;
+    categoryId?: number;
+    supermarketId?: number;
+    supermarketIds?: number[];
+    sort?: ProductSortOption;
+    page: number;
+    pageSize: number;
+  }): Observable<ProductPage> {
+    const supermarketIds = filters.supermarketIds?.filter(id => Number.isFinite(id)) ?? [];
+    const request = this.productService.getProducts(filters);
+
+    if (filters.supermarketId || supermarketIds.length <= 1) {
+      return request;
+    }
+
+    return request.pipe(
+      catchError(() => this.getModeProductsPageFallback(filters, supermarketIds))
+    );
+  }
+
+  private getModeProductsPageFallback(filters: {
+    search?: string;
+    categoryId?: number;
+    sort?: ProductSortOption;
+    page: number;
+    pageSize: number;
+  }, supermarketIds: number[]): Observable<ProductPage> {
+    const requestPageSize = Math.max(filters.page * filters.pageSize, ProductsComponent.MODE_FETCH_PAGE_SIZE);
+
+    return forkJoin(
+      supermarketIds.map(supermarketId =>
+        this.productService.getProducts({
+          search: filters.search,
+          categoryId: filters.categoryId,
+          supermarketId,
+          sort: filters.sort,
+          page: 1,
+          pageSize: requestPageSize
+        })
+      )
+    ).pipe(
+      map((pages) => {
+        const mergedItems = pages
+          .flatMap(page => page.items ?? [])
+          .sort((left, right) => left.name.localeCompare(right.name));
+        const startIndex = Math.max(0, (filters.page - 1) * filters.pageSize);
+
+        return {
+          items: mergedItems.slice(startIndex, startIndex + filters.pageSize),
+          totalCount: pages.reduce((total, page) => total + (page.totalCount ?? 0), 0),
+          page: filters.page,
+          pageSize: filters.pageSize
+        };
+      })
+    );
+  }
+
   private getTabTextColor(backgroundColor?: string): string {
     if (!backgroundColor) {
       return '#fff';
     }
 
     return backgroundColor.toLowerCase() === '#ffd600' ? '#333' : '#fff';
-  }
-
-  private getModeProductsPage(supermarkets: Supermarket[], search: string | undefined, categoryId: number | undefined): Observable<ProductPage> {
-    const requiredItems = this.currentPage * ProductsComponent.PAGE_SIZE;
-    const requiredPages = Math.max(1, Math.ceil(requiredItems / ProductsComponent.MODE_FETCH_PAGE_SIZE));
-    const perStoreRequests = supermarkets.map(supermarket =>
-      forkJoin(
-        Array.from({ length: requiredPages }, (_, index) =>
-          this.productService.getProducts({
-            search,
-            categoryId,
-            supermarketId: supermarket.id,
-            page: index + 1,
-            pageSize: ProductsComponent.MODE_FETCH_PAGE_SIZE
-          })
-        )
-      )
-    );
-
-    return forkJoin(perStoreRequests).pipe(
-      map(storePages => {
-        const totalCount = storePages.reduce((sum, pages) => sum + (pages[0]?.totalCount ?? 0), 0);
-        const combinedItems = storePages
-          .flatMap(pages => pages.flatMap(page => page.items ?? []))
-          .sort((left, right) => left.name.localeCompare(right.name));
-        const startIndex = (this.currentPage - 1) * ProductsComponent.PAGE_SIZE;
-
-        return {
-          items: combinedItems.slice(startIndex, startIndex + ProductsComponent.PAGE_SIZE),
-          totalCount,
-          page: this.currentPage,
-          pageSize: ProductsComponent.PAGE_SIZE
-        };
-      })
-    );
   }
 
   private getModeForStore(storeSlug: string): ProductMode {

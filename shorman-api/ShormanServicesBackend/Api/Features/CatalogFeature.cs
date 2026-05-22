@@ -5,7 +5,14 @@ using ShormanServicesBackend.Api.Persistence;
 
 namespace ShormanServicesBackend.Api.Features;
 
-public record GetProductsQuery(string? Search, int? CategoryId, int? SupermarketId, IReadOnlyCollection<int>? SupermarketIds, int Page = 1, int PageSize = 30) : IRequest<PagedResultDto<ProductDto>>;
+public enum ProductSortOption
+{
+    Default = 0,
+    PriceLowToHigh = 1,
+    PriceHighToLow = 2
+}
+
+public record GetProductsQuery(string? Search, int? CategoryId, int? SupermarketId, IReadOnlyCollection<int>? SupermarketIds, ProductSortOption Sort = ProductSortOption.Default, int Page = 1, int PageSize = 30) : IRequest<PagedResultDto<ProductDto>>;
 public record GetProductByIdQuery(int Id) : IRequest<ProductDto?>;
 public record GetCategoriesQuery() : IRequest<IReadOnlyCollection<CategoryDto>>;
 public record GetSupermarketsQuery() : IRequest<IReadOnlyCollection<SupermarketDto>>;
@@ -55,8 +62,14 @@ public class GetProductsQueryHandler(ApiDbContext dbContext, IPricingPolicyProvi
 
         var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
 
-        var baseItems = await query
-            .OrderBy(x => x.Name)
+        var orderedQuery = request.Sort switch
+        {
+            ProductSortOption.PriceLowToHigh => query.OrderBy(x => x.Price).ThenBy(x => x.Name),
+            ProductSortOption.PriceHighToLow => query.OrderByDescending(x => x.Price).ThenBy(x => x.Name),
+            _ => query.OrderBy(x => x.Name)
+        };
+
+        var baseItems = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(product => new
@@ -67,14 +80,33 @@ public class GetProductsQueryHandler(ApiDbContext dbContext, IPricingPolicyProvi
                 BasePrice = product.Price,
                 product.ImageUrl,
                 product.CategoryId,
-                Category = new CategoryDto(product.Category.Id, product.Category.Name, product.Category.Slug, product.Category.Icon),
                 product.SupermarketId,
-                Supermarket = new SupermarketDto(product.Supermarket.Id, product.Supermarket.Name, product.Supermarket.Slug, product.Supermarket.LogoUrl, product.Supermarket.Color),
                 product.Unit,
                 product.Stock,
                 product.IsAvailable
             })
             .ToListAsync(cancellationToken);
+
+        var categoryIds = baseItems
+            .Select(product => product.CategoryId)
+            .Distinct()
+            .ToArray();
+        var supermarketIds = baseItems
+            .Select(product => product.SupermarketId)
+            .Distinct()
+            .ToArray();
+
+        var categories = await dbContext.Categories
+            .AsNoTracking()
+            .Where(category => categoryIds.Contains(category.Id))
+            .Select(category => new CategoryDto(category.Id, category.Name, category.Slug, category.Icon))
+            .ToDictionaryAsync(category => category.Id, cancellationToken);
+
+        var supermarkets = await dbContext.Supermarkets
+            .AsNoTracking()
+            .Where(supermarket => supermarketIds.Contains(supermarket.Id))
+            .Select(supermarket => new SupermarketDto(supermarket.Id, supermarket.Name, supermarket.Slug, supermarket.LogoUrl, supermarket.Color))
+            .ToDictionaryAsync(supermarket => supermarket.Id, cancellationToken);
 
         var items = baseItems
             .Select(product => new ProductDto(
@@ -84,9 +116,9 @@ public class GetProductsQueryHandler(ApiDbContext dbContext, IPricingPolicyProvi
                 pricingPolicyProvider.ApplyProductPrice(product.BasePrice, activePolicy),
                 product.ImageUrl,
                 product.CategoryId,
-                product.Category,
+                categories[product.CategoryId],
                 product.SupermarketId,
-                product.Supermarket,
+                supermarkets[product.SupermarketId],
                 product.Unit,
                 product.Stock,
                 product.IsAvailable))

@@ -28,6 +28,7 @@ public static class MenuPermissionKeys
     public const string ProductManagementPricing = "product-management.pricing";
     public const string Checkout = "checkout";
     public const string Orders = "orders";
+    public const string HistoryStats = "history-stats";
     public const string Addresses = "addresses";
     public const string RiderDashboard = "rider-dashboard";
     public const string UserList = "user-management.user-list";
@@ -42,6 +43,7 @@ public static class MenuPermissionKeys
         ProductManagementPricing,
         Checkout,
         Orders,
+        HistoryStats,
         Addresses,
         RiderDashboard,
         UserList,
@@ -61,6 +63,7 @@ public static class MenuPermissionKeys
                 Products,
                 ProductManagement,
                 Checkout,
+                HistoryStats,
                 Addresses,
                 ProductData,
                 OrderSummary
@@ -70,6 +73,7 @@ public static class MenuPermissionKeys
                 Products,
                 Checkout,
                 Orders,
+                HistoryStats,
                 Addresses
             ],
             RoleNames.Rider =>

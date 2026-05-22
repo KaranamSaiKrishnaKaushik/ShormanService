@@ -1,6 +1,6 @@
 import { Component, HostListener, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { AsyncPipe, NgIf } from '@angular/common';
+import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
@@ -9,27 +9,28 @@ import { MenuPermissionService } from '../../../core/services/menu-permission.se
 import { USER_MANAGEMENT_MENU_KEYS } from '../../../core/models/menu-permission.model';
 import { OrderAlertService } from '../../../core/services/order-alert.service';
 import { LanguageService } from '../../../core/services/language.service';
+import { ThemeOption, ThemeService } from '../../../core/services/theme.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, AsyncPipe, NgIf, TranslatePipe],
+  imports: [RouterLink, RouterLinkActive, AsyncPipe, NgFor, NgIf, TranslatePipe],
   template: `
     <ng-container *ngIf="orderAlert.notification$ | async as notification">
     </ng-container>
     <nav class="navbar">
       <div class="navbar-container">
         <a routerLink="/products" class="navbar-brand">
-          <span class="brand-icon">🛒</span>
+          <span class="app-icon brand-icon">shopping_bag</span>
           <span class="brand-name">Shorman</span>
           <span class="brand-sub">Service</span>
         </a>
 
         <!-- Desktop Navigation -->
         <div class="navbar-links">
-          <a routerLink="/products" routerLinkActive="active" class="nav-link">{{ 'navbar.products' | translate }}</a>
+          <a *ngIf="showProducts()" routerLink="/products" routerLinkActive="active" class="nav-link">{{ 'navbar.products' | translate }}</a>
           <ng-container *ngIf="auth.isLoggedIn$ | async">
-            <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="nav-link">{{ 'navbar.orders' | translate }}</a>
+            <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="nav-link">{{ ordersNavLabelKey() | translate }}</a>
             <a *ngIf="showHistoryStats()" routerLink="/history-stats" routerLinkActive="active" class="nav-link">{{ 'navbar.historyStats' | translate }}</a>
             <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="nav-link">{{ 'navbar.addresses' | translate }}</a>
             <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="nav-link">{{ 'navbar.checkout' | translate }}</a>
@@ -42,7 +43,7 @@ import { LanguageService } from '../../../core/services/language.service';
         <div class="navbar-actions">
           <!-- Mobile Menu Toggle -->
           <button class="mobile-menu-toggle" (click)="toggleMobileMenu()">
-            <span>☰</span>
+            <span class="app-icon">menu</span>
           </button>
 
           <button *ngIf="showOrderInboxButton()"
@@ -50,7 +51,7 @@ import { LanguageService } from '../../../core/services/language.service';
             class="order-inbox-btn"
             (click)="toggleOrderDropdown()"
             [attr.aria-label]="orderAlertLabel()">
-            <span class="order-inbox-icon">🔔</span>
+            <span class="app-icon order-inbox-icon">notifications</span>
             <span class="cart-badge" *ngIf="orderAlert.notification$ | async as notification">
               {{ notification.count > 99 ? '99+' : notification.count }}
             </span>
@@ -74,8 +75,33 @@ import { LanguageService } from '../../../core/services/language.service';
             <button type="button" class="lang-btn" [class.active]="currentLanguage === 'de'" (click)="setLanguage('de')">{{ 'lang.de' | translate }}</button>
           </div>
 
+          <div class="theme-switch">
+            <span class="app-icon theme-icon">palette</span>
+            <button
+              type="button"
+              class="theme-trigger"
+              [class.open]="themeDropdownOpen"
+              (click)="toggleThemeDropdown()"
+              aria-label="Theme picker"
+              [attr.aria-expanded]="themeDropdownOpen">
+              <span class="theme-label">{{ currentThemeLabel() }}</span>
+              <span class="app-icon theme-chevron">expand_more</span>
+            </button>
+            <div *ngIf="themeDropdownOpen" class="theme-dropdown">
+              <button
+                *ngFor="let theme of themeOptions"
+                type="button"
+                class="theme-option"
+                [class.active]="theme.id === currentThemeId"
+                (click)="selectTheme(theme.id)">
+                <span class="theme-swatch" [attr.data-theme]="theme.id"></span>
+                <span>{{ theme.label }}</span>
+              </button>
+            </div>
+          </div>
+
           <button *ngIf="showCartButton()" class="cart-btn" (click)="cartService.toggleCart()">
-            <span class="cart-icon">🛒</span>
+            <span class="app-icon cart-icon">shopping_cart</span>
             <span class="cart-badge" *ngIf="(cartService.cart$ | async)?.itemCount as count">
               {{ count > 99 ? '99+' : count }}
             </span>
@@ -95,9 +121,9 @@ import { LanguageService } from '../../../core/services/language.service';
 
       <!-- Mobile Navigation Menu -->
       <div class="mobile-menu" [class.open]="mobileMenuOpen">
-        <a routerLink="/products" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.products' | translate }}</a>
+        <a *ngIf="showProducts()" routerLink="/products" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.products' | translate }}</a>
         <ng-container *ngIf="auth.isLoggedIn$ | async">
-          <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.orders' | translate }}</a>
+          <a *ngIf="showOrders()" routerLink="/orders" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ ordersNavLabelKey() | translate }}</a>
           <a *ngIf="showHistoryStats()" routerLink="/history-stats" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.historyStats' | translate }}</a>
           <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('addresses')" routerLink="/addresses" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.addresses' | translate }}</a>
           <a *ngIf="auth.hasAnyRole(customerRoles) && menuPermissions.hasPermission('checkout')" routerLink="/checkout" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.checkout' | translate }}</a>
@@ -114,14 +140,15 @@ import { LanguageService } from '../../../core/services/language.service';
   `,
   styles: [`
     .navbar {
-      background: #fff;
-      border-bottom: 2px solid #2E7D32;
+      background: color-mix(in srgb, var(--color-surface) 92%, white);
+      border-bottom: 1px solid var(--color-border);
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(18px);
     }
     .navbar-container {
       max-width: 1200px;
@@ -129,7 +156,7 @@ import { LanguageService } from '../../../core/services/language.service';
       padding: 0 1rem;
       display: flex;
       align-items: center;
-      height: 64px;
+      height: var(--navbar-height);
       gap: 1.5rem;
     }
     .navbar-brand {
@@ -139,17 +166,22 @@ import { LanguageService } from '../../../core/services/language.service';
       gap: 0.4rem;
       flex-shrink: 0;
     }
-    .brand-icon { font-size: 1.6rem; }
+    .brand-icon {
+      font-size: 1.5rem;
+      color: var(--color-primary);
+    }
     .brand-name {
       font-size: 1.4rem;
       font-weight: 800;
-      color: #2E7D32;
+      color: var(--color-primary);
+      font-family: var(--font-display);
       letter-spacing: -0.5px;
     }
     .brand-sub {
       font-size: 0.85rem;
-      color: #FF6F00;
+      color: var(--color-accent);
       font-weight: 600;
+      font-family: var(--font-ui);
     }
     .navbar-links {
       display: flex;
@@ -158,16 +190,17 @@ import { LanguageService } from '../../../core/services/language.service';
     }
     .nav-link {
       text-decoration: none;
-      color: #555;
+      color: var(--color-text-muted);
       padding: 0.4rem 0.75rem;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       font-weight: 500;
       font-size: 0.95rem;
       transition: all 0.2s;
+      font-family: var(--font-ui);
     }
     .nav-link:hover, .nav-link.active {
-      color: #2E7D32;
-      background: #E8F5E9;
+      color: var(--color-primary);
+      background: var(--color-primary-soft);
     }
     .navbar-actions {
       display: flex;
@@ -178,9 +211,10 @@ import { LanguageService } from '../../../core/services/language.service';
     }
     .cart-btn {
       position: relative;
-      background: none;
-      border: 2px solid #2E7D32;
-      border-radius: 8px;
+      background: color-mix(in srgb, var(--color-primary-soft) 60%, white);
+      border: 1px solid var(--color-border-strong);
+      color: var(--color-primary);
+      border-radius: var(--radius-sm);
       padding: 0.4rem 0.75rem;
       cursor: pointer;
       display: flex;
@@ -191,9 +225,9 @@ import { LanguageService } from '../../../core/services/language.service';
     }
     .order-inbox-btn {
       position: relative;
-      background: #fff;
-      border: 2px solid #2E7D32;
-      border-radius: 8px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-strong);
+      border-radius: var(--radius-sm);
       padding: 0.4rem 0.75rem;
       cursor: pointer;
       display: flex;
@@ -203,16 +237,19 @@ import { LanguageService } from '../../../core/services/language.service';
       transition: all 0.2s;
       font-size: 1.1rem;
       text-decoration: none;
-      color: #2E7D32;
+      color: var(--color-primary);
       min-width: 48px;
     }
-    .cart-btn:hover { background: #E8F5E9; }
-    .order-inbox-btn:hover { background: #E8F5E9; }
+    .cart-btn:hover,
+    .order-inbox-btn:hover {
+      background: var(--color-primary-soft);
+      border-color: var(--color-primary);
+    }
     .cart-badge {
       position: absolute;
       top: -8px;
       right: -8px;
-      background: #FF6F00;
+      background: var(--color-accent);
       color: #fff;
       border-radius: 50%;
       min-width: 20px;
@@ -223,9 +260,11 @@ import { LanguageService } from '../../../core/services/language.service';
       font-size: 0.7rem;
       font-weight: 700;
       padding: 0 3px;
+      font-family: var(--font-ui);
     }
     .order-inbox-icon {
       line-height: 1;
+      font-size: 1.25rem;
     }
     .order-dropdown {
       position: absolute;
@@ -233,10 +272,10 @@ import { LanguageService } from '../../../core/services/language.service';
       right: 5.25rem;
       width: min(320px, 78vw);
       padding: 1rem;
-      border-radius: 16px;
-      background: #fff;
-      border: 1px solid #dce6d8;
-      box-shadow: 0 18px 38px rgba(24, 54, 44, 0.16);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-medium);
       z-index: 1005;
     }
     .order-dropdown-header {
@@ -245,11 +284,11 @@ import { LanguageService } from '../../../core/services/language.service';
       gap: 0.75rem;
       align-items: center;
       margin-bottom: 0.6rem;
-      color: #174d2b;
+      color: var(--color-primary-strong);
     }
     .order-dropdown-count {
-      background: #eef7ed;
-      color: #1f6a35;
+      background: var(--color-primary-soft);
+      color: var(--color-primary);
       border-radius: 999px;
       padding: 0.3rem 0.6rem;
       font-size: 0.78rem;
@@ -258,7 +297,7 @@ import { LanguageService } from '../../../core/services/language.service';
     }
     .order-dropdown-copy {
       margin: 0 0 0.9rem;
-      color: #566b5d;
+      color: var(--color-text-muted);
       font-size: 0.9rem;
       line-height: 1.5;
     }
@@ -269,32 +308,131 @@ import { LanguageService } from '../../../core/services/language.service';
       min-height: 40px;
       padding: 0.6rem 0.9rem;
       border-radius: 999px;
-      background: #174d2b;
+      background: var(--color-primary-strong);
       color: #fff;
       text-decoration: none;
       font-weight: 700;
+      font-family: var(--font-ui);
     }
     .lang-switch {
       display: flex;
       gap: 0.25rem;
-      border: 1px solid #c8d8c8;
-      border-radius: 8px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
       padding: 0.12rem;
-      background: #f7fbf7;
+      background: var(--color-surface-alt);
+    }
+    .theme-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-width: 0;
+      padding: 0.28rem 0.45rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-alt);
+      position: relative;
+    }
+    .theme-icon {
+      color: var(--color-primary);
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .theme-trigger {
+      border: none;
+      background: transparent;
+      color: var(--color-text);
+      min-width: 8.75rem;
+      padding: 0;
+      outline: none;
+      cursor: pointer;
+      font-family: var(--font-ui);
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .theme-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .theme-chevron {
+      font-size: 1rem;
+      color: var(--color-text-muted);
+      transition: transform 0.2s ease;
+    }
+    .theme-trigger.open .theme-chevron {
+      transform: rotate(180deg);
+    }
+    .theme-dropdown {
+      position: absolute;
+      top: calc(100% + 0.55rem);
+      right: 0;
+      min-width: 12.5rem;
+      padding: 0.45rem;
+      border-radius: 18px;
+      border: 1px solid var(--color-border);
+      background: color-mix(in srgb, var(--color-surface) 94%, white);
+      box-shadow: var(--shadow-medium);
+      display: grid;
+      gap: 0.25rem;
+      z-index: 1006;
+    }
+    .theme-option {
+      border: none;
+      background: transparent;
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border-radius: 14px;
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: var(--font-ui);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      text-align: left;
+    }
+    .theme-option:hover,
+    .theme-option.active {
+      background: var(--color-primary-soft);
+      color: var(--color-primary);
+    }
+    .theme-swatch {
+      width: 1rem;
+      height: 1rem;
+      border-radius: 999px;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+    }
+    .theme-swatch[data-theme='fresh-market'] {
+      background: linear-gradient(135deg, #165b33, #f4b63a);
+    }
+    .theme-swatch[data-theme='terracotta'] {
+      background: linear-gradient(135deg, #8f3f2a, #f0a15d);
+    }
+    .theme-swatch[data-theme='coastal'] {
+      background: linear-gradient(135deg, #0c5f78, #5db7d7);
     }
     .lang-btn {
       border: none;
       background: transparent;
-      color: #3f4f3f;
-      border-radius: 6px;
+      color: var(--color-text-muted);
+      border-radius: 8px;
       min-width: 34px;
       height: 28px;
       font-weight: 700;
       font-size: 0.75rem;
       cursor: pointer;
+      font-family: var(--font-ui);
     }
     .lang-btn.active {
-      background: #2E7D32;
+      background: var(--color-primary);
       color: #fff;
     }
     .user-menu {
@@ -304,53 +442,63 @@ import { LanguageService } from '../../../core/services/language.service';
     }
     .user-name {
       font-weight: 600;
-      color: #2E7D32;
+      color: var(--color-primary);
       font-size: 0.9rem;
+      font-family: var(--font-ui);
     }
     .btn-logout {
       background: none;
-      border: 1px solid #ccc;
+      border: 1px solid var(--color-border);
       padding: 0.35rem 0.75rem;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 0.85rem;
-      color: #666;
+      color: var(--color-text-muted);
       transition: all 0.2s;
+      font-family: var(--font-ui);
     }
-    .btn-logout:hover { background: #fee; border-color: #f44; color: #f44; }
+    .btn-logout:hover {
+      background: var(--color-danger-soft);
+      border-color: var(--color-danger);
+      color: var(--color-danger);
+    }
     .btn-login {
       text-decoration: none;
-      background: #2E7D32;
+      background: var(--color-primary);
       color: #fff;
       padding: 0.4rem 1rem;
-      border-radius: 6px;
+      border-radius: 8px;
       font-weight: 600;
       font-size: 0.9rem;
       transition: background 0.2s;
+      font-family: var(--font-ui);
     }
-    .btn-login:hover { background: #1B5E20; }
+    .btn-login:hover { background: var(--color-primary-strong); }
 
     /* Mobile Menu Toggle Button */
     .mobile-menu-toggle {
       display: none;
       background: none;
       border: none;
-      font-size: 1.8rem;
-      color: #2E7D32;
+      color: var(--color-primary);
       cursor: pointer;
       padding: 0.25rem;
       line-height: 1;
+    }
+
+    .mobile-menu-toggle .app-icon {
+      font-size: 1.6rem;
     }
 
     /* Mobile Menu */
     .mobile-menu {
       display: none;
       position: fixed;
-      top: 64px;
+      top: var(--navbar-height);
       right: 0;
       width: 250px;
       max-width: 80vw;
-      background: #fff;
+      background: var(--color-surface);
       box-shadow: -2px 0 8px rgba(0,0,0,0.15);
       z-index: 999;
       transform: translateX(100%);
@@ -365,12 +513,13 @@ import { LanguageService } from '../../../core/services/language.service';
     .mobile-nav-link {
       display: block;
       text-decoration: none;
-      color: #555;
+      color: var(--color-text-muted);
       padding: 0.875rem 1.25rem;
       font-weight: 500;
       font-size: 1rem;
       transition: all 0.2s;
       border-left: 3px solid transparent;
+      font-family: var(--font-ui);
     }
 
     .mobile-logout-btn {
@@ -383,16 +532,16 @@ import { LanguageService } from '../../../core/services/language.service';
 
     .mobile-nav-link:hover,
     .mobile-nav-link.active {
-      color: #2E7D32;
-      background: #E8F5E9;
-      border-left-color: #2E7D32;
+      color: var(--color-primary);
+      background: var(--color-primary-soft);
+      border-left-color: var(--color-primary);
     }
 
     /* Mobile Backdrop */
     .mobile-backdrop {
       display: none;
       position: fixed;
-      top: 64px;
+      top: var(--navbar-height);
       left: 0;
       right: 0;
       bottom: 0;
@@ -415,6 +564,7 @@ import { LanguageService } from '../../../core/services/language.service';
       .user-name { display: none; }
       .desktop-user-menu { display: none; }
       .brand-sub { display: none; }
+      .theme-switch { display: none; }
       .btn-login { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
       .order-dropdown {
         right: 0;
@@ -433,9 +583,13 @@ export class NavbarComponent {
   orderAlert = inject(OrderAlertService);
   languageService = inject(LanguageService);
   translate = inject(TranslateService);
+  themeService = inject(ThemeService);
   mobileMenuOpen = false;
   orderDropdownOpen = false;
+  themeDropdownOpen = false;
   currentLanguage = 'en';
+  currentThemeId = this.themeService.getCurrentThemeId();
+  themeOptions: ThemeOption[] = this.themeService.themeOptions;
   customerRoles: AppRole[] = CUSTOMER_ROLES;
   riderRoles: AppRole[] = RIDER_ROLES;
 
@@ -450,10 +604,31 @@ export class NavbarComponent {
     this.languageService.currentLanguage$.subscribe(lang => {
       this.currentLanguage = lang;
     });
+
+    this.themeService.themeId$.subscribe(themeId => {
+      this.currentThemeId = themeId;
+    });
   }
 
   async setLanguage(language: string): Promise<void> {
     await this.languageService.setLanguage(language);
+  }
+
+  setTheme(themeId: string): void {
+    this.themeService.setTheme(themeId as ThemeOption['id']);
+  }
+
+  selectTheme(themeId: ThemeOption['id']): void {
+    this.setTheme(themeId);
+    this.themeDropdownOpen = false;
+  }
+
+  toggleThemeDropdown(): void {
+    this.themeDropdownOpen = !this.themeDropdownOpen;
+  }
+
+  currentThemeLabel(): string {
+    return this.themeOptions.find(theme => theme.id === this.currentThemeId)?.label ?? 'Theme';
   }
 
   toggleMobileMenu() {
@@ -466,21 +641,20 @@ export class NavbarComponent {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    if (!this.orderDropdownOpen) {
-      return;
-    }
-
     const target = event.target as HTMLElement | null;
     if (!target) {
       this.closeOrderDropdown();
+      this.themeDropdownOpen = false;
       return;
     }
 
-    if (target.closest('.order-dropdown') || target.closest('.order-inbox-btn')) {
-      return;
+    if (this.orderDropdownOpen && !target.closest('.order-dropdown') && !target.closest('.order-inbox-btn')) {
+      this.closeOrderDropdown();
     }
 
-    this.closeOrderDropdown();
+    if (this.themeDropdownOpen && !target.closest('.theme-switch')) {
+      this.themeDropdownOpen = false;
+    }
   }
 
   closeMobileMenu() {
@@ -493,6 +667,10 @@ export class NavbarComponent {
 
   showCartButton(): boolean {
     return this.auth.hasAnyRole(this.customerRoles);
+  }
+
+  showProducts(): boolean {
+    return !this.auth.isLoggedIn || this.menuPermissions.hasPermission('products');
   }
 
   showOrderInboxButton(): boolean {
@@ -531,11 +709,17 @@ export class NavbarComponent {
   }
 
   showOrders(): boolean {
-    return (this.auth.hasRole('Customer') || this.auth.hasRole('Rider')) && this.menuPermissions.hasPermission('orders');
+    return this.auth.isLoggedIn && this.menuPermissions.hasPermission('orders');
   }
 
   showHistoryStats(): boolean {
-    return this.auth.hasRole('Customer') || this.auth.hasRole('Admin') || this.auth.hasRole('SuperAdmin');
+    return this.auth.isLoggedIn && this.menuPermissions.hasPermission('history-stats');
+  }
+
+  ordersNavLabelKey(): string {
+    return this.auth.hasRole('Rider')
+      ? 'navbar.orders'
+      : 'navbar.orderHistory';
   }
 
   showUserManagement(): boolean {

@@ -17,10 +17,11 @@ public class ProductsController(IMediator mediator) : ControllerBase
         [FromQuery] int? categoryId,
         [FromQuery] int? supermarketId,
         [FromQuery] int[]? supermarketIds,
+        [FromQuery] ProductSortOption sort = ProductSortOption.Default,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30,
         CancellationToken cancellationToken = default) =>
-        mediator.Send(new GetProductsQuery(search, categoryId, supermarketId, supermarketIds, page, pageSize), cancellationToken);
+        mediator.Send(new GetProductsQuery(search, categoryId, supermarketId, supermarketIds, sort, page, pageSize), cancellationToken);
 
     [HttpGet("admin")]
     [Authorize(Roles = $"{RoleNames.SuperAdmin},{RoleNames.Admin}")]
