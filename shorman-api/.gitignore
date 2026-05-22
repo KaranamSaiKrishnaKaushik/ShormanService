@@ -1,0 +1,2 @@
+# Ignore local development settings with secrets
+build-validation-pricing/appsettings.Development.Local.json
