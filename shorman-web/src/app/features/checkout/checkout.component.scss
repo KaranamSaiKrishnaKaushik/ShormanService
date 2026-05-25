@@ -1,5 +1,6 @@
+// Use the global gradient background for all main pages
 .checkout-page {
-  background: #F9FAFB;
+  background: var(--page-bg-accent);
   min-height: calc(100vh - 128px);
   padding: 2rem 0;
 }

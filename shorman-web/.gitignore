@@ -39,6 +39,9 @@ testem.log
 /typings
 __screenshots__/
 
+# Exclude production environment file
+src/environments/environment.production.ts
+
 # System files
 .DS_Store
 Thumbs.db

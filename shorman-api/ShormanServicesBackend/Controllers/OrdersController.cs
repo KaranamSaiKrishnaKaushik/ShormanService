@@ -14,8 +14,13 @@ namespace ShormanServicesBackend.Controllers;
 public class OrdersController(IMediator mediator) : ControllerBase
 {
     [HttpGet]
-    public Task<IReadOnlyCollection<OrderDto>> GetOrders(CancellationToken cancellationToken) =>
-        mediator.Send(new GetOrdersQuery(GetUserId()), cancellationToken);
+    public Task<PagedResultDto<OrderDto>> GetOrders(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery(Name = "sort")] string sortDirection = "desc",
+        CancellationToken cancellationToken = default) =>
+        mediator.Send(new GetOrdersQuery(GetUserId(), page, pageSize, search, sortDirection), cancellationToken);
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<OrderDto>> GetOrder(int id, CancellationToken cancellationToken)

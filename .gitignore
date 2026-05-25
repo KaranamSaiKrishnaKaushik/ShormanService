@@ -27,9 +27,7 @@ shorman-api/ShormanServicesBackend/*.db
 shorman-api/ShormanServicesBackend/*.db-shm
 shorman-api/ShormanServicesBackend/*.db-wal
 shorman-api/ShormanServicesBackend/appsettings.Local.json
-shorman-api/ShormanServicesBackend/appsettings.Development.Local.json
 !shorman-api/ShormanServicesBackend/appsettings.Local.example.json
-!shorman-api/ShormanServicesBackend/appsettings.Development.Local.example.json
 
 # Visual Studio / Rider user files
 *.user

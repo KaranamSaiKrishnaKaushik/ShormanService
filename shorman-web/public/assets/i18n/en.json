@@ -6,6 +6,7 @@
   "navbar": {
     "products": "Products",
     "orders": "Orders",
+    "orderHistory": "Order History",
     "historyStats": "History Stats",
     "addresses": "Addresses",
     "checkout": "Checkout",
@@ -146,6 +147,14 @@
     "pagination": {
       "prev": "Prev",
       "next": "Next"
+    },
+    "sort": {
+      "label": "Sort",
+      "options": {
+        "default": "Default",
+        "priceLowToHigh": "Price: Low to High",
+        "priceHighToLow": "Price: High to Low"
+      }
     }
   },
   "addresses": {

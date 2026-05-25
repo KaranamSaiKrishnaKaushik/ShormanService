@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of, delay, throwError, map, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Order, CreateOrderRequest, CheckoutSessionResponse } from '../models/order.model';
+import { Order, CreateOrderRequest, CheckoutSessionResponse, GetOrdersParams, PagedResult } from '../models/order.model';
 
 // Mock data for development
 let MOCK_ORDERS: Order[] = [
@@ -165,14 +165,56 @@ export class OrderService {
     );
   }
 
-  getOrders(): Observable<Order[]> {
+  getOrders(params?: GetOrdersParams): Observable<PagedResult<Order>> {
     console.log('OrderService.getOrders called, useMock:', this.useMock);
     if (this.useMock) {
-      console.log('Returning mock orders:', MOCK_ORDERS);
-      return of([...MOCK_ORDERS]).pipe(delay(300));
+      const page = Math.max(1, params?.page ?? 1);
+      const pageSize = Math.max(1, params?.pageSize ?? 20);
+      const search = params?.search?.trim().toLowerCase() ?? '';
+      const sort = params?.sort ?? 'desc';
+
+      const filteredOrders = [...MOCK_ORDERS]
+        .filter(order => {
+          if (!search) {
+            return true;
+          }
+
+          const matchesId = order.id.toString() === search;
+          const matchesItem = order.items.some(item => item.productName.toLowerCase().includes(search));
+          return matchesId || matchesItem;
+        })
+        .sort((left, right) => {
+          const leftTime = new Date(left.createdAt).getTime();
+          const rightTime = new Date(right.createdAt).getTime();
+          return sort === 'asc' ? leftTime - rightTime : rightTime - leftTime;
+        });
+
+      const start = (page - 1) * pageSize;
+
+      return of({
+        items: filteredOrders.slice(start, start + pageSize),
+        totalCount: filteredOrders.length,
+        page,
+        pageSize
+      }).pipe(delay(300));
     }
-    return this.http.get<unknown>(`${environment.apiUrl}/orders`).pipe(
-      map((response) => this.toOrderArray(response))
+
+    let httpParams = new HttpParams()
+      .set('page', String(params?.page ?? 1))
+      .set('pageSize', String(params?.pageSize ?? 20))
+      .set('sort', params?.sort ?? 'desc');
+
+    if (params?.search?.trim()) {
+      httpParams = httpParams.set('search', params.search.trim());
+    }
+
+    return this.http.get<PagedResult<Order>>(`${environment.apiUrl}/orders`, { params: httpParams }).pipe(
+      map(response => ({
+        items: this.toOrderArray(response.items),
+        totalCount: Number(response.totalCount ?? 0),
+        page: Number(response.page ?? params?.page ?? 1),
+        pageSize: Number(response.pageSize ?? params?.pageSize ?? 20)
+      }))
     );
   }
 

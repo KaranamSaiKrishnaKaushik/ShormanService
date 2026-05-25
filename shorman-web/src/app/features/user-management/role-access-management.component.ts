@@ -132,8 +132,10 @@ export class RoleAccessManagementComponent implements OnInit {
 
   readonly managedRoles: ManagedRole[] = ['Admin', 'Customer', 'Rider'];
   readonly menuItems: Array<{ key: MenuPermissionKey; label: string; description: string }> = [
+    { key: 'products', label: 'Products', description: 'Allow the storefront catalog and products landing page in navigation.' },
     { key: 'checkout', label: 'Checkout', description: 'Allow the role to open checkout and place orders from the cart.' },
-    { key: 'orders', label: 'Orders', description: 'Allow order history and order detail pages.' },
+    { key: 'orders', label: 'Order History', description: 'Allow the order-history page and order detail pages for this role.' },
+    { key: 'history-stats', label: 'History Stats', description: 'Allow the shopping-history analytics page in navigation and routing.' },
     { key: 'addresses', label: 'Addresses', description: 'Allow address management pages.' },
     { key: 'rider-dashboard', label: 'Rider Dashboard', description: 'Allow the rider workspace entry in navigation and routing.' },
     { key: 'product-management', label: 'Product Management', description: 'Allow the product import workspace with uploads, history, and catalog review.' },

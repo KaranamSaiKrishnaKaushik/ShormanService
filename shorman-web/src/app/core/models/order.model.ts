@@ -48,6 +48,22 @@ export interface Order {
   completedAt?: string;
 }
 
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export type OrderSortDirection = 'asc' | 'desc';
+
+export interface GetOrdersParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  sort?: OrderSortDirection;
+}
+
 export interface AdminOrderSummary extends Order {
   customerName: string;
   customerEmail: string;
