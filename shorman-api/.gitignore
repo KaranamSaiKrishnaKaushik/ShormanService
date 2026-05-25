@@ -1,4 +1,0 @@
-# Ignore local development settings with secrets
-build-validation-pricing/appsettings.Development.Local.json
-# Ignore all appsettings.Development.Local.json files recursively
-**/appsettings.Development.Local.json
