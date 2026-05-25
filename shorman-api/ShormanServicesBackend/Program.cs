@@ -7,7 +7,8 @@ using ShormanServicesBackend.Api.Features;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration
-    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.Local.json", optional: true, reloadOnChange: true);
 
 var keyVaultUri = builder.Configuration["KeyVault:VaultUri"]
     ?? Environment.GetEnvironmentVariable("KEYVAULT_URI");

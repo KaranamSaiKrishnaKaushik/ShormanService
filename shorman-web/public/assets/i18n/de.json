@@ -6,7 +6,7 @@
   "navbar": {
     "products": "Produkte",
     "orders": "Bestellungen",
-    "orderHistory": "Bestellverlauf",
+    "orderHistory": "Bestellhistorie",
     "historyStats": "Verlaufsstatistik",
     "addresses": "Adressen",
     "checkout": "Kasse",
@@ -139,14 +139,6 @@
       "page": "Seite",
       "of": "von"
     },
-    "sort": {
-      "label": "Sortieren",
-      "options": {
-        "default": "Empfohlen",
-        "priceLowToHigh": "Preis: aufsteigend",
-        "priceHighToLow": "Preis: absteigend"
-      }
-    },
     "empty": {
       "title": "Keine Produkte gefunden",
       "subtitle": "Passe deine Suche oder Filter an",
@@ -155,6 +147,14 @@
     "pagination": {
       "prev": "Zurück",
       "next": "Weiter"
+    },
+    "sort": {
+      "label": "Sortieren",
+      "options": {
+        "default": "Standard",
+        "priceLowToHigh": "Preis: aufsteigend",
+        "priceHighToLow": "Preis: absteigend"
+      }
     }
   },
   "addresses": {

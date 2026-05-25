@@ -1,6 +1,5 @@
 using System.Text;
 using MediatR;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ShormanServicesBackend.Api.Features;
@@ -16,6 +15,9 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<Auth0Options>(configuration.GetSection(Auth0Options.SectionName));
+        services.Configure<DeliveryZoneOptions>(configuration.GetSection(DeliveryZoneOptions.SectionName));
+        services.Configure<ProductManagementOptions>(configuration.GetSection(ProductManagementOptions.SectionName));
+        services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
         services.Configure<DeliveryZoneOptions>(configuration.GetSection(DeliveryZoneOptions.SectionName));
         services.Configure<ProductManagementOptions>(configuration.GetSection(ProductManagementOptions.SectionName));
         services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
@@ -63,7 +65,19 @@ public static class DependencyInjection
 
         services.AddMediatR(typeof(DependencyInjection).Assembly);
         services.AddMemoryCache();
+        services.AddMemoryCache();
         services.AddScoped<JwtTokenService>();
+        services.AddScoped<IDeliveryGeocodingService, DeliveryGeocodingService>();
+        services.AddScoped<IProductManagementImportService, ProductManagementImportService>();
+        services.AddScoped<IPricingPolicyProvider, PricingPolicyProvider>();
+        services.AddScoped<StripePaymentService>();
+        services.AddHttpClient("delivery-geocoder", client =>
+        {
+            client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
+            client.Timeout = TimeSpan.FromSeconds(8);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("ShormanService/1.0");
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.8,de;q=0.7");
+        });
         services.AddScoped<IDeliveryGeocodingService, DeliveryGeocodingService>();
         services.AddScoped<IProductManagementImportService, ProductManagementImportService>();
         services.AddScoped<IPricingPolicyProvider, PricingPolicyProvider>();
@@ -529,6 +543,14 @@ public static class DependencyInjection
         WHERE oi.SupermarketName IS NULL;
         """,
         """
+        UPDATE oi
+        SET oi.SupermarketName = s.Name
+        FROM order_items oi
+        INNER JOIN products p ON p.Id = oi.ProductId
+        INNER JOIN supermarkets s ON s.Id = p.SupermarketId
+        WHERE oi.SupermarketName IS NULL;
+        """,
+        """
         IF OBJECT_ID('roles', 'U') IS NULL
         CREATE TABLE roles (
             Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
@@ -824,10 +846,24 @@ public static class DependencyInjection
             `PasswordResetExpiresAtUtc` DATETIME NULL,
             `IsDeleted` TINYINT(1) NOT NULL DEFAULT 0,
             `DeletedAtUtc` DATETIME NULL,
+            `IsEmailVerified` TINYINT(1) NOT NULL DEFAULT 1,
+            `EmailVerificationCode` VARCHAR(20) NULL,
+            `EmailVerificationExpiresAtUtc` DATETIME NULL,
+            `PasswordResetCode` VARCHAR(20) NULL,
+            `PasswordResetExpiresAtUtc` DATETIME NULL,
+            `IsDeleted` TINYINT(1) NOT NULL DEFAULT 0,
+            `DeletedAtUtc` DATETIME NULL,
             `CreatedAtUtc` DATETIME NOT NULL,
             UNIQUE KEY `UQ_users_Email` (`Email`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
+        MySqlAddColumnIfMissing("users", "IsDeleted", "TINYINT(1) NOT NULL DEFAULT 0"),
+        MySqlAddColumnIfMissing("users", "DeletedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("users", "IsEmailVerified", "TINYINT(1) NOT NULL DEFAULT 1"),
+        MySqlAddColumnIfMissing("users", "EmailVerificationCode", "VARCHAR(20) NULL"),
+        MySqlAddColumnIfMissing("users", "EmailVerificationExpiresAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("users", "PasswordResetCode", "VARCHAR(20) NULL"),
+        MySqlAddColumnIfMissing("users", "PasswordResetExpiresAtUtc", "DATETIME NULL"),
         MySqlAddColumnIfMissing("users", "IsDeleted", "TINYINT(1) NOT NULL DEFAULT 0"),
         MySqlAddColumnIfMissing("users", "DeletedAtUtc", "DATETIME NULL"),
         MySqlAddColumnIfMissing("users", "IsEmailVerified", "TINYINT(1) NOT NULL DEFAULT 1"),
@@ -858,6 +894,7 @@ public static class DependencyInjection
         CREATE TABLE IF NOT EXISTS `products` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `ProductKey` VARCHAR(64) NULL,
+            `ProductKey` VARCHAR(64) NULL,
             `Name` VARCHAR(220) NOT NULL,
             `Description` VARCHAR(1000) NULL,
             `Price` DECIMAL(10,2) NOT NULL,
@@ -867,6 +904,9 @@ public static class DependencyInjection
             `Unit` VARCHAR(50) NULL,
             `Stock` INT NULL,
             `IsAvailable` TINYINT(1) NOT NULL DEFAULT 1,
+            `DataSource` VARCHAR(30) NOT NULL DEFAULT 'manual',
+            `UpdatedAtUtc` DATETIME NULL,
+            `LastImportRunId` INT NULL,
             `DataSource` VARCHAR(30) NOT NULL DEFAULT 'manual',
             `UpdatedAtUtc` DATETIME NULL,
             `LastImportRunId` INT NULL,
@@ -972,16 +1012,26 @@ public static class DependencyInjection
             `UserId` INT NOT NULL,
             `CustomerNameSnapshot` VARCHAR(201) NULL,
             `CustomerEmailSnapshot` VARCHAR(256) NULL,
+            `CustomerNameSnapshot` VARCHAR(201) NULL,
+            `CustomerEmailSnapshot` VARCHAR(256) NULL,
             `Status` VARCHAR(30) NOT NULL,
             `PaymentMethod` VARCHAR(30) NOT NULL,
+            `PaymentStatus` VARCHAR(30) NOT NULL DEFAULT 'PENDING',
             `PaymentStatus` VARCHAR(30) NOT NULL DEFAULT 'PENDING',
             `AddressId` INT NOT NULL,
             `Subtotal` DECIMAL(10,2) NOT NULL,
             `DeliveryFee` DECIMAL(10,2) NOT NULL,
             `Total` DECIMAL(10,2) NOT NULL,
             `AssignedRiderId` INT NULL,
+            `AssignedRiderId` INT NULL,
             `CreatedAtUtc` DATETIME NOT NULL,
             `UpdatedAtUtc` DATETIME NULL,
+            `AcceptedAtUtc` DATETIME NULL,
+            `PickedUpAtUtc` DATETIME NULL,
+            `OutForDeliveryAtUtc` DATETIME NULL,
+            `DeliveredAtUtc` DATETIME NULL,
+            `CashCollectedAtUtc` DATETIME NULL,
+            `CompletedAtUtc` DATETIME NULL,
             `AcceptedAtUtc` DATETIME NULL,
             `PickedUpAtUtc` DATETIME NULL,
             `OutForDeliveryAtUtc` DATETIME NULL,
@@ -1012,6 +1062,26 @@ public static class DependencyInjection
         """,
         MySqlCreateIndexIfMissing("orders", "IX_orders_AssignedRiderId", "`AssignedRiderId`"),
         MySqlCreateIndexIfMissing("orders", "IX_orders_Status", "`Status`"),
+        MySqlAddColumnIfMissing("orders", "PaymentStatus", "VARCHAR(30) NOT NULL DEFAULT 'PENDING'"),
+        MySqlAddColumnIfMissing("orders", "AssignedRiderId", "INT NULL"),
+        MySqlAddColumnIfMissing("orders", "AcceptedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "PickedUpAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "OutForDeliveryAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "DeliveredAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "CashCollectedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "CompletedAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("orders", "CustomerNameSnapshot", "VARCHAR(201) NULL"),
+        MySqlAddColumnIfMissing("orders", "CustomerEmailSnapshot", "VARCHAR(256) NULL"),
+        """
+        UPDATE `orders` o
+        INNER JOIN `users` u ON u.`Id` = o.`UserId`
+        SET
+            o.`CustomerNameSnapshot` = COALESCE(NULLIF(o.`CustomerNameSnapshot`, ''), NULLIF(TRIM(CONCAT(COALESCE(u.`FirstName`, ''), ' ', COALESCE(u.`LastName`, ''))), ''), u.`Email`),
+            o.`CustomerEmailSnapshot` = COALESCE(NULLIF(o.`CustomerEmailSnapshot`, ''), u.`Email`)
+        WHERE o.`CustomerNameSnapshot` IS NULL OR o.`CustomerNameSnapshot` = '' OR o.`CustomerEmailSnapshot` IS NULL OR o.`CustomerEmailSnapshot` = '';
+        """,
+        MySqlCreateIndexIfMissing("orders", "IX_orders_AssignedRiderId", "`AssignedRiderId`"),
+        MySqlCreateIndexIfMissing("orders", "IX_orders_Status", "`Status`"),
         """
         CREATE TABLE IF NOT EXISTS `order_items` (
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -1020,11 +1090,20 @@ public static class DependencyInjection
             `ProductName` VARCHAR(220) NOT NULL,
             `ProductImageUrl` VARCHAR(1000) NULL,
             `SupermarketName` VARCHAR(100) NULL,
+            `SupermarketName` VARCHAR(100) NULL,
             `Quantity` INT NOT NULL,
             `UnitPrice` DECIMAL(10,2) NOT NULL,
             `TotalPrice` DECIMAL(10,2) NOT NULL,
             CONSTRAINT `FK_order_items_Order` FOREIGN KEY (`OrderId`) REFERENCES `orders` (`Id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        MySqlAddColumnIfMissing("order_items", "SupermarketName", "VARCHAR(100) NULL"),
+        """
+        UPDATE `order_items` oi
+        INNER JOIN `products` p ON p.`Id` = oi.`ProductId`
+        INNER JOIN `supermarkets` s ON s.`Id` = p.`SupermarketId`
+        SET oi.`SupermarketName` = s.`Name`
+        WHERE oi.`SupermarketName` IS NULL;
         """,
         MySqlAddColumnIfMissing("order_items", "SupermarketName", "VARCHAR(100) NULL"),
         """
@@ -1079,17 +1158,28 @@ public static class DependencyInjection
             `Provider` VARCHAR(50) NULL,
             `ProviderPaymentMethodRef` VARCHAR(200) NULL,
             `DisplayLabel` VARCHAR(120) NULL,
+            `ProviderPaymentMethodRef` VARCHAR(200) NULL,
+            `DisplayLabel` VARCHAR(120) NULL,
             `Last4` VARCHAR(4) NULL,
             `ExpiryMonth` TINYINT NULL,
             `ExpiryYear` SMALLINT NULL,
             `Country` VARCHAR(8) NULL,
             `Fingerprint` VARCHAR(120) NULL,
+            `Country` VARCHAR(8) NULL,
+            `Fingerprint` VARCHAR(120) NULL,
             `IsDefault` TINYINT(1) NOT NULL DEFAULT 0,
             `CreatedAtUtc` DATETIME NOT NULL,
+            `UpdatedAtUtc` DATETIME NULL,
             `UpdatedAtUtc` DATETIME NULL,
             CONSTRAINT `FK_payment_methods_User` FOREIGN KEY (`UserId`) REFERENCES `users` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
+        MySqlAddColumnIfMissing("payment_methods", "ProviderPaymentMethodRef", "VARCHAR(200) NULL"),
+        MySqlAddColumnIfMissing("payment_methods", "DisplayLabel", "VARCHAR(120) NULL"),
+        MySqlAddColumnIfMissing("payment_methods", "Country", "VARCHAR(8) NULL"),
+        MySqlAddColumnIfMissing("payment_methods", "Fingerprint", "VARCHAR(120) NULL"),
+        MySqlAddColumnIfMissing("payment_methods", "UpdatedAtUtc", "DATETIME NULL"),
+        MySqlCreateIndexIfMissing("payment_methods", "IX_payment_methods_UserId", "`UserId`"),
         MySqlAddColumnIfMissing("payment_methods", "ProviderPaymentMethodRef", "VARCHAR(200) NULL"),
         MySqlAddColumnIfMissing("payment_methods", "DisplayLabel", "VARCHAR(120) NULL"),
         MySqlAddColumnIfMissing("payment_methods", "Country", "VARCHAR(8) NULL"),
@@ -1101,6 +1191,8 @@ public static class DependencyInjection
             `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `OrderId` INT NOT NULL,
             `PaymentMethodId` INT NULL,
+            `Provider` VARCHAR(50) NULL,
+            `PaymentType` VARCHAR(30) NOT NULL DEFAULT 'UNKNOWN',
             `Provider` VARCHAR(50) NULL,
             `PaymentType` VARCHAR(30) NOT NULL DEFAULT 'UNKNOWN',
             `Amount` DECIMAL(10,2) NOT NULL,
@@ -1116,12 +1208,74 @@ public static class DependencyInjection
             `FailureCode` VARCHAR(100) NULL,
             `FailureMessage` VARCHAR(500) NULL,
             `MetadataJson` VARCHAR(4000) NULL,
+            `ProviderPaymentIntentRef` VARCHAR(200) NULL,
+            `ProviderSessionRef` VARCHAR(200) NULL,
+            `ProviderChargeRef` VARCHAR(200) NULL,
+            `FeeAmount` DECIMAL(10,2) NULL,
+            `NetAmount` DECIMAL(10,2) NULL,
+            `RawProviderStatus` VARCHAR(60) NULL,
+            `FailureCode` VARCHAR(100) NULL,
+            `FailureMessage` VARCHAR(500) NULL,
+            `MetadataJson` VARCHAR(4000) NULL,
             `CreatedAtUtc` DATETIME NOT NULL,
             `UpdatedAtUtc` DATETIME NULL,
             CONSTRAINT `FK_payment_transactions_Order` FOREIGN KEY (`OrderId`) REFERENCES `orders` (`Id`),
             CONSTRAINT `FK_payment_transactions_PaymentMethod` FOREIGN KEY (`PaymentMethodId`) REFERENCES `payment_methods` (`Id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
+        MySqlAddColumnIfMissing("payment_transactions", "Provider", "VARCHAR(50) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "PaymentType", "VARCHAR(30) NOT NULL DEFAULT 'UNKNOWN'"),
+        MySqlAddColumnIfMissing("payment_transactions", "ProviderPaymentIntentRef", "VARCHAR(200) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "ProviderSessionRef", "VARCHAR(200) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "ProviderChargeRef", "VARCHAR(200) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "FeeAmount", "DECIMAL(10,2) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "NetAmount", "DECIMAL(10,2) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "RawProviderStatus", "VARCHAR(60) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "FailureCode", "VARCHAR(100) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "FailureMessage", "VARCHAR(500) NULL"),
+        MySqlAddColumnIfMissing("payment_transactions", "MetadataJson", "VARCHAR(4000) NULL"),
+        MySqlCreateIndexIfMissing("payment_transactions", "IX_payment_transactions_OrderId", "`OrderId`"),
+        MySqlCreateIndexIfMissing("payment_transactions", "IX_payment_transactions_ProviderRef", "`ProviderRef`"),
+        MySqlCreateIndexIfMissing("payment_transactions", "IX_payment_transactions_ProviderSessionRef", "`ProviderSessionRef`"),
+        """
+        CREATE TABLE IF NOT EXISTS `pricing_policy_versions` (
+            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `VersionNo` INT NOT NULL,
+            `XFactorPercent` DECIMAL(8,4) NOT NULL,
+            `YFactorAmount` DECIMAL(10,2) NOT NULL,
+            `DeliveryCharge` DECIMAL(10,2) NOT NULL,
+            `IsActive` TINYINT(1) NOT NULL DEFAULT 1,
+            `EffectiveFromUtc` DATETIME NOT NULL,
+            `EffectiveToUtc` DATETIME NULL,
+            `Reason` VARCHAR(500) NULL,
+            `CreatedByUserId` INT NOT NULL,
+            `CreatedAtUtc` DATETIME NOT NULL,
+            UNIQUE KEY `UQ_pricing_policy_versions_VersionNo` (`VersionNo`),
+            CONSTRAINT `FK_pricing_policy_versions_User` FOREIGN KEY (`CreatedByUserId`) REFERENCES `users` (`Id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        MySqlCreateIndexIfMissing("pricing_policy_versions", "IX_pricing_policy_versions_IsActive_EffectiveFromUtc", "`IsActive`, `EffectiveFromUtc`"),
+        """
+        CREATE TABLE IF NOT EXISTS `pricing_policy_audit_events` (
+            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `PolicyVersionId` INT NOT NULL,
+            `ActionType` VARCHAR(30) NOT NULL,
+            `OldXFactorPercent` DECIMAL(8,4) NULL,
+            `NewXFactorPercent` DECIMAL(8,4) NOT NULL,
+            `OldYFactorAmount` DECIMAL(10,2) NULL,
+            `NewYFactorAmount` DECIMAL(10,2) NOT NULL,
+            `OldDeliveryCharge` DECIMAL(10,2) NULL,
+            `NewDeliveryCharge` DECIMAL(10,2) NOT NULL,
+            `ChangedByUserId` INT NOT NULL,
+            `ChangedAtUtc` DATETIME NOT NULL,
+            `CorrelationId` VARCHAR(64) NOT NULL,
+            `MetadataJson` VARCHAR(4000) NULL,
+            CONSTRAINT `FK_pricing_policy_audit_events_Version` FOREIGN KEY (`PolicyVersionId`) REFERENCES `pricing_policy_versions` (`Id`),
+            CONSTRAINT `FK_pricing_policy_audit_events_User` FOREIGN KEY (`ChangedByUserId`) REFERENCES `users` (`Id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        MySqlCreateIndexIfMissing("pricing_policy_audit_events", "IX_pricing_policy_audit_events_ChangedAtUtc", "`ChangedAtUtc`"),
+        MySqlCreateIndexIfMissing("pricing_policy_audit_events", "IX_pricing_policy_audit_events_ChangedByUserId_ChangedAtUtc", "`ChangedByUserId`, `ChangedAtUtc`"),
         MySqlAddColumnIfMissing("payment_transactions", "Provider", "VARCHAR(50) NULL"),
         MySqlAddColumnIfMissing("payment_transactions", "PaymentType", "VARCHAR(30) NOT NULL DEFAULT 'UNKNOWN'"),
         MySqlAddColumnIfMissing("payment_transactions", "ProviderPaymentIntentRef", "VARCHAR(200) NULL"),

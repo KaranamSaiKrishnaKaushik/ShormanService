@@ -139,14 +139,6 @@
       "page": "Page",
       "of": "of"
     },
-    "sort": {
-      "label": "Sort",
-      "options": {
-        "default": "Recommended",
-        "priceLowToHigh": "Price: Low to High",
-        "priceHighToLow": "Price: High to Low"
-      }
-    },
     "empty": {
       "title": "No products found",
       "subtitle": "Try adjusting your search or filters",
@@ -155,6 +147,14 @@
     "pagination": {
       "prev": "Prev",
       "next": "Next"
+    },
+    "sort": {
+      "label": "Sort",
+      "options": {
+        "default": "Default",
+        "priceLowToHigh": "Price: Low to High",
+        "priceHighToLow": "Price: High to Low"
+      }
     }
   },
   "addresses": {
