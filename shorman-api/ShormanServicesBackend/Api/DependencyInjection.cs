@@ -167,6 +167,8 @@ public static class DependencyInjection
             PasswordHash NVARCHAR(200) NOT NULL,
             FirstName NVARCHAR(100) NOT NULL,
             LastName NVARCHAR(100) NOT NULL,
+            DisplayName NVARCHAR(80) NULL,
+            ThemePreference NVARCHAR(40) NULL,
             Phone NVARCHAR(50) NULL,
             IsEmailVerified BIT NOT NULL DEFAULT 1,
             EmailVerificationCode NVARCHAR(20) NULL,
@@ -206,6 +208,14 @@ public static class DependencyInjection
         """
         IF COL_LENGTH('users', 'PasswordResetExpiresAtUtc') IS NULL
         ALTER TABLE users ADD PasswordResetExpiresAtUtc DATETIME2 NULL;
+        """,
+        """
+        IF COL_LENGTH('users', 'DisplayName') IS NULL
+        ALTER TABLE users ADD DisplayName NVARCHAR(80) NULL;
+        """,
+        """
+        IF COL_LENGTH('users', 'ThemePreference') IS NULL
+        ALTER TABLE users ADD ThemePreference NVARCHAR(40) NULL;
         """,
         """
         IF OBJECT_ID('categories', 'U') IS NULL
@@ -838,6 +848,8 @@ public static class DependencyInjection
             `PasswordHash` VARCHAR(200) NOT NULL,
             `FirstName` VARCHAR(100) NOT NULL,
             `LastName` VARCHAR(100) NOT NULL,
+            `DisplayName` VARCHAR(80) NULL,
+            `ThemePreference` VARCHAR(40) NULL,
             `Phone` VARCHAR(50) NULL,
             `IsEmailVerified` TINYINT(1) NOT NULL DEFAULT 1,
             `EmailVerificationCode` VARCHAR(20) NULL,
@@ -864,6 +876,8 @@ public static class DependencyInjection
         MySqlAddColumnIfMissing("users", "EmailVerificationExpiresAtUtc", "DATETIME NULL"),
         MySqlAddColumnIfMissing("users", "PasswordResetCode", "VARCHAR(20) NULL"),
         MySqlAddColumnIfMissing("users", "PasswordResetExpiresAtUtc", "DATETIME NULL"),
+        MySqlAddColumnIfMissing("users", "DisplayName", "VARCHAR(80) NULL"),
+        MySqlAddColumnIfMissing("users", "ThemePreference", "VARCHAR(40) NULL"),
         MySqlAddColumnIfMissing("users", "IsDeleted", "TINYINT(1) NOT NULL DEFAULT 0"),
         MySqlAddColumnIfMissing("users", "DeletedAtUtc", "DATETIME NULL"),
         MySqlAddColumnIfMissing("users", "IsEmailVerified", "TINYINT(1) NOT NULL DEFAULT 1"),

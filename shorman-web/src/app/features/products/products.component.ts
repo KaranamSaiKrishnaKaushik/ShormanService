@@ -186,9 +186,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
   get modeHeading(): string {
     const modeTitleKey = `products.mode.${this.activeMode}.title`;
     const translatedModeTitle = this.translate.instant(modeTitleKey);
-    const modeTitle = translatedModeTitle === modeTitleKey ? this.currentMode.title : translatedModeTitle;
-    const nounKey = this.totalProducts === 1 ? 'products.results.productSingular' : 'products.results.productPlural';
-    return `${modeTitle} · ${this.totalProducts} ${this.translate.instant(nounKey)}`;
+    return translatedModeTitle === modeTitleKey ? this.currentMode.title : translatedModeTitle;
   }
 
   get visibleSupermarketTabs(): SupermarketTab[] {
@@ -275,12 +273,12 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
     this.sortMenuOpen = false;
     this.closeMobileFilters();
-    this.loadProducts(true);
+    this.loadProducts(true, true);
   }
 
   setSupermarket(slug: string): void {
     this.activeSupermarket = slug;
-    this.loadProducts(true);
+    this.loadProducts(true, true);
   }
 
   onSearchChange(_: string): void {
@@ -288,7 +286,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   applyFilters(): void {
-    this.loadProducts(true);
+    this.loadProducts(true, true);
   }
 
   toggleSortMenu(event: MouseEvent): void {
@@ -309,14 +307,14 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
     this.activeSort = sort;
     this.sortMenuOpen = false;
-    this.loadProducts(true);
+    this.loadProducts(true, true);
   }
 
   resetFilters(): void {
     this.searchQuery = '';
     this.activeSupermarket = 'all';
     this.activeCategory = 'all';
-    this.loadProducts(true);
+    this.loadProducts(true, true);
   }
 
   toggleMobileFilters(): void {
@@ -479,7 +477,7 @@ export class ProductsComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadProducts(reset: boolean): void {
+  private loadProducts(reset: boolean, logSelectionCount = false): void {
     if (reset) {
       this.currentPage = 1;
     }
@@ -527,6 +525,9 @@ export class ProductsComponent implements OnInit, OnDestroy {
         this.totalPages = Math.max(1, Math.ceil(this.totalProducts / ProductsComponent.PAGE_SIZE));
         this.currentPage = page.page;
         this.filteredProducts = items;
+        if (logSelectionCount) {
+          console.log('Filtered items after selection:', this.totalProducts);
+        }
         this.loading = false;
         this.cdr.detectChanges();
       },

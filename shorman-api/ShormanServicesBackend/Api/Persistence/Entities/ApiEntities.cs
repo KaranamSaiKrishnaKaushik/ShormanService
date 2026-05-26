@@ -7,6 +7,8 @@ public class ApiUser
     public string PasswordHash { get; set; } = string.Empty;
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string? ThemePreference { get; set; }
     public string? Phone { get; set; }
     public bool IsEmailVerified { get; set; } = true;
     public string? EmailVerificationCode { get; set; }

@@ -1,11 +1,12 @@
 namespace ShormanServicesBackend.Api.Contracts;
 
-public record UserDto(int Id, string Email, string FirstName, string LastName, string? Phone, string? CreatedAt, IReadOnlyCollection<string> Roles);
+public record UserDto(int Id, string Email, string FirstName, string LastName, string? DisplayName, string? ThemePreference, string? Phone, string? CreatedAt, IReadOnlyCollection<string> Roles);
 public record AuthResponse(string Token, UserDto User);
 public record LoginRequest(string Email, string Password);
 public record RegisterRequest(string FirstName, string LastName, string Email, string Password, string? Phone);
 public record RegisterResponse(string Email, string Message, bool VerificationRequired, string? VerificationCode);
 public record Auth0ExchangeRequest(string Email, string? FirstName, string? LastName);
+public record UpdateCurrentUserProfileRequest(string? DisplayName, string? ThemePreference);
 public record VerifyEmailRequest(string Email, string Code);
 public record PasswordResetRequest(string Email);
 public record PasswordResetConfirmRequest(string Email, string Code, string NewPassword);
