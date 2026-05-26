@@ -63,6 +63,8 @@ export class ProductService {
     if (filters?.search) params.set('search', filters.search);
     if (filters?.categoryId) params.set('categoryId', String(filters.categoryId));
     if (filters?.supermarketId) params.set('supermarketId', String(filters.supermarketId));
+    filters?.supermarketIds?.forEach(supermarketId => params.append('supermarketIds', String(supermarketId)));
+    if (filters?.sort && filters.sort !== 'default') params.set('sort', filters.sort);
     params.set('page', String(filters?.page ?? 1));
     params.set('pageSize', String(filters?.pageSize ?? 30));
 
@@ -90,6 +92,7 @@ export class ProductService {
     if (filters?.search) params.set('search', filters.search);
     if (filters?.categoryId) params.set('categoryId', String(filters.categoryId));
     if (filters?.supermarketId) params.set('supermarketId', String(filters.supermarketId));
+    filters?.supermarketIds?.forEach(supermarketId => params.append('supermarketIds', String(supermarketId)));
     params.set('page', String(filters?.page ?? 1));
     params.set('pageSize', String(filters?.pageSize ?? 50));
 
@@ -170,6 +173,10 @@ export class ProductService {
     if (filters?.supermarketId) {
       results = results.filter(p => p.supermarketId === filters.supermarketId);
     }
+    if (filters?.supermarketIds?.length) {
+      const supermarketIds = new Set(filters.supermarketIds);
+      results = results.filter(p => supermarketIds.has(p.supermarketId));
+    }
     if (filters?.supermarketSlug && filters.supermarketSlug !== 'all') {
       const sm = MOCK_SUPERMARKETS.find(s => s.slug === filters.supermarketSlug);
       if (sm) results = results.filter(p => p.supermarketId === sm.id);
@@ -177,6 +184,12 @@ export class ProductService {
     if (filters?.categorySlug && filters.categorySlug !== 'all') {
       const cat = MOCK_CATEGORIES.find(c => c.slug === filters.categorySlug);
       if (cat) results = results.filter(p => p.categoryId === cat.id);
+    }
+
+    if (filters?.sort === 'priceLowToHigh') {
+      results = results.sort((left, right) => left.price - right.price || left.name.localeCompare(right.name));
+    } else if (filters?.sort === 'priceHighToLow') {
+      results = results.sort((left, right) => right.price - left.price || left.name.localeCompare(right.name));
     }
 
     return results;

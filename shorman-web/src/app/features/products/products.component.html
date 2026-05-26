@@ -1,36 +1,94 @@
 <div class="products-page">
-  <!-- Header with search -->
+  <section class="delivery-zone-banner" [class.compact]="isDeliveryBannerCompact">
+    <div class="delivery-zone-inner" *ngIf="!isDeliveryBannerCompact; else compactDeliveryZone">
+      <div class="delivery-zone-copy">
+        <span class="delivery-zone-kicker">{{ 'products.delivery.kicker' | translate }}</span>
+        <h2>{{ 'products.delivery.title' | translate }}</h2>
+        <p>{{ 'products.delivery.subtitle' | translate }}</p>
+      </div>
+
+      <form class="delivery-zone-form" (ngSubmit)="checkDeliveryZone()">
+        <input type="text" [(ngModel)]="deliveryCheck.street" name="deliveryStreet" placeholder="{{ 'products.delivery.street' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.houseNumber" name="deliveryHouseNumber" placeholder="{{ 'products.delivery.houseNumber' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.postalCode" name="deliveryPostalCode" placeholder="{{ 'products.delivery.postalCode' | translate }}" />
+        <input type="text" [(ngModel)]="deliveryCheck.city" name="deliveryCity" placeholder="{{ 'products.delivery.city' | translate }}" />
+        <button type="submit" class="delivery-zone-btn" [disabled]="checkingDelivery">
+          {{ checkingDelivery ? ('products.delivery.checking' | translate) : ('products.delivery.checkAddress' | translate) }}
+        </button>
+      </form>
+
+      <p class="delivery-zone-error" *ngIf="deliveryCheckError">{{ deliveryCheckError }}</p>
+      <div class="delivery-zone-result" *ngIf="deliveryCheckResult as result" [class.ineligible]="!result.eligible">
+        <strong>{{ result.eligible ? ('products.delivery.available' | translate) : ('products.delivery.notAvailable' | translate) }}</strong>
+        <span>{{ result.message }}</span>
+      </div>
+    </div>
+
+    <ng-template #compactDeliveryZone>
+      <div class="delivery-zone-compact" *ngIf="deliveryCheckResult as result">
+        <div class="delivery-zone-compact-copy">
+          <span class="delivery-zone-kicker">{{ 'products.delivery.kicker' | translate }}</span>
+          <strong [class.ineligible]="!result.eligible">
+            {{ result.eligible ? ('products.delivery.available' | translate) : ('products.delivery.notAvailable' | translate) }}
+          </strong>
+          <span>{{ deliverySummary }}</span>
+        </div>
+        <button type="button" class="delivery-zone-compact-btn" (click)="expandDeliveryCheck()">
+          {{ 'products.delivery.checkAnotherAddress' | translate }}
+        </button>
+      </div>
+    </ng-template>
+  </section>
+
+  <div class="delivery-prereq" *ngIf="!deliveryCheckCompleted">
+    <p>{{ 'products.delivery.unlockPrompt' | translate }}</p>
+  </div>
+
+  <ng-container *ngIf="deliveryCheckCompleted">
   <div class="page-header">
     <div class="header-inner">
-      <button class="mobile-filter-btn" (click)="toggleMobileFilters()">
-        <span class="filter-icon">☰</span>
-        Filters
+      <div class="mode-switch" role="tablist" aria-label="Product mode">
+        <button
+          *ngFor="let mode of productModes"
+          type="button"
+          class="mode-chip"
+          [class.active]="activeMode === mode.slug"
+          [style.--mode-accent]="mode.accent"
+          [style.--mode-surface]="mode.surface"
+          (click)="setMode(mode.slug)">
+          {{ ('products.mode.' + mode.slug + '.title') | translate }}
+        </button>
+      </div>
+
+      <button type="button" class="mobile-filter-btn" (click)="toggleMobileFilters()">
+        <span class="app-icon filter-icon">tune</span>
+        {{ 'products.filters' | translate }}
         <span class="filter-badge" *ngIf="activeFiltersCount > 0">{{ activeFiltersCount }}</span>
       </button>
+
       <div class="search-bar">
-        <span class="search-icon">🔍</span>
+        <span class="app-icon search-icon">search</span>
         <input
           type="text"
           [(ngModel)]="searchQuery"
           (ngModelChange)="onSearchChange($event)"
-          placeholder="Search products…"
+          placeholder="{{ 'products.searchPlaceholder' | translate }}"
           class="search-input"
         />
-        <button *ngIf="searchQuery" class="search-clear" (click)="searchQuery = ''; applyFilters()">✕</button>
+        <button type="button" *ngIf="searchQuery" class="search-clear" (click)="searchQuery = ''; applyFilters()">✕</button>
       </div>
     </div>
   </div>
 
-  <!-- Supermarket Tabs -->
   <div class="supermarket-tabs">
     <div class="tabs-inner">
       <button
-        *ngFor="let tab of supermarketTabs"
+        *ngFor="let tab of visibleSupermarketTabs"
+        type="button"
         class="sm-tab"
         [class.active]="activeSupermarket === tab.slug"
-        [style.background]="activeSupermarket === tab.slug ? tab.bgColor : '#fff'"
-        [style.color]="activeSupermarket === tab.slug ? tab.color : '#333'"
-        [style.border-color]="tab.bgColor"
+        [style.--store-border-color]="tab.bgColor"
+        [style.--store-text-color]="tab.color"
         (click)="setSupermarket(tab.slug)"
       >
         {{ tab.name }}
@@ -38,31 +96,31 @@
     </div>
   </div>
 
-  <div class="products-layout">
+  <div class="products-layout" [class.filters-open]="isMobileFiltersActive">
     <!-- Mobile Filter Overlay -->
     <div class="mobile-filter-overlay" *ngIf="mobileFiltersOpen" (click)="closeMobileFilters()"></div>
 
     <!-- Sidebar -->
     <aside class="sidebar" [class.mobile-open]="mobileFiltersOpen">
       <div class="mobile-filter-header">
-        <h3>Filters</h3>
-        <button class="close-btn" (click)="closeMobileFilters()">✕</button>
+        <h3>{{ 'products.filters' | translate }}</h3>
+        <button type="button" class="close-btn" (click)="closeMobileFilters()">✕</button>
       </div>
 
       <div class="sidebar-section">
-        <h3 class="sidebar-title">Categories</h3>
+        <h3 class="sidebar-title">{{ sidebarTitle }}</h3>
         <div class="category-list">
           <label class="category-item" [class.active]="activeCategory === 'all'">
             <input type="radio" name="category" value="all" [(ngModel)]="activeCategory"
               (change)="applyFilters(); closeMobileFilters()" />
-            <span class="cat-icon">🛍️</span>
-            <span class="cat-name">All Products</span>
+            <span class="cat-icon">{{ getCategoryGlyph('all') }}</span>
+            <span class="cat-name">{{ allCategoriesLabel }}</span>
           </label>
-          <label *ngFor="let cat of categories" class="category-item" [class.active]="activeCategory === cat.slug">
+          <label *ngFor="let cat of visibleCategories" class="category-item" [class.active]="activeCategory === cat.slug">
             <input type="radio" name="category" [value]="cat.slug" [(ngModel)]="activeCategory"
               (change)="applyFilters(); closeMobileFilters()" />
-            <span class="cat-icon">{{ cat.icon }}</span>
-            <span class="cat-name">{{ cat.name }}</span>
+            <span class="cat-icon">{{ getCategoryGlyph(cat) }}</span>
+            <span class="cat-name">{{ getCategoryLabel(cat) }}</span>
           </label>
         </div>
       </div>
@@ -71,84 +129,110 @@
     <!-- Main Content -->
     <main class="products-main">
       <div class="results-header">
-        <span class="results-count">
-          <strong>{{ totalProducts }}</strong>
-          product{{ totalProducts !== 1 ? 's' : '' }} found
-        </span>
-        <span class="results-count" *ngIf="totalPages > 0">
-          Page <strong>{{ currentPage }}</strong> of <strong>{{ totalPages }}</strong>
-        </span>
-      </div>
+        <div class="results-copy">
+          <h2 class="results-title">{{ modeHeading }}</h2>
+        </div>
+        <div class="results-tools">
+          <div class="sort-menu" *ngIf="activeMode === 'groceries'" (click)="$event.stopPropagation()">
+            <button
+              type="button"
+              class="sort-trigger"
+              [class.open]="sortMenuOpen"
+              (click)="toggleSortMenu($event)">
+              <span class="sort-trigger-copy">
+                <span class="sort-chip-label">{{ 'products.sort.label' | translate }}</span>
+                <strong>{{ activeSortLabel }}</strong>
+              </span>
+              <span class="sort-trigger-icon" [class.open]="sortMenuOpen">⌄</span>
+            </button>
 
-      <app-loading-spinner *ngIf="loading"></app-loading-spinner>
-
-      <div *ngIf="!loading && filteredProducts.length === 0" class="empty-state">
-        <div class="empty-icon">🔍</div>
-        <h3>No products found</h3>
-        <p>Try adjusting your search or filters</p>
-        <button class="btn-reset" (click)="resetFilters()">Reset Filters</button>
-      </div>
-
-      <div class="product-grid" *ngIf="!loading && filteredProducts.length > 0">
-        <div *ngFor="let product of filteredProducts" class="product-card">
-          <!-- Product Image -->
-          <div class="product-image">
-            <img *ngIf="product.imageUrl" [src]="product.imageUrl" [alt]="product.name" loading="lazy" />
-            <div *ngIf="!product.imageUrl" class="image-placeholder"
-              [style.background]="getPlaceholderColor(product.supermarketId)">
-              {{ product.name.charAt(0).toUpperCase() }}
-            </div>
-            <div class="sm-badge" [style.background]="getSupermarketColor(product.supermarketId)">
-              {{ product.supermarket?.name }}
-            </div>
-          </div>
-
-          <!-- Product Info -->
-          <div class="product-info">
-            <div class="product-category">{{ product.category?.name }}</div>
-            <h4 class="product-name">{{ product.name }}</h4>
-            <div class="product-unit" *ngIf="product.unit">{{ product.unit }}</div>
-
-            <div class="product-footer">
-              <div class="product-price">{{ product.price | currency:'EUR':'symbol':'1.2-2' }}</div>
-
-              <div class="cart-controls" *ngIf="getQuantity(product.id) > 0; else addBtn">
-                <button class="qty-btn minus" (click)="decreaseQty(product)">−</button>
-                <span class="qty-value">{{ getQuantity(product.id) }}</span>
-                <button class="qty-btn plus" (click)="increaseQty(product)">+</button>
-              </div>
-              <ng-template #addBtn>
-                <button class="btn-add" (click)="addToCart(product)">+ Add</button>
-              </ng-template>
+            <div class="sort-dropdown" *ngIf="sortMenuOpen">
+              <button
+                *ngFor="let option of sortOptions"
+                type="button"
+                class="sort-option"
+                [class.active]="activeSort === option.value"
+                (click)="setSort(option.value)">
+                <span>{{ option.translationKey | translate }}</span>
+                <span class="sort-option-check" *ngIf="activeSort === option.value">✓</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div *ngIf="!loading && totalPages > 1" class="empty-state">
-        <div class="tabs-inner">
-          <button class="sm-tab" type="button" [disabled]="currentPage <= 1" (click)="changePage(currentPage - 1)">Prev</button>
-          <button
-            *ngFor="let pageNumber of visiblePageNumbers"
-            class="sm-tab"
-            type="button"
-            [class.active]="currentPage === pageNumber"
-            (click)="changePage(pageNumber)">
-            {{ pageNumber }}
-          </button>
-          <button class="sm-tab" type="button" [disabled]="currentPage >= totalPages" (click)="changePage(currentPage + 1)">Next</button>
+      <div class="products-scroll-panel">
+        <app-loading-spinner *ngIf="loading"></app-loading-spinner>
+
+        <div *ngIf="!loading && filteredProducts.length === 0" class="empty-state">
+          <div class="app-icon empty-icon">search_off</div>
+          <h3>{{ 'products.empty.title' | translate }}</h3>
+          <p>{{ 'products.empty.subtitle' | translate }}</p>
+          <button type="button" class="btn-reset" (click)="resetFilters()">{{ 'products.empty.reset' | translate }}</button>
+        </div>
+
+        <div class="product-grid" *ngIf="!loading && filteredProducts.length > 0">
+          <div *ngFor="let product of filteredProducts" class="product-card">
+            <!-- Product Image -->
+            <div class="product-image">
+              <img *ngIf="product.imageUrl" [src]="product.imageUrl" [alt]="product.name" loading="lazy" />
+              <div *ngIf="!product.imageUrl" class="image-placeholder"
+                [style.background]="getPlaceholderColor(product.supermarketId)">
+                {{ product.name.charAt(0).toUpperCase() }}
+              </div>
+              <div class="sm-badge" [ngStyle]="getStoreBadgeStyle(product)">
+                {{ product.supermarket?.name }}
+              </div>
+            </div>
+
+            <!-- Product Info -->
+            <div class="product-info">
+              <div class="product-category">{{ getCategoryLabel(product.category) }}</div>
+              <h4 class="product-name">{{ product.name }}</h4>
+              <div class="product-unit" *ngIf="product.unit">{{ product.unit }}</div>
+
+              <div class="product-footer">
+                <div class="product-price">{{ product.price | currency:'EUR':'symbol':'1.2-2' }}</div>
+
+                <div class="cart-controls" *ngIf="getQuantity(product.id) > 0; else addBtn">
+                  <button type="button" class="qty-btn minus" (click)="decreaseQty(product)">−</button>
+                  <span class="qty-value">{{ getQuantity(product.id) }}</span>
+                  <button type="button" class="qty-btn plus" (click)="increaseQty(product)">+</button>
+                </div>
+                <ng-template #addBtn>
+                  <button type="button" class="btn-add" (click)="addToCart(product)">+ {{ 'products.add' | translate }}</button>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="!loading && totalPages > 1" class="empty-state pagination-panel">
+          <div class="tabs-inner">
+            <button class="sm-tab" type="button" [disabled]="currentPage <= 1" (click)="changePage(currentPage - 1)">{{ 'products.pagination.prev' | translate }}</button>
+            <button
+              *ngFor="let pageNumber of visiblePageNumbers"
+              class="sm-tab"
+              type="button"
+              [class.active]="currentPage === pageNumber"
+              (click)="changePage(pageNumber)">
+              {{ pageNumber }}
+            </button>
+            <button class="sm-tab" type="button" [disabled]="currentPage >= totalPages" (click)="changePage(currentPage + 1)">{{ 'products.pagination.next' | translate }}</button>
+          </div>
         </div>
       </div>
     </main>
   </div>
 
   <!-- Mobile Cart Button -->
-  <button class="mobile-cart-btn" (click)="cartService.openCart()"
+  <button type="button" class="mobile-cart-btn" (click)="cartService.openCart()"
     *ngIf="(cartService.cart$ | async)?.itemCount as count">
-    <span class="cart-icon">🛒</span>
-    <span class="cart-text">Cart</span>
+    <span class="app-icon cart-icon">shopping_cart</span>
+    <span class="cart-text">{{ 'products.cart' | translate }}</span>
     <span class="cart-badge">{{ count }}</span>
   </button>
+  </ng-container>
 </div>
 
 <!-- Cart Sidebar Overlay -->

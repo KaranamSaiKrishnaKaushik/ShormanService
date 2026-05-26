@@ -132,11 +132,14 @@ export class RoleAccessManagementComponent implements OnInit {
 
   readonly managedRoles: ManagedRole[] = ['Admin', 'Customer', 'Rider'];
   readonly menuItems: Array<{ key: MenuPermissionKey; label: string; description: string }> = [
+    { key: 'products', label: 'Products', description: 'Allow the storefront catalog and products landing page in navigation.' },
     { key: 'checkout', label: 'Checkout', description: 'Allow the role to open checkout and place orders from the cart.' },
-    { key: 'orders', label: 'Orders', description: 'Allow order history and order detail pages.' },
+    { key: 'orders', label: 'Order History', description: 'Allow the order-history page and order detail pages for this role.' },
+    { key: 'history-stats', label: 'History Stats', description: 'Allow the shopping-history analytics page in navigation and routing.' },
     { key: 'addresses', label: 'Addresses', description: 'Allow address management pages.' },
     { key: 'rider-dashboard', label: 'Rider Dashboard', description: 'Allow the rider workspace entry in navigation and routing.' },
-    { key: 'user-management.product-data', label: 'Product Data Admin', description: 'Allow the catalog grid for editing and deleting product records.' },
+    { key: 'product-management', label: 'Product Management', description: 'Allow the product import workspace with uploads, history, and catalog review.' },
+    { key: 'user-management.order-summary', label: 'Order History Admin', description: 'Allow the admin order-history tab inside user management.' },
     { key: 'user-management.user-list', label: 'User List Admin', description: 'Allow the registered-user list and role assignment view.' },
     { key: 'user-management.role-access', label: 'Role Access Admin', description: 'Allow editing the menu-permission matrix itself.' }
   ];

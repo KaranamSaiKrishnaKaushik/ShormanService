@@ -3,11 +3,12 @@ import { DecimalPipe, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Category, Product, ProductFilters, ProductPage, Supermarket, UpdateProductRequest } from '../../core/models/product.model';
 import { ProductService } from '../../core/services/product.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-product-data-management',
   standalone: true,
-  imports: [FormsModule, NgFor, NgIf, DecimalPipe],
+  imports: [FormsModule, NgFor, NgIf, DecimalPipe, TranslateModule],
   template: `
     <section class="toolbar">
       <input
@@ -16,8 +17,8 @@ import { ProductService } from '../../core/services/product.service';
         (keydown.enter)="applyFilters()"
         placeholder="Search product name" />
       <select [(ngModel)]="selectedCategoryId" (ngModelChange)="applyFilters()">
-        <option [ngValue]="null">All Categories</option>
-        <option *ngFor="let category of categories" [ngValue]="category.id">{{ category.name }}</option>
+        <option [ngValue]="null">{{ 'productManagement.allCategories' | translate }}</option>
+        <option *ngFor="let category of categories" [ngValue]="category.id">{{ getCategoryLabel(category) }}</option>
       </select>
       <select [(ngModel)]="selectedSupermarketId" (ngModelChange)="applyFilters()">
         <option [ngValue]="null">All Supermarkets</option>
@@ -91,10 +92,10 @@ import { ProductService } from '../../core/services/product.service';
             <td>
               <ng-container *ngIf="editingProductId === product.id; else categoryView">
                 <select [(ngModel)]="draft.categoryId">
-                  <option *ngFor="let category of categories" [ngValue]="category.id">{{ category.name }}</option>
+                  <option *ngFor="let category of categories" [ngValue]="category.id">{{ getCategoryLabel(category) }}</option>
                 </select>
               </ng-container>
-              <ng-template #categoryView>{{ product.category?.name || product.categoryId }}</ng-template>
+              <ng-template #categoryView>{{ getCategoryLabel(product.category) || product.categoryId }}</ng-template>
             </td>
             <td>
               <ng-container *ngIf="editingProductId === product.id; else supermarketView">
@@ -291,6 +292,7 @@ import { ProductService } from '../../core/services/product.service';
 })
 export class ProductDataManagementComponent implements OnInit {
   private readonly productService = inject(ProductService);
+  private readonly translate = inject(TranslateService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   categories: Category[] = [];
@@ -317,6 +319,16 @@ export class ProductDataManagementComponent implements OnInit {
     });
 
     this.loadProducts();
+  }
+
+  getCategoryLabel(category: Category | undefined | null): string {
+    if (!category) {
+      return '';
+    }
+
+    const key = `categories.${category.slug}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? category.name : translated;
   }
 
   get totalPages(): number {

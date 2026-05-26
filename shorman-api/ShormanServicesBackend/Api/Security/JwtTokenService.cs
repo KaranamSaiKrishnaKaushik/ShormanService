@@ -24,24 +24,32 @@ public static class RoleNames
 public static class MenuPermissionKeys
 {
     public const string Products = "products";
+    public const string ProductManagement = "product-management";
+    public const string ProductManagementPricing = "product-management.pricing";
     public const string Checkout = "checkout";
     public const string Orders = "orders";
+    public const string HistoryStats = "history-stats";
     public const string Addresses = "addresses";
     public const string RiderDashboard = "rider-dashboard";
     public const string UserList = "user-management.user-list";
     public const string RoleAccess = "user-management.role-access";
     public const string ProductData = "user-management.product-data";
+    public const string OrderSummary = "user-management.order-summary";
 
     public static readonly string[] All =
     [
         Products,
+        ProductManagement,
+        ProductManagementPricing,
         Checkout,
         Orders,
+        HistoryStats,
         Addresses,
         RiderDashboard,
         UserList,
         RoleAccess,
-        ProductData
+        ProductData,
+        OrderSummary
     ];
 
     public static bool IsValid(string key) => All.Contains(key, StringComparer.OrdinalIgnoreCase);
@@ -53,16 +61,19 @@ public static class MenuPermissionKeys
             RoleNames.Admin =>
             [
                 Products,
+                ProductManagement,
                 Checkout,
-                Orders,
+                HistoryStats,
                 Addresses,
-                ProductData
+                ProductData,
+                OrderSummary
             ],
             RoleNames.Customer =>
             [
                 Products,
                 Checkout,
                 Orders,
+                HistoryStats,
                 Addresses
             ],
             RoleNames.Rider =>

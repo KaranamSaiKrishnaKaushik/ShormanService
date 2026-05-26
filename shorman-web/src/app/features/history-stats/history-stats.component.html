@@ -1,0 +1,207 @@
+<section class="stats-shell">
+  <header class="page-head">
+    <div>
+      <p class="crumb">History Stats - {{ currentName }}</p>
+      <h1>{{ 'history.title' | translate }}</h1>
+      <p class="sub">{{ profileSubtitle() }}</p>
+    </div>
+    <div class="page-actions">
+      <div class="mode-pill" role="tablist" aria-label="History data mode">
+        <button type="button" [class.on]="dataMode === 'template'" (click)="selectDataMode('template')">Template Data</button>
+        <button type="button" [class.on]="dataMode === 'mine'" (click)="selectDataMode('mine')">My History Data</button>
+      </div>
+      <div class="range-pill" role="tablist" aria-label="History range">
+        <button
+          type="button"
+          *ngFor="let range of rangeOptions"
+          [class.on]="selectedRange === range.key"
+          (click)="selectRange(range.key)">
+          {{ range.labelKey | translate }}
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <ng-container *ngIf="loading; else historyContent">
+    <section class="loading-card" aria-live="polite" aria-busy="true">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <h2>Loading your history data</h2>
+      <p>Please wait while Shorman refreshes your stats, charts, and order trends.</p>
+    </section>
+  </ng-container>
+
+  <ng-template #historyContent>
+  <ng-container *ngIf="!showLoginRequiredState(); else loginRequiredState">
+  <section class="kpis">
+    <article class="kpi" [class.up]="spendDeltaPct() >= 0" [class.down]="spendDeltaPct() < 0">
+      <p class="label">{{ 'history.kpi.totalSpend' | translate }}</p>
+      <p class="value">EUR {{ totalSpend | number:'1.2-2' }}</p>
+      <p class="delta" [class.down]="spendDeltaPct() < 0">
+        {{ deltaArrow(spendDeltaPct()) }} {{ signedDelta(spendDeltaPct(), 1) }}% {{ comparisonSuffix() }}
+      </p>
+    </article>
+    <article class="kpi" [class.up]="totalOrders >= previousTotalOrders" [class.down]="totalOrders < previousTotalOrders">
+      <p class="label">{{ 'history.kpi.totalOrders' | translate }}</p>
+      <p class="value">{{ totalOrders | number }}</p>
+      <p class="delta" [class.down]="totalOrders < previousTotalOrders">
+        {{ deltaArrow(totalOrders - previousTotalOrders) }} {{ signedDelta(totalOrders - previousTotalOrders, 0) }} {{ 'history.kpi.moreOrders' | translate }}
+      </p>
+    </article>
+    <article class="kpi" [class.up]="avgBasketDelta() >= 0" [class.down]="avgBasketDelta() < 0">
+      <p class="label">{{ 'history.kpi.avgBasket' | translate }}</p>
+      <p class="value">EUR {{ averageBasket | number:'1.2-2' }}</p>
+      <p class="delta" [class.down]="avgBasketDelta() < 0">
+        {{ deltaArrow(avgBasketDelta()) }} EUR {{ signedDelta(avgBasketDelta(), 2) }}
+      </p>
+    </article>
+    <article class="kpi" [class.up]="favoriteStoreShare >= 50" [class.down]="favoriteStoreShare < 50">
+      <p class="label">{{ 'history.kpi.favoriteStore' | translate }}</p>
+      <p class="value">{{ favoriteStore }}</p>
+      <p class="delta">
+        <span class="bubble" [class.red]="favoriteStoreShare < 30">
+          EUR {{ favoriteStoreSpend | number:'1.2-2' }} - {{ favoriteStoreShare | number:'1.0-0' }}%
+        </span>
+      </p>
+    </article>
+    <article class="kpi" [class.up]="favoriteCategoryShare >= 20" [class.down]="favoriteCategoryShare < 20">
+      <p class="label">{{ 'history.kpi.favoriteCategory' | translate }}</p>
+      <p class="value">{{ favoriteCategory }}</p>
+      <p class="delta">
+        <span class="bubble" [class.red]="favoriteCategoryShare < 20">
+          EUR {{ favoriteCategorySpend | number:'1.2-2' }} - {{ favoriteCategoryShare | number:'1.0-0' }}%
+        </span>
+      </p>
+    </article>
+    <article class="kpi" [class.up]="groceryShare >= drugstoreShare" [class.down]="groceryShare < drugstoreShare">
+      <p class="label">{{ 'history.kpi.groceryVsDrugstore' | translate }}</p>
+      <p class="value">{{ groceryShare | number:'1.0-0' }}% - {{ drugstoreShare | number:'1.0-0' }}%</p>
+      <div class="split">
+        <span class="g" [style.flex]="groceryShare"></span>
+        <span class="d" [style.flex]="drugstoreShare"></span>
+      </div>
+    </article>
+  </section>
+
+  <section class="grid two-left">
+    <article class="card">
+      <header>
+        <h2>{{ 'history.charts.spendOverTime' | translate }}</h2>
+        <p>{{ 'history.charts.monthlyStacked' | translate }}</p>
+      </header>
+      <div class="chart-wrap"><canvas #areaCanvas></canvas></div>
+      <div class="legend-row">
+        <span class="lg" *ngFor="let item of spendByStore">
+          <i [style.background]="storeColor(item.store)"></i>
+          {{ item.store }}
+        </span>
+      </div>
+    </article>
+
+    <article class="card">
+      <header>
+        <h2>{{ 'history.charts.spendByStore' | translate }}</h2>
+        <p>{{ 'history.charts.shareTotalSpend' | translate }}</p>
+      </header>
+      <div class="chart-wrap"><canvas #donutCanvas></canvas></div>
+      <div class="legend-list">
+        <span class="lg" *ngFor="let item of spendByStore">
+          <i [style.background]="storeColor(item.store)"></i>
+            {{ item.store }} - EUR {{ item.spend | number:'1.0-0' }}
+        </span>
+      </div>
+    </article>
+  </section>
+
+  <section class="grid two-right">
+    <article class="card">
+      <header>
+        <h2>{{ 'history.charts.topCategories' | translate }}</h2>
+        <p>{{ 'history.charts.categoryLegend' | translate }}</p>
+      </header>
+      <div class="chart-wrap tall"><canvas #categoryCanvas></canvas></div>
+      <ul class="category-meta">
+        <li *ngFor="let category of categories">
+          <span>{{ category.name }}</span>
+          <small>{{ category.orderCount }} orders</small>
+        </li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <header>
+        <h2>{{ 'history.charts.heatmap' | translate }}</h2>
+        <p>{{ 'history.charts.heatmapHint' | translate }}</p>
+      </header>
+
+      <div class="heat">
+        <p class="group-title grocery">{{ 'history.charts.groceries' | translate }}</p>
+        <div class="heat-row head" [style.gridTemplateColumns]="heatGridCols(groceryCategoryAxis.length)">
+          <span></span>
+          <span *ngFor="let key of groceryCategoryAxis">{{ key }}</span>
+        </div>
+        <div class="heat-row" [style.gridTemplateColumns]="heatGridCols(groceryCategoryAxis.length)" *ngFor="let row of heatmapGroceries">
+          <span class="store">{{ row.store }}</span>
+          <span class="cell grocery" *ngFor="let key of groceryCategoryAxis"
+            [style.opacity]="heatOpacity(row.values[key], maxHeatValue(heatmapGroceries))">
+                  {{ row.values[key] > 0 ? ('EUR ' + row.values[key]) : '-' }}
+          </span>
+        </div>
+
+        <p class="group-title drugstore">{{ 'history.charts.drugstore' | translate }}</p>
+        <div class="heat-row head drug" [style.gridTemplateColumns]="heatGridCols(drugstoreCategoryAxis.length)">
+          <span></span>
+          <span *ngFor="let key of drugstoreCategoryAxis">{{ key }}</span>
+        </div>
+        <div class="heat-row drug" [style.gridTemplateColumns]="heatGridCols(drugstoreCategoryAxis.length)" *ngFor="let row of heatmapDrugstore">
+          <span class="store">{{ row.store }}</span>
+          <span class="cell drugstore" *ngFor="let key of drugstoreCategoryAxis"
+            [style.opacity]="heatOpacity(row.values[key], maxHeatValue(heatmapDrugstore))">
+                  {{ row.values[key] > 0 ? ('EUR ' + row.values[key]) : '-' }}
+          </span>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <article class="card">
+    <header>
+      <h2>{{ 'history.charts.topReordered' | translate }}</h2>
+      <p>{{ 'history.charts.topReorderedHint' | translate }}</p>
+    </header>
+
+    <section class="reorder-grid">
+      <div class="re-item" *ngFor="let item of reorderedProducts">
+        <div class="thumb">
+          <img *ngIf="item.imageUrl" [src]="item.imageUrl" [alt]="item.name" />
+          <span *ngIf="!item.imageUrl">{{ item.name.slice(0, 1) }}</span>
+        </div>
+        <div class="content">
+          <p class="name">{{ item.name }}</p>
+          <p class="meta">
+            <span class="badge" [style.background]="storeColor(item.store)">{{ item.store }}</span>
+              x{{ item.quantity }} {{ 'history.charts.bought' | translate }}
+          </p>
+          <div class="progress"><i [style.width.%]="reorderPercent(item.repeatCount)"></i></div>
+        </div>
+            <p class="repeat">{{ item.repeatCount }}x - EUR {{ item.spend | number:'1.0-0' }}</p>
+      </div>
+    </section>
+  </article>
+
+  <p *ngIf="loading" class="state-note">{{ 'history.state.loading' | translate }}</p>
+  <p *ngIf="!loading && errorMsg" class="state-note warn">{{ errorMsg }}</p>
+  </ng-container>
+  </ng-template>
+
+  <ng-template #loginRequiredState>
+    <section class="login-required-card">
+      <p class="login-required-eyebrow">My History Data</p>
+      <h2>Please log in to view your data.</h2>
+      <p>Use your account to load your real orders, spend insights, and reorder trends.</p>
+      <div class="login-required-actions">
+        <a routerLink="/login" [queryParams]="{ returnUrl: '/history-stats' }" class="action-btn primary">Log in</a>
+        <a routerLink="/register" [queryParams]="{ returnUrl: '/history-stats' }" class="action-btn secondary">Create account</a>
+      </div>
+    </section>
+  </ng-template>
+</section>

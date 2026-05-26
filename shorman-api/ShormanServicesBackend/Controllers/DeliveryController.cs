@@ -10,13 +10,19 @@ namespace ShormanServicesBackend.Controllers;
 public class DeliveryController(IMediator mediator) : ControllerBase
 {
     [HttpGet("check")]
-    public async Task<ActionResult<DeliveryCheckResult>> Check([FromQuery] string postalCode, CancellationToken cancellationToken)
+    public async Task<ActionResult<DeliveryCheckResult>> Check(
+        [FromQuery] string postalCode,
+        [FromQuery] string? city,
+        [FromQuery] string? street,
+        [FromQuery] string? houseNumber,
+        [FromQuery] string? country,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(postalCode))
         {
             return BadRequest(new { message = "postalCode is required." });
         }
 
-        return Ok(await mediator.Send(new CheckDeliveryQuery(postalCode), cancellationToken));
+        return Ok(await mediator.Send(new CheckDeliveryQuery(postalCode, city, street, houseNumber, country), cancellationToken));
     }
 }

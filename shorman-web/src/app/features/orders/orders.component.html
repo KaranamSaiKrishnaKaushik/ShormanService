@@ -1,52 +1,161 @@
 <div class="orders-page">
   <div class="container">
-    <h1>Order History</h1>
+    <h1>{{ pageTitle }}</h1>
+
+    <section class="orders-toolbar" *ngIf="!loading">
+      <label class="search-box">
+        <span class="search-label">Search</span>
+        <input
+          type="text"
+          [(ngModel)]="searchTerm"
+          (keydown.enter)="applySearch()"
+          placeholder="Order ID or product name" />
+      </label>
+
+      <div class="toolbar-actions">
+        <label class="sort-box">
+          <span class="search-label">Date</span>
+          <select [(ngModel)]="sortDirection" (ngModelChange)="onSortChange()">
+            <option value="desc">Latest first</option>
+            <option value="asc">Oldest first</option>
+          </select>
+        </label>
+
+        <button type="button" class="toolbar-btn primary" (click)="applySearch()">Search</button>
+        <button type="button" class="toolbar-btn" *ngIf="searchTerm" (click)="clearSearch()">Clear</button>
+      </div>
+    </section>
 
     <!-- Loading State -->
     <div *ngIf="loading" class="loading">
       <div class="spinner"></div>
-      <p>Loading your orders…</p>
+      <p>{{ loadingMessage }}</p>
     </div>
 
     <!-- Error State -->
     <div *ngIf="errorMsg && !loading" class="error-state">
       <div class="error-icon">⚠️</div>
       <p>{{ errorMsg }}</p>
-      <button class="btn-retry" (click)="loadOrders()">Retry</button>
+      <button type="button" class="btn-retry" (click)="loadOrders()">Retry</button>
     </div>
 
     <!-- Empty State -->
     <div *ngIf="!loading && !errorMsg && orders.length === 0" class="empty-state">
       <div class="empty-icon">📦</div>
-      <h3>No orders yet</h3>
-      <p>Your order history will appear here.</p>
+      <h3>{{ emptyTitle }}</h3>
+      <p>{{ emptyMessage }}</p>
     </div>
 
-    <!-- Order Cards -->
-    <div *ngFor="let order of orders" class="order-card">
-      <div class="order-header">
-        <span class="order-id">#{{ order.id }}</span>
-        <span class="order-status" [ngClass]="'status-' + order.status.toLowerCase()">
-          {{ order.status }}
-        </span>
-        <span class="order-date">{{ order.createdAt | date:'mediumDate' }}</span>
-      </div>
-
-      <div class="order-items">
-        <div *ngFor="let item of order.items" class="order-item">
-          {{ item.productName }} × {{ item.quantity }}
-          <span class="item-price">{{ item.totalPrice | currency:'EUR' }}</span>
+    <div *ngIf="!loading && !errorMsg && orders.length > 0" class="orders-layout" [class.has-selection]="hasSelectedOrder">
+      <section class="orders-list">
+        <div class="orders-summary">
+          <span>{{ totalCount }} orders</span>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
         </div>
-      </div>
 
-      <div class="order-footer">
-        <span class="delivery-address" *ngIf="order.deliveryAddress">
-          📍 {{ order.deliveryAddress }}
-        </span>
-        <div class="order-total">
-          Total: <strong>{{ order.total | currency:'EUR' }}</strong>
+        <button
+          *ngFor="let order of orders; trackBy: trackByOrderId"
+          type="button"
+          class="order-card"
+          [class.selected]="isSelected(order)"
+          (click)="toggleOrderSelection(order)">
+          <div class="order-header">
+            <span class="order-id">#{{ order.id }}</span>
+            <span class="order-status" [ngClass]="'status-' + order.status.toLowerCase()">
+              {{ order.status }}
+            </span>
+            <span class="order-payment">{{ formatPaymentMethod(order.paymentMethod) }}</span>
+            <span class="order-date">{{ order.createdAt | date:'mediumDate' }}</span>
+          </div>
+
+          <div class="order-items">
+            <div *ngFor="let item of order.items | slice:0:2; trackBy: trackByOrderItem" class="order-item">
+              {{ item.productName }} × {{ item.quantity }}
+              <span class="item-price">{{ item.totalPrice | currency:'EUR' }}</span>
+            </div>
+            <div *ngIf="order.items.length > 2" class="order-item more-items-row">
+              <span>+{{ order.items.length - 2 }} more items</span>
+              <span class="expand-hint">{{ isSelected(order) ? 'Hide details' : 'Show store details' }}</span>
+            </div>
+          </div>
+
+          <div class="order-footer">
+            <span class="delivery-address" *ngIf="order.deliveryAddress">
+              📍 {{ order.deliveryAddress }}
+            </span>
+            <span class="delivery-address">
+              💳 {{ formatPaymentMethod(order.paymentMethod) }} · {{ formatPaymentStatus(order.paymentStatus) }}
+            </span>
+            <div class="order-total">
+              Total: <strong>{{ order.total | currency:'EUR' }}</strong>
+            </div>
+          </div>
+        </button>
+
+        <nav class="orders-pagination" *ngIf="totalPages > 1">
+          <button type="button" class="pagination-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
+          <button
+            *ngFor="let page of visiblePages"
+            type="button"
+            class="pagination-btn"
+            [class.active]="page === currentPage"
+            (click)="goToPage(page)">
+            {{ page }}
+          </button>
+          <button type="button" class="pagination-btn" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
+        </nav>
+      </section>
+
+      <aside *ngIf="selectedOrder" class="order-detail-panel">
+        <div class="detail-panel-header">
+          <div>
+            <p class="detail-eyebrow">Order details</p>
+            <h2>#{{ selectedOrder.id }} · {{ selectedOrder.createdAt | date:'mediumDate' }}</h2>
+          </div>
+          <button type="button" class="detail-close-btn" (pointerdown)="closeOrderSelection(); $event.stopPropagation(); $event.preventDefault()">Close</button>
         </div>
-      </div>
+
+        <div class="detail-meta-grid">
+          <div class="detail-meta-card">
+            <span class="detail-meta-label">Status</span>
+            <strong>{{ selectedOrder.status }}</strong>
+          </div>
+          <div class="detail-meta-card">
+            <span class="detail-meta-label">Payment</span>
+            <strong>{{ formatPaymentMethod(selectedOrder.paymentMethod) }}</strong>
+            <small>{{ formatPaymentStatus(selectedOrder.paymentStatus) }}</small>
+          </div>
+          <div class="detail-meta-card">
+            <span class="detail-meta-label">Delivery</span>
+            <strong>{{ selectedOrder.deliveryAddress || 'No address' }}</strong>
+          </div>
+          <div class="detail-meta-card">
+            <span class="detail-meta-label">Total</span>
+            <strong>{{ selectedOrder.total | currency:'EUR' }}</strong>
+            <small>{{ selectedOrder.items.length }} items</small>
+          </div>
+        </div>
+
+        <section *ngFor="let group of selectedOrderStoreGroups; trackBy: trackByStoreName" class="store-group">
+          <div class="store-group-header">
+            <div>
+              <p class="store-label">Store</p>
+              <h3>{{ group.storeName }}</h3>
+            </div>
+            <strong>{{ itemSubtotal(group.items) | currency:'EUR' }}</strong>
+          </div>
+
+          <div class="store-item-list">
+            <div *ngFor="let item of group.items; trackBy: trackByOrderItem" class="store-item-row">
+              <div>
+                <strong>{{ item.productName }}</strong>
+                <small>{{ item.quantity }} × {{ item.unitPrice | currency:'EUR' }}</small>
+              </div>
+              <span>{{ item.totalPrice | currency:'EUR' }}</span>
+            </div>
+          </div>
+        </section>
+      </aside>
     </div>
   </div>
 </div>

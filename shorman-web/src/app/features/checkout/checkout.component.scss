@@ -1,5 +1,6 @@
+// Use the global gradient background for all main pages
 .checkout-page {
-  background: #F9FAFB;
+  background: var(--page-bg-accent);
   min-height: calc(100vh - 128px);
   padding: 2rem 0;
 }
@@ -46,7 +47,7 @@
 .step-num {
   width: 28px;
   height: 28px;
-  background: #2E7D32;
+  background: var(--color-primary);
   color: #fff;
   border-radius: 50%;
   display: flex;
@@ -78,12 +79,12 @@
 
 .address-option input[type="radio"] {
   margin-top: 4px;
-  accent-color: #2E7D32;
+  accent-color: var(--color-primary);
 }
 
 .address-option.selected {
-  border-color: #2E7D32;
-  background: #F0FDF4;
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary-soft) 78%, white);
 }
 
 .addr-content {
@@ -101,8 +102,8 @@
 }
 
 .default-tag {
-  background: #E8F5E9;
-  color: #2E7D32;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
   font-size: 0.72rem;
   padding: 0.1rem 0.5rem;
   border-radius: 20px;
@@ -120,7 +121,7 @@
 }
 
 .eligible {
-  color: #2E7D32;
+  color: var(--color-primary);
 }
 
 .ineligible {
@@ -135,11 +136,11 @@
   border-radius: 5px;
   font-size: 0.78rem;
   cursor: pointer;
-  color: #2E7D32;
+  color: var(--color-primary);
 }
 
 .btn-check-delivery:hover {
-  background: #E8F5E9;
+  background: var(--color-primary-soft);
 }
 
 .no-addresses {
@@ -154,8 +155,8 @@
 
 .btn-add-addr {
   background: none;
-  border: 1.5px dashed #2E7D32;
-  color: #2E7D32;
+  border: 1.5px dashed var(--color-primary);
+  color: var(--color-primary);
   padding: 0.5rem 1rem;
   border-radius: 8px;
   cursor: pointer;
@@ -165,7 +166,7 @@
 }
 
 .btn-add-addr:hover {
-  background: #E8F5E9;
+  background: var(--color-primary-soft);
 }
 
 .address-form-inline {
@@ -205,11 +206,11 @@
 
 .form-control:focus {
   outline: none;
-  border-color: #2E7D32;
+  border-color: var(--color-primary);
 }
 
 .btn-save-addr {
-  background: #2E7D32;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   padding: 0.6rem 1.5rem;
@@ -245,8 +246,8 @@
 }
 
 .payment-option.selected {
-  border-color: #2E7D32;
-  background: #F0FDF4;
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary-soft) 78%, white);
 }
 
 .pay-icon {
@@ -271,7 +272,7 @@
 }
 
 .pay-check {
-  color: #2E7D32;
+  color: var(--color-primary);
   font-weight: 800;
   font-size: 1.1rem;
 }
@@ -332,7 +333,7 @@
 }
 
 .summary-row.total strong {
-  color: #2E7D32;
+  color: var(--color-primary);
   font-size: 1.2rem;
 }
 
@@ -346,8 +347,8 @@
 }
 
 .success-msg {
-  background: #F0FDF4;
-  color: #2E7D32;
+  background: color-mix(in srgb, var(--color-primary-soft) 78%, white);
+  color: var(--color-primary-strong);
   padding: 0.75rem;
   border-radius: 8px;
   font-size: 0.88rem;

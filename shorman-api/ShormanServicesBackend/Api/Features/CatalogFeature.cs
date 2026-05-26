@@ -5,15 +5,22 @@ using ShormanServicesBackend.Api.Persistence;
 
 namespace ShormanServicesBackend.Api.Features;
 
-public record GetProductsQuery(string? Search, int? CategoryId, int? SupermarketId, int Page = 1, int PageSize = 30) : IRequest<PagedResultDto<ProductDto>>;
+public enum ProductSortOption
+{
+    Default = 0,
+    PriceLowToHigh = 1,
+    PriceHighToLow = 2
+}
+
+public record GetProductsQuery(string? Search, int? CategoryId, int? SupermarketId, IReadOnlyCollection<int>? SupermarketIds, ProductSortOption Sort = ProductSortOption.Default, int Page = 1, int PageSize = 30) : IRequest<PagedResultDto<ProductDto>>;
 public record GetProductByIdQuery(int Id) : IRequest<ProductDto?>;
 public record GetCategoriesQuery() : IRequest<IReadOnlyCollection<CategoryDto>>;
 public record GetSupermarketsQuery() : IRequest<IReadOnlyCollection<SupermarketDto>>;
-public record GetAdminProductsQuery(string? Search, int? CategoryId, int? SupermarketId, int Page = 1, int PageSize = 50) : IRequest<PagedResultDto<ProductDto>>;
+public record GetAdminProductsQuery(string? Search, int? CategoryId, int? SupermarketId, IReadOnlyCollection<int>? SupermarketIds, int Page = 1, int PageSize = 50) : IRequest<PagedResultDto<ProductDto>>;
 public record UpdateProductCommand(int Id, UpdateProductRequest Request) : IRequest<ProductDto?>;
 public record DeleteProductCommand(int Id) : IRequest<bool>;
 
-public class GetProductsQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetProductsQuery, PagedResultDto<ProductDto>>
+public class GetProductsQueryHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<GetProductsQuery, PagedResultDto<ProductDto>>
 {
     public async Task<PagedResultDto<ProductDto>> Handle(GetProductsQuery request, CancellationToken cancellationToken)
     {
@@ -46,27 +53,76 @@ public class GetProductsQueryHandler(ApiDbContext dbContext) : IRequestHandler<G
         {
             query = query.Where(x => x.SupermarketId == request.SupermarketId.Value);
         }
+        else if (request.SupermarketIds is { Count: > 0 })
+        {
+            query = query.Where(x => request.SupermarketIds.Contains(x.SupermarketId));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        var items = await query
-            .OrderBy(x => x.Name)
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+
+        var orderedQuery = request.Sort switch
+        {
+            ProductSortOption.PriceLowToHigh => query.OrderBy(x => x.Price).ThenBy(x => x.Name),
+            ProductSortOption.PriceHighToLow => query.OrderByDescending(x => x.Price).ThenBy(x => x.Name),
+            _ => query.OrderBy(x => x.Name)
+        };
+
+        var baseItems = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(product => new
+            {
+                product.Id,
+                product.Name,
+                product.Description,
+                BasePrice = product.Price,
+                product.ImageUrl,
+                product.CategoryId,
+                product.SupermarketId,
+                product.Unit,
+                product.Stock,
+                product.IsAvailable
+            })
+            .ToListAsync(cancellationToken);
+
+        var categoryIds = baseItems
+            .Select(product => product.CategoryId)
+            .Distinct()
+            .ToArray();
+        var supermarketIds = baseItems
+            .Select(product => product.SupermarketId)
+            .Distinct()
+            .ToArray();
+
+        var categories = await dbContext.Categories
+            .AsNoTracking()
+            .Where(category => categoryIds.Contains(category.Id))
+            .Select(category => new CategoryDto(category.Id, category.Name, category.Slug, category.Icon))
+            .ToDictionaryAsync(category => category.Id, cancellationToken);
+
+        var supermarkets = await dbContext.Supermarkets
+            .AsNoTracking()
+            .Where(supermarket => supermarketIds.Contains(supermarket.Id))
+            .Select(supermarket => new SupermarketDto(supermarket.Id, supermarket.Name, supermarket.Slug, supermarket.LogoUrl, supermarket.Color))
+            .ToDictionaryAsync(supermarket => supermarket.Id, cancellationToken);
+
+        var items = baseItems
             .Select(product => new ProductDto(
                 product.Id,
                 product.Name,
                 product.Description,
-                product.Price,
+                pricingPolicyProvider.ApplyProductPrice(product.BasePrice, activePolicy),
                 product.ImageUrl,
                 product.CategoryId,
-                new CategoryDto(product.Category.Id, product.Category.Name, product.Category.Slug, product.Category.Icon),
+                categories[product.CategoryId],
                 product.SupermarketId,
-                new SupermarketDto(product.Supermarket.Id, product.Supermarket.Name, product.Supermarket.Slug, product.Supermarket.LogoUrl, product.Supermarket.Color),
+                supermarkets[product.SupermarketId],
                 product.Unit,
                 product.Stock,
                 product.IsAvailable))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         return new PagedResultDto<ProductDto>(items, totalCount, page, pageSize);
     }
@@ -87,29 +143,50 @@ public class GetProductsQueryHandler(ApiDbContext dbContext) : IRequestHandler<G
             product.IsAvailable);
 }
 
-public class GetProductByIdQueryHandler(ApiDbContext dbContext) : IRequestHandler<GetProductByIdQuery, ProductDto?>
+public class GetProductByIdQueryHandler(ApiDbContext dbContext, IPricingPolicyProvider pricingPolicyProvider) : IRequestHandler<GetProductByIdQuery, ProductDto?>
 {
     public async Task<ProductDto?> Handle(GetProductByIdQuery request, CancellationToken cancellationToken)
     {
+        var activePolicy = await pricingPolicyProvider.GetActivePolicyAsync(cancellationToken);
+
         var product = await dbContext.Products
             .AsNoTracking()
             .Where(x => x.Id == request.Id)
-            .Select(item => new ProductDto(
+            .Select(item => new
+            {
                 item.Id,
                 item.Name,
                 item.Description,
-                item.Price,
+                BasePrice = item.Price,
                 item.ImageUrl,
                 item.CategoryId,
-                new CategoryDto(item.Category.Id, item.Category.Name, item.Category.Slug, item.Category.Icon),
+                Category = new CategoryDto(item.Category.Id, item.Category.Name, item.Category.Slug, item.Category.Icon),
                 item.SupermarketId,
-                new SupermarketDto(item.Supermarket.Id, item.Supermarket.Name, item.Supermarket.Slug, item.Supermarket.LogoUrl, item.Supermarket.Color),
+                Supermarket = new SupermarketDto(item.Supermarket.Id, item.Supermarket.Name, item.Supermarket.Slug, item.Supermarket.LogoUrl, item.Supermarket.Color),
                 item.Unit,
                 item.Stock,
-                item.IsAvailable))
+                item.IsAvailable
+            })
             .SingleOrDefaultAsync(cancellationToken);
 
-        return product;
+        if (product is null)
+        {
+            return null;
+        }
+
+        return new ProductDto(
+            product.Id,
+            product.Name,
+            product.Description,
+            pricingPolicyProvider.ApplyProductPrice(product.BasePrice, activePolicy),
+            product.ImageUrl,
+            product.CategoryId,
+            product.Category,
+            product.SupermarketId,
+            product.Supermarket,
+            product.Unit,
+            product.Stock,
+            product.IsAvailable);
     }
 }
 
@@ -143,6 +220,10 @@ public class GetAdminProductsQueryHandler(ApiDbContext dbContext) : IRequestHand
         if (request.SupermarketId.HasValue)
         {
             query = query.Where(x => x.SupermarketId == request.SupermarketId.Value);
+        }
+        else if (request.SupermarketIds is { Count: > 0 })
+        {
+            query = query.Where(x => request.SupermarketIds.Contains(x.SupermarketId));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);

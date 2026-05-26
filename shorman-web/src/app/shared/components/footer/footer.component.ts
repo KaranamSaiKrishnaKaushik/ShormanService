@@ -7,7 +7,7 @@ import { Component } from '@angular/core';
     <footer class="footer">
       <div class="footer-container">
         <div class="footer-brand">
-          <span class="brand-icon">🛒</span>
+          <span class="app-icon brand-icon">local_mall</span>
           <strong>Shorman Service</strong>
           <span class="footer-tagline">Fresh groceries, delivered fast.</span>
         </div>
@@ -19,7 +19,7 @@ import { Component } from '@angular/core';
   `,
   styles: [`
     .footer {
-      background: #1B5E20;
+      background: var(--color-primary-strong);
       color: #fff;
       margin-top: auto;
       padding: 1.5rem 0;
@@ -39,15 +39,20 @@ import { Component } from '@angular/core';
       align-items: center;
       gap: 0.5rem;
       font-size: 1rem;
+      font-family: var(--font-ui);
     }
-    .brand-icon { font-size: 1.3rem; }
+    .brand-icon {
+      font-size: 1.2rem;
+      color: #fff4d8;
+    }
     .footer-tagline {
-      color: #A5D6A7;
+      color: color-mix(in srgb, white 72%, var(--color-accent) 28%);
       font-size: 0.85rem;
     }
     .footer-links {
       font-size: 0.85rem;
-      color: #A5D6A7;
+      color: color-mix(in srgb, white 74%, var(--color-accent) 26%);
+      font-family: var(--font-ui);
     }
   `]
 })

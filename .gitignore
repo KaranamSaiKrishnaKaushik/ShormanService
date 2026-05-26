@@ -21,15 +21,17 @@ shorman-web/*.tsbuildinfo
 shorman-api/**/bin/
 shorman-api/**/obj/
 shorman-api/artifacts/
+shorman-api/**/.copilot-build-temp/
 
 # Local backend database files
 shorman-api/ShormanServicesBackend/*.db
 shorman-api/ShormanServicesBackend/*.db-shm
 shorman-api/ShormanServicesBackend/*.db-wal
-shorman-api/ShormanServicesBackend/appsettings.Local.json
-shorman-api/ShormanServicesBackend/appsettings.Development.Local.json
+shorman-api/**/appsettings.Local.json
+shorman-api/**/appsettings.Development.Local.json
 !shorman-api/ShormanServicesBackend/appsettings.Local.example.json
-!shorman-api/ShormanServicesBackend/appsettings.Development.Local.example.json
+!shorman-api/**/appsettings.Local.example.json
+!shorman-api/**/appsettings.Development.Local.example.json
 
 # Visual Studio / Rider user files
 *.user
@@ -85,3 +87,6 @@ Thumbs.db
 ### TypeScript cache
 ### ========================
 *.tsbuildinfo
+
+# Ignore compiled Python files
+web-scraper/web_scraper/__pycache__/

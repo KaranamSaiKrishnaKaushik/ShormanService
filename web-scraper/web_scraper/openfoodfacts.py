@@ -6,10 +6,9 @@ import logging
 import sys
 import time
 import urllib.request
+from dataclasses import dataclass
 
-EXPORT_URL = "https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz"
 DEFAULT_USER_AGENT = "ShormanApp-WebScraper/1.0 (Open Food Facts store export filter)"
-SUPPORTED_STORES = ("rewe", "aldi", "edeka", "penny", "lidl")
 REQUESTED_FIELDS = (
     "code",
     "url",
@@ -31,6 +30,36 @@ REQUESTED_FIELDS = (
     "image_small_url",
 )
 
+
+@dataclass(frozen=True)
+class ProductFactsSource:
+    slug: str
+    display_name: str
+    export_url: str
+    file_prefix: str
+    supported_stores: tuple[str, ...]
+
+
+SOURCES: dict[str, ProductFactsSource] = {
+    "food": ProductFactsSource(
+        slug="food",
+        display_name="Open Food Facts",
+        export_url="https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz",
+        file_prefix="openfoodfacts",
+        supported_stores=("rewe", "aldi", "edeka", "penny", "lidl"),
+    ),
+    "beauty": ProductFactsSource(
+        slug="beauty",
+        display_name="Open Beauty Facts",
+        export_url="https://static.openbeautyfacts.org/data/en.openbeautyfacts.org.products.csv.gz",
+        file_prefix="openbeautyfacts",
+        supported_stores=("dm", "rossmann"),
+    ),
+}
+
+DEFAULT_SOURCE = "food"
+SUPPORTED_STORES = tuple(dict.fromkeys(store for source in SOURCES.values() for store in source.supported_stores))
+
 log = logging.getLogger("web_scraper.openfoodfacts")
 
 
@@ -51,14 +80,16 @@ class OpenFoodFactsStoreClient:
     def fetch_store_products(
         self,
         store: str,
+        source: str = DEFAULT_SOURCE,
         max_matches: int | None = None,
         max_rows_scanned: int | None = None,
     ) -> list[dict]:
+        source_config = get_source(source)
         normalized_store = store.strip().lower()
-        if normalized_store not in SUPPORTED_STORES:
-            raise ValueError(f"Unsupported store: {store}")
+        if normalized_store not in source_config.supported_stores:
+            raise ValueError(f"Unsupported store '{store}' for source '{source_config.slug}'")
 
-        request = urllib.request.Request(EXPORT_URL, headers={"User-Agent": DEFAULT_USER_AGENT})
+        request = urllib.request.Request(source_config.export_url, headers={"User-Agent": DEFAULT_USER_AGENT})
         matches: list[dict] = []
         _set_max_csv_field_size()
 
@@ -76,9 +107,10 @@ class OpenFoodFactsStoreClient:
                     matches.append(self._select_fields(row))
                     if len(matches) % 100 == 0:
                         log.info(
-                            "Matched %d %s rows after scanning %d export rows",
+                            "Matched %d %s rows from %s after scanning %d export rows",
                             len(matches),
                             normalized_store.upper(),
+                            source_config.display_name,
                             row_index,
                         )
 
@@ -88,8 +120,24 @@ class OpenFoodFactsStoreClient:
                     if self.delay_seconds > 0:
                         time.sleep(self.delay_seconds)
 
-        log.info("Finished export scan with %d %s matches", len(matches), normalized_store.upper())
+        log.info("Finished %s export scan with %d %s matches", source_config.display_name, len(matches), normalized_store.upper())
         return matches
 
     def _select_fields(self, row: dict[str, str]) -> dict[str, str]:
         return {field: row.get(field, "") for field in REQUESTED_FIELDS}
+
+
+def get_source(source: str) -> ProductFactsSource:
+    normalized_source = source.strip().lower()
+    try:
+        return SOURCES[normalized_source]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported source: {source}") from exc
+
+
+def get_supported_stores(source: str) -> tuple[str, ...]:
+    return get_source(source).supported_stores
+
+
+def get_file_prefix(source: str) -> str:
+    return get_source(source).file_prefix
