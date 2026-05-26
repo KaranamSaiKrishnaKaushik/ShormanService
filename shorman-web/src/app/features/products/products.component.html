@@ -87,9 +87,8 @@
         type="button"
         class="sm-tab"
         [class.active]="activeSupermarket === tab.slug"
-        [style.background]="activeSupermarket === tab.slug ? tab.bgColor : '#fff'"
-        [style.color]="activeSupermarket === tab.slug ? tab.color : '#333'"
-        [style.border-color]="tab.bgColor"
+        [style.--store-border-color]="tab.bgColor"
+        [style.--store-text-color]="tab.color"
         (click)="setSupermarket(tab.slug)"
       >
         {{ tab.name }}

@@ -122,7 +122,7 @@
 }
 
 .btn-add-new {
-  background: #2E7D32;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   padding: 0.6rem 1.25rem;
@@ -134,7 +134,7 @@
 }
 
 .btn-add-new:hover {
-  background: #1B5E20;
+  background: var(--color-primary-strong);
 }
 
 .addr-list {
@@ -154,8 +154,8 @@
 }
 
 .addr-card.default {
-  border-color: #2E7D32;
-  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 .addr-card.editing {
@@ -197,8 +197,8 @@
 }
 
 .addr-radio input[type="radio"]:checked + label {
-  border-color: #2E7D32;
-  background: #2E7D32;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
 }
 
 .addr-radio input[type="radio"]:checked + label::after {
@@ -214,7 +214,7 @@
 }
 
 .addr-radio label:hover {
-  border-color: #2E7D32;
+  border-color: var(--color-primary);
 }
 
 .addr-content {
@@ -244,8 +244,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  background: #E8F5E9;
-  color: #2E7D32;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
   font-size: 0.75rem;
   padding: 0.25rem 0.65rem;
   border-radius: 20px;
@@ -318,7 +318,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
   margin-top: 1.5rem;
-  border: 2px solid #2E7D32;
+  border: 2px solid var(--color-primary);
 }
 
 .form-header {
@@ -408,8 +408,8 @@
 
 .form-control:focus {
   outline: none;
-  border-color: #2E7D32;
-  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
 }
 
 .form-control.invalid {
@@ -463,8 +463,8 @@
 }
 
 .checkbox-label input[type="checkbox"]:checked ~ .checkmark {
-  background: #2E7D32;
-  border-color: #2E7D32;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .checkbox-label input[type="checkbox"]:checked ~ .checkmark::after {
@@ -495,7 +495,7 @@
 }
 
 .btn-primary {
-  background: #2E7D32;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   padding: 0.75rem 1.75rem;
@@ -507,9 +507,9 @@
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #1B5E20;
+  background: var(--color-primary-strong);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .btn-primary:disabled {
