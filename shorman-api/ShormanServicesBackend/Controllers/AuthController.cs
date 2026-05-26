@@ -90,4 +90,24 @@ public class AuthController(IMediator mediator) : ControllerBase
             return BadRequest(new { message = exception.Message });
         }
     }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<ActionResult<UserDto>> UpdateProfile([FromBody] UpdateCurrentUserProfileRequest request, CancellationToken cancellationToken)
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdValue, out var userId))
+        {
+            return Unauthorized(new { message = "The current user could not be resolved." });
+        }
+
+        try
+        {
+            return Ok(await mediator.Send(new UpdateCurrentUserProfileCommand(userId, request), cancellationToken));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
 }

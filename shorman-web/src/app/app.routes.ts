@@ -13,7 +13,7 @@ export const routes: Routes = [
   { path: 'cart', loadComponent: () => import('./features/cart/cart-sidebar.component').then(m => m.CartSidebarComponent) },
   { path: 'checkout', loadComponent: () => import('./features/checkout/checkout.component').then(m => m.CheckoutComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Customer'], menuKey: 'checkout' } },
   { path: 'orders', loadComponent: () => import('./features/orders/orders.component').then(m => m.OrdersComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Customer', 'Rider'], menuKey: 'orders' } },
-  { path: 'history-stats', loadComponent: () => import('./features/history-stats/history-stats.component').then(m => m.HistoryStatsComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Customer'], menuKey: 'history-stats' } },
+  { path: 'history-stats', loadComponent: () => import('./features/history-stats/history-stats.component').then(m => m.HistoryStatsComponent) },
   { path: 'addresses', loadComponent: () => import('./features/addresses/addresses.component').then(m => m.AddressesComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Customer'], menuKey: 'addresses' } },
   { path: 'rider', loadComponent: () => import('./features/rider-dashboard/rider-dashboard.component').then(m => m.RiderDashboardComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Rider'], menuKey: 'rider-dashboard' } },
   { path: 'product-management', loadComponent: () => import('./features/product-management/product-management.component').then(m => m.ProductManagementComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin'], menuKey: 'product-management' } },

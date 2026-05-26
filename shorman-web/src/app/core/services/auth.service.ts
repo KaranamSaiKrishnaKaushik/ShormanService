@@ -11,6 +11,7 @@ import {
   LoginRequest,
   RegisterRequest,
   RegisterResponse,
+  UpdateCurrentUserProfileRequest,
   VerifyEmailRequest,
   PasswordResetRequest,
   PasswordResetConfirmRequest,
@@ -128,6 +129,64 @@ export class AuthService {
 
   clearAuthError(): void {
     this.authErrorSubject.next(null);
+  }
+
+  getPreferredUserName(user: Partial<User> | null | undefined = this.currentUser, fallback = 'Account'): string {
+    const displayName = user?.displayName?.trim();
+    if (displayName) {
+      return displayName;
+    }
+
+    const firstName = user?.firstName?.trim();
+    if (firstName) {
+      return firstName;
+    }
+
+    const email = user?.email?.trim();
+    return email || fallback;
+  }
+
+  updateProfile(req: UpdateCurrentUserProfileRequest): Observable<User> {
+    const currentUser = this.currentUser;
+    if (!currentUser) {
+      return throwError(() => new Error('You must be signed in to update your profile.'));
+    }
+
+    if (this.useMock) {
+      const mockUser = MOCK_USERS.find(user => user.id === currentUser.id);
+      if (!mockUser) {
+        return throwError(() => new Error('Mock user was not found.'));
+      }
+
+      if (req.displayName !== undefined) {
+        const displayName = req.displayName?.trim() ?? '';
+        mockUser.displayName = displayName.length > 0 ? displayName : null;
+      }
+
+      if (req.themePreference !== undefined) {
+        const themePreference = req.themePreference?.trim() ?? '';
+        mockUser.themePreference = themePreference.length > 0 ? themePreference : null;
+      }
+
+      const normalizedUser = this.normalizeUser(mockUser);
+      if (!normalizedUser) {
+        return throwError(() => new Error('Mock profile update returned an invalid user.'));
+      }
+
+      this.persistAuthenticatedUser(normalizedUser);
+      return of(normalizedUser).pipe(delay(250));
+    }
+
+    return this.http.put<User>(`${environment.apiUrl}/auth/profile`, req).pipe(
+      tap(user => {
+        const normalizedUser = this.normalizeUser(user);
+        if (!normalizedUser) {
+          throw new Error('Profile update returned an invalid user payload.');
+        }
+
+        this.persistAuthenticatedUser(normalizedUser);
+      })
+    );
   }
 
   private storeReturnUrl(returnUrl: string): void {
@@ -371,9 +430,13 @@ export class AuthService {
 
     this.authErrorSubject.next(null);
     localStorage.setItem(this.TOKEN_KEY, res.token);
-    localStorage.setItem(this.USER_KEY, JSON.stringify(normalizedUser));
+    this.persistAuthenticatedUser(normalizedUser);
     localStorage.setItem(this.LAST_LOGIN_EMAIL_KEY, normalizedUser.email);
-    this.currentUserSubject.next(normalizedUser);
+  }
+
+  private persistAuthenticatedUser(user: User): void {
+    localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+    this.currentUserSubject.next(user);
     this.isLoggedInSubject.next(true);
   }
 
@@ -583,6 +646,8 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName ?? '',
       lastName: user.lastName ?? '',
+      displayName: typeof user.displayName === 'string' ? user.displayName : null,
+      themePreference: typeof user.themePreference === 'string' ? user.themePreference : null,
       phone: user.phone,
       createdAt: user.createdAt,
       roles: Array.isArray(user.roles) ? user.roles.filter((role): role is AppRole => typeof role === 'string') : []

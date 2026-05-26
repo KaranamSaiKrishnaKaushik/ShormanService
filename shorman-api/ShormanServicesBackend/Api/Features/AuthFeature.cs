@@ -16,6 +16,7 @@ public record VerifyEmailCommand(VerifyEmailRequest Request) : IRequest<AuthResp
 public record RequestPasswordResetCommand(PasswordResetRequest Request) : IRequest<PasswordResetRequestResponse>;
 public record ConfirmPasswordResetCommand(PasswordResetConfirmRequest Request) : IRequest<object>;
 public record Auth0ExchangeCommand(string Email, string? FirstName, string? LastName) : IRequest<AuthResponse>;
+public record UpdateCurrentUserProfileCommand(int UserId, UpdateCurrentUserProfileRequest Request) : IRequest<UserDto>;
 
 public class LoginCommandHandler(ApiDbContext dbContext, JwtTokenService jwtTokenService) : IRequestHandler<LoginCommand, AuthResponse>
 {
@@ -52,14 +53,30 @@ public class LoginCommandHandler(ApiDbContext dbContext, JwtTokenService jwtToke
 
     internal static AuthResponse ToAuthResponse(ApiUser user, JwtTokenService jwtTokenService)
     {
+        var userDto = ToUserDto(user);
+
+        return new AuthResponse(
+            jwtTokenService.CreateToken(user),
+            userDto);
+    }
+
+    internal static UserDto ToUserDto(ApiUser user)
+    {
         var roles = user.UserRoles
             .Select(x => x.Role.Name)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return new AuthResponse(
-            jwtTokenService.CreateToken(user),
-            new UserDto(user.Id, user.Email, user.FirstName, user.LastName, user.Phone, user.CreatedAtUtc.ToString("O"), roles));
+        return new UserDto(
+            user.Id,
+            user.Email,
+            user.FirstName,
+            user.LastName,
+            user.DisplayName,
+            user.ThemePreference,
+            user.Phone,
+            user.CreatedAtUtc.ToString("O"),
+            roles);
     }
 }
 
@@ -268,9 +285,57 @@ public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService
     }
 }
 
+public class UpdateCurrentUserProfileCommandHandler(ApiDbContext dbContext) : IRequestHandler<UpdateCurrentUserProfileCommand, UserDto>
+{
+    public async Task<UserDto> Handle(UpdateCurrentUserProfileCommand request, CancellationToken cancellationToken)
+    {
+        var user = await AuthFeatureShared.LoadUserWithRolesAsync(dbContext, request.UserId, cancellationToken);
+
+        if (request.Request.DisplayName is not null)
+        {
+            var displayName = request.Request.DisplayName.Trim();
+            if (displayName.Length > 80)
+            {
+                throw new InvalidOperationException("Display name must be 80 characters or fewer.");
+            }
+
+            user.DisplayName = displayName.Length == 0 ? null : displayName;
+        }
+
+        if (request.Request.ThemePreference is not null)
+        {
+            var themePreference = request.Request.ThemePreference.Trim();
+            if (themePreference.Length == 0)
+            {
+                user.ThemePreference = null;
+            }
+            else if (AuthFeatureShared.IsSupportedTheme(themePreference))
+            {
+                user.ThemePreference = themePreference;
+            }
+            else
+            {
+                throw new InvalidOperationException("Theme preference is not supported.");
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return LoginCommandHandler.ToUserDto(user);
+    }
+}
+
 internal static class AuthFeatureShared
 {
+    private static readonly HashSet<string> SupportedThemes =
+    [
+        "fresh-market",
+        "terracotta",
+        "coastal"
+    ];
+
     public static string CreateOneTimeCode() => RandomNumberGenerator.GetInt32(100000, 1000000).ToString(CultureInfo.InvariantCulture);
+
+    public static bool IsSupportedTheme(string themePreference) => SupportedThemes.Contains(themePreference);
 
     public static HashSet<string> GetBootstrapSuperAdminEmails(IConfiguration configuration)
     {

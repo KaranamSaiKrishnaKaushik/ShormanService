@@ -5,17 +5,33 @@
       <h1>{{ 'history.title' | translate }}</h1>
       <p class="sub">{{ profileSubtitle() }}</p>
     </div>
-    <div class="range-pill" role="tablist" aria-label="History range">
-      <button
-        type="button"
-        *ngFor="let range of rangeOptions"
-        [class.on]="selectedRange === range.key"
-        (click)="selectRange(range.key)">
-        {{ range.labelKey | translate }}
-      </button>
+    <div class="page-actions">
+      <div class="mode-pill" role="tablist" aria-label="History data mode">
+        <button type="button" [class.on]="dataMode === 'template'" (click)="selectDataMode('template')">Template Data</button>
+        <button type="button" [class.on]="dataMode === 'mine'" (click)="selectDataMode('mine')">My History Data</button>
+      </div>
+      <div class="range-pill" role="tablist" aria-label="History range">
+        <button
+          type="button"
+          *ngFor="let range of rangeOptions"
+          [class.on]="selectedRange === range.key"
+          (click)="selectRange(range.key)">
+          {{ range.labelKey | translate }}
+        </button>
+      </div>
     </div>
   </header>
 
+  <ng-container *ngIf="loading; else historyContent">
+    <section class="loading-card" aria-live="polite" aria-busy="true">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <h2>Loading your history data</h2>
+      <p>Please wait while Shorman refreshes your stats, charts, and order trends.</p>
+    </section>
+  </ng-container>
+
+  <ng-template #historyContent>
+  <ng-container *ngIf="!showLoginRequiredState(); else loginRequiredState">
   <section class="kpis">
     <article class="kpi" [class.up]="spendDeltaPct() >= 0" [class.down]="spendDeltaPct() < 0">
       <p class="label">{{ 'history.kpi.totalSpend' | translate }}</p>
@@ -174,4 +190,18 @@
 
   <p *ngIf="loading" class="state-note">{{ 'history.state.loading' | translate }}</p>
   <p *ngIf="!loading && errorMsg" class="state-note warn">{{ errorMsg }}</p>
+  </ng-container>
+  </ng-template>
+
+  <ng-template #loginRequiredState>
+    <section class="login-required-card">
+      <p class="login-required-eyebrow">My History Data</p>
+      <h2>Please log in to view your data.</h2>
+      <p>Use your account to load your real orders, spend insights, and reorder trends.</p>
+      <div class="login-required-actions">
+        <a routerLink="/login" [queryParams]="{ returnUrl: '/history-stats' }" class="action-btn primary">Log in</a>
+        <a routerLink="/register" [queryParams]="{ returnUrl: '/history-stats' }" class="action-btn secondary">Create account</a>
+      </div>
+    </section>
+  </ng-template>
 </section>

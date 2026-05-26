@@ -1,5 +1,6 @@
 import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { Chart, ChartConfiguration, Plugin } from 'chart.js/auto';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
@@ -9,6 +10,7 @@ import { OrderInsightsService } from '../../core/services/order-insights.service
 import { LanguageService } from '../../core/services/language.service';
 
 type Segment = 'grocery' | 'drugstore';
+type HistoryDataMode = 'template' | 'mine';
 
 interface CategoryStat {
   name: string;
@@ -43,7 +45,7 @@ interface HistoryStatsProfile {
 @Component({
   selector: 'app-history-stats',
   standalone: true,
-  imports: [CommonModule, TranslatePipe],
+  imports: [CommonModule, RouterLink, TranslatePipe],
   templateUrl: './history-stats.component.html',
   styleUrl: './history-stats.component.scss'
 })
@@ -75,9 +77,10 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
     Rossmann: '#BE185D'
   };
 
+  dataMode: HistoryDataMode = 'template';
   selectedRange: InsightsRange = '1y';
   currentEmail = '';
-  currentName = 'Customer';
+  currentName = 'Guest';
   currentLanguage = 'en';
 
   loading = false;
@@ -142,12 +145,17 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentLanguage = this.languageService.getCurrentLanguage();
     this.userSub = this.auth.currentUser$.subscribe(user => {
       this.currentEmail = (user?.email ?? '').toLowerCase();
-      this.currentName = user?.firstName?.trim() || 'Customer';
+      this.currentName = this.auth.getPreferredUserName(user, 'Guest');
       this.loadInsights();
     });
 
     this.languageSub = this.languageService.currentLanguage$.subscribe(language => {
       this.currentLanguage = language;
+      if (this.dataMode === 'template') {
+        this.loadInsights();
+        return;
+      }
+
       this.months = this.lastMonths(12).slice(Math.max(0, 12 - this.months.length));
       this.cdr.detectChanges();
       this.renderCharts();
@@ -170,12 +178,33 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadInsights();
   }
 
+  selectDataMode(mode: HistoryDataMode): void {
+    if (this.dataMode === mode) {
+      return;
+    }
+
+    this.dataMode = mode;
+    this.loadInsights();
+  }
+
   profileSubtitle(): string {
+    if (this.dataMode === 'template') {
+      return `Showing seeded template data for ${this.translate.instant(`history.range.${this.selectedRange}`)}.`;
+    }
+
+    if (this.showLoginRequiredState()) {
+      return 'Log in to load your real orders, spend, and reorder trends.';
+    }
+
     return this.translate.instant('history.subtitle', {
       range: this.translate.instant(`history.range.${this.selectedRange}`),
       orders: this.totalOrders,
       spend: this.totalSpend.toFixed(2)
     });
+  }
+
+  showLoginRequiredState(): boolean {
+    return this.dataMode === 'mine' && !this.auth.isLoggedIn;
   }
 
   comparisonSuffix(): string {
@@ -241,12 +270,29 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private loadInsights(): void {
+    if (this.dataMode === 'template') {
+      this.loading = false;
+      this.errorMsg = '';
+      this.applyTemplateProfile();
+      this.cdr.detectChanges();
+      this.renderCharts();
+      return;
+    }
+
     if (!this.currentEmail) {
+      this.loading = false;
+      this.errorMsg = '';
+      this.clearInsights();
+      this.destroyCharts();
+      this.cdr.detectChanges();
       return;
     }
 
     this.loading = true;
     this.errorMsg = '';
+    this.clearInsights();
+    this.destroyCharts();
+    this.cdr.detectChanges();
 
     this.insightsService.getInsights(this.selectedRange).subscribe({
       next: insights => {
@@ -257,12 +303,39 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: () => {
         this.loading = false;
-        this.errorMsg = this.translate.instant('history.state.fallback');
-        this.applyMockProfile();
+        this.errorMsg = 'Your order insights could not be loaded right now.';
+        this.clearInsights();
+        this.destroyCharts();
         this.cdr.detectChanges();
-        this.renderCharts();
       }
     });
+  }
+
+  private clearInsights(): void {
+    this.months = [];
+    this.spendByStore = [];
+    this.categories = [];
+    this.reorderedProducts = [];
+    this.heatmapGroceries = [];
+    this.heatmapDrugstore = [];
+    this.groceryCategoryAxis = [];
+    this.drugstoreCategoryAxis = [];
+    this.monthlyByStore = {};
+
+    this.totalSpend = 0;
+    this.totalOrders = 0;
+    this.averageBasket = 0;
+    this.previousTotalSpend = 0;
+    this.previousTotalOrders = 0;
+    this.previousAverageBasket = 0;
+    this.favoriteStore = 'N/A';
+    this.favoriteStoreSpend = 0;
+    this.favoriteStoreShare = 0;
+    this.favoriteCategory = 'N/A';
+    this.favoriteCategorySpend = 0;
+    this.favoriteCategoryShare = 0;
+    this.groceryShare = 0;
+    this.drugstoreShare = 0;
   }
 
   private applyInsights(insights: OrderInsights): void {
@@ -505,8 +578,8 @@ export class HistoryStatsComponent implements OnInit, AfterViewInit, OnDestroy {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  private applyMockProfile(): void {
-    const profile = this.getProfiles()[this.currentEmail] ?? this.getProfiles()['demo@shorman.com'];
+  private applyTemplateProfile(): void {
+    const profile = this.getProfiles()['demo@shorman.com'];
     const monthSlice = this.selectedRange === '30d' ? 2 : this.selectedRange === '6m' ? 6 : 12;
     const allMonths = this.lastMonths(12);
     const startIndex = Math.max(0, allMonths.length - monthSlice);

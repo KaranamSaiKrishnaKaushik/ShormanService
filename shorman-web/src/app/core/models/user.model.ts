@@ -9,6 +9,8 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  displayName?: string | null;
+  themePreference?: string | null;
   phone?: string;
   createdAt?: string;
   roles: AppRole[];
@@ -24,6 +26,11 @@ export interface RegisterResponse {
   message: string;
   verificationRequired: boolean;
   verificationCode?: string | null;
+}
+
+export interface UpdateCurrentUserProfileRequest {
+  displayName?: string | null;
+  themePreference?: string | null;
 }
 
 export interface LoginRequest {

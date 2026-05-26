@@ -131,7 +131,6 @@
       <div class="results-header">
         <div class="results-copy">
           <h2 class="results-title">{{ modeHeading }}</h2>
-          <span class="results-count">{{ totalProducts }} {{ (totalProducts === 1 ? 'products.results.productSingular' : 'products.results.productPlural') | translate }} {{ 'products.results.found' | translate }}</span>
         </div>
         <div class="results-tools">
           <div class="sort-menu" *ngIf="activeMode === 'groceries'" (click)="$event.stopPropagation()">
@@ -159,9 +158,6 @@
               </button>
             </div>
           </div>
-          <span class="results-count" *ngIf="totalPages > 0">
-            {{ 'products.results.page' | translate }} <strong>{{ currentPage }}</strong> {{ 'products.results.of' | translate }} <strong>{{ totalPages }}</strong>
-          </span>
         </div>
       </div>
 
