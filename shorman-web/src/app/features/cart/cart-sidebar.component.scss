@@ -147,7 +147,7 @@ $navbar-height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--color-success, #2E7D32), var(--color-success-alt, #4CAF50));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
   color: #fff;
   font-weight: 800;
   font-size: 1.25rem;
@@ -176,7 +176,7 @@ $navbar-height: 64px;
 
 .item-price {
   font-size: 0.85rem;
-  color: #2E7D32;
+  color: var(--color-primary);
   font-weight: 700;
   margin-top: 0.2rem;
 }
@@ -270,7 +270,7 @@ $navbar-height: 64px;
 
 .subtotal strong {
   font-size: 1.25rem;
-  color: var(--color-success, #2E7D32);
+  color: var(--color-primary);
 }
 
 .delivery-note {
@@ -292,7 +292,7 @@ $navbar-height: 64px;
 
 .btn-checkout {
   width: 100%;
-  background: var(--color-success, #2E7D32);
+  background: var(--color-primary);
   color: #fff;
   border: none;
   padding: 0.85rem;
@@ -305,7 +305,7 @@ $navbar-height: 64px;
 }
 
 .btn-checkout:hover {
-  background: var(--color-success-hover, #1B5E20);
+  background: var(--color-primary-strong);
 }
 
 .btn-clear {

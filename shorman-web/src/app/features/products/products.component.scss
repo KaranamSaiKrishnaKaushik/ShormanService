@@ -343,10 +343,21 @@
   white-space: nowrap;
   transition: all 0.2s;
   letter-spacing: 0.5px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--store-border-color, var(--color-border-strong));
+}
+
+.sm-tab.active {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+  border-color: var(--color-primary);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
 .sm-tab:not(.active):hover {
-  background: #f5f5f5 !important;
+  background: var(--color-surface-alt) !important;
+  color: var(--store-text-color, var(--color-text));
 }
 
 /* ===== Layout ===== */
@@ -504,7 +515,7 @@
   cursor: pointer;
   transition: background 0.15s;
   font-size: 0.9rem;
-  color: #555;
+  color: var(--color-text-muted);
 }
 
 .category-item input[type="radio"] {
@@ -512,12 +523,12 @@
 }
 
 .category-item:hover {
-  background: #F3F4F6;
+  background: var(--color-surface-alt);
 }
 
 .category-item.active {
-  background: #E8F5E9;
-  color: #2E7D32;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
   font-weight: 600;
 }
 
