@@ -7,15 +7,18 @@ from pathlib import Path
 
 from .db_importer import ImportSummary, PromotionSummary, StoreStatus, get_store_statuses, import_store_json, promote_staged_products
 from .exporters import write_csv, write_json, write_jsonl
-from .openfoodfacts import OpenFoodFactsStoreClient, SUPPORTED_STORES
+from .openfoodfacts import DEFAULT_SOURCE, OpenFoodFactsStoreClient, SOURCES, SUPPORTED_STORES, get_file_prefix, get_source, get_supported_stores
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Open Food Facts store export filter")
     subparsers = parser.add_subparsers(dest="source", required=True)
+    source_choices = list(SOURCES)
+    store_choices = list(SUPPORTED_STORES)
 
     off_store = subparsers.add_parser("off-store", help="Filter store-linked rows from the Open Food Facts export")
-    off_store.add_argument("--store", choices=list(SUPPORTED_STORES), required=True)
+    off_store.add_argument("--catalog", choices=source_choices, default=DEFAULT_SOURCE)
+    off_store.add_argument("--store", choices=store_choices, required=True)
     off_store.add_argument("--max-matches", type=int)
     off_store.add_argument("--max-rows-scanned", type=int)
     off_store.add_argument("--delay", type=float, default=0.0)
@@ -24,7 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
     off_store.add_argument("--verbose", action="store_true")
 
     import_store = subparsers.add_parser("import-store-json", help="Import a store latest JSON file into database staging tables")
-    import_store.add_argument("--store", choices=list(SUPPORTED_STORES), required=True)
+    import_store.add_argument("--catalog", choices=source_choices, default=DEFAULT_SOURCE)
+    import_store.add_argument("--store", choices=store_choices, required=True)
     import_store.add_argument("--input-file")
     import_store.add_argument("--appsettings-path", default="../shorman-api/ShormanServicesBackend/appsettings.Development.Local.json")
     import_store.add_argument("--provider", choices=["sqlserver", "mysql"])
@@ -33,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     import_store.add_argument("--verbose", action="store_true")
 
     sync_all = subparsers.add_parser("sync-all-stores", help="Export and import all supported stores")
+    sync_all.add_argument("--catalog", choices=source_choices, default=DEFAULT_SOURCE)
     sync_all.add_argument("--max-matches", type=int)
     sync_all.add_argument("--max-rows-scanned", type=int)
     sync_all.add_argument("--delay", type=float, default=0.0)
@@ -44,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync_all.add_argument("--verbose", action="store_true")
 
     promote_store = subparsers.add_parser("promote-staged-products", help="Promote staged OFF rows into the app products table")
-    promote_store.add_argument("--store", choices=[*SUPPORTED_STORES, "all"], default="all")
+    promote_store.add_argument("--store", choices=[*store_choices, "all"], default="all")
     promote_store.add_argument("--appsettings-path", default="../shorman-api/ShormanServicesBackend/appsettings.Development.Local.json")
     promote_store.add_argument("--provider", choices=["sqlserver", "mysql"])
     promote_store.add_argument("--connection-string")
@@ -52,7 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
     promote_store.add_argument("--verbose", action="store_true")
 
     status_cmd = subparsers.add_parser("status", help="Show latest file and database status per store")
-    status_cmd.add_argument("--store", choices=[*SUPPORTED_STORES, "all"], default="all")
+    status_cmd.add_argument("--catalog", choices=source_choices, default=DEFAULT_SOURCE)
+    status_cmd.add_argument("--store", choices=[*store_choices, "all"], default="all")
     status_cmd.add_argument("--output-dir", default="data")
     status_cmd.add_argument("--appsettings-path", default="../shorman-api/ShormanServicesBackend/appsettings.Development.Local.json")
     status_cmd.add_argument("--provider", choices=["sqlserver", "mysql"])
@@ -71,7 +77,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if args.source == "off-store":
+        _validate_store_catalog(args.catalog, args.store, parser)
         records = _export_store(
+            catalog=args.catalog,
             store=args.store,
             output_dir=Path(args.output_dir),
             delay=args.delay,
@@ -79,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
             max_rows_scanned=args.max_rows_scanned,
             output_format=args.format,
         )
-        logging.info("Wrote %d Open Food Facts %s rows to %s", len(records), args.store.upper(), (Path(args.output_dir) / args.store).resolve())
+        logging.info("Wrote %d %s %s rows to %s", len(records), get_source(args.catalog).display_name, args.store.upper(), (Path(args.output_dir) / args.store).resolve())
         return 0
 
     if args.source == "import-store-json":
@@ -108,9 +116,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_import(args: argparse.Namespace) -> ImportSummary:
-    input_file = Path(args.input_file) if args.input_file else Path("data") / args.store / f"openfoodfacts_{args.store}_latest.json"
+    _validate_store_catalog(args.catalog, args.store)
+    file_prefix = get_file_prefix(args.catalog)
+    input_file = Path(args.input_file) if args.input_file else Path("data") / args.store / f"{file_prefix}_{args.store}_latest.json"
     appsettings_path = Path(args.appsettings_path)
     return import_store_json(
+        catalog=args.catalog,
         store=args.store,
         input_file=input_file,
         appsettings_path=appsettings_path,
@@ -121,9 +132,11 @@ def _run_import(args: argparse.Namespace) -> ImportSummary:
 
 
 def _run_sync_all(args: argparse.Namespace) -> tuple[list[ImportSummary], list[PromotionSummary]]:
+    source_config = get_source(args.catalog)
     import_summaries: list[ImportSummary] = []
-    for store in SUPPORTED_STORES:
+    for store in source_config.supported_stores:
         _export_store(
+            catalog=args.catalog,
             store=store,
             output_dir=Path(args.output_dir),
             delay=args.delay,
@@ -133,8 +146,9 @@ def _run_sync_all(args: argparse.Namespace) -> tuple[list[ImportSummary], list[P
         )
         import_summaries.append(
             import_store_json(
+                catalog=args.catalog,
                 store=store,
-                input_file=Path(args.output_dir) / store / f"openfoodfacts_{store}_latest.json",
+                input_file=Path(args.output_dir) / store / f"{source_config.file_prefix}_{store}_latest.json",
                 appsettings_path=Path(args.appsettings_path),
                 provider=args.provider,
                 connection_string=args.connection_string,
@@ -145,7 +159,7 @@ def _run_sync_all(args: argparse.Namespace) -> tuple[list[ImportSummary], list[P
     promotion_summaries: list[PromotionSummary] = []
     if args.promote_to_app:
         promotion_summaries = promote_staged_products(
-            stores=list(SUPPORTED_STORES),
+            stores=list(source_config.supported_stores),
             appsettings_path=Path(args.appsettings_path),
             provider=args.provider,
             connection_string=args.connection_string,
@@ -166,8 +180,9 @@ def _run_promote(args: argparse.Namespace) -> list[PromotionSummary]:
 
 
 def _run_status(args: argparse.Namespace) -> list[StoreStatus]:
-    stores = list(SUPPORTED_STORES) if args.store == "all" else [args.store]
+    stores = list(get_supported_stores(args.catalog)) if args.store == "all" else [args.store]
     return get_store_statuses(
+        catalog=args.catalog,
         stores=stores,
         output_dir=Path(args.output_dir),
         appsettings_path=Path(args.appsettings_path),
@@ -178,6 +193,7 @@ def _run_status(args: argparse.Namespace) -> list[StoreStatus]:
 
 def _export_store(
     *,
+    catalog: str,
     store: str,
     output_dir: Path,
     delay: float,
@@ -185,17 +201,19 @@ def _export_store(
     max_rows_scanned: int | None,
     output_format: str,
 ) -> list[dict]:
+    source_config = get_source(catalog)
     client = OpenFoodFactsStoreClient(delay_seconds=delay)
     records = client.fetch_store_products(
         store=store,
+        source=catalog,
         max_matches=max_matches,
         max_rows_scanned=max_rows_scanned,
     )
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     store_output_dir = output_dir / store
-    file_stub = f"openfoodfacts_{store}_{timestamp}"
-    latest_stub = f"openfoodfacts_{store}_latest"
+    file_stub = f"{source_config.file_prefix}_{store}_{timestamp}"
+    latest_stub = f"{source_config.file_prefix}_{store}_latest"
 
     if output_format in {"json", "all"}:
         write_json(store_output_dir / f"{file_stub}.json", records)
@@ -208,6 +226,17 @@ def _export_store(
         write_csv(store_output_dir / f"{latest_stub}.csv", records)
 
     return records
+
+
+def _validate_store_catalog(catalog: str, store: str, parser: argparse.ArgumentParser | None = None) -> None:
+    supported_stores = get_supported_stores(catalog)
+    if store in supported_stores:
+        return
+
+    message = f"Store '{store}' is not supported for catalog '{catalog}'. Supported stores: {', '.join(supported_stores)}"
+    if parser is not None:
+        parser.error(message)
+    raise ValueError(message)
 
 
 def _log_import_summary(summary: ImportSummary) -> None:

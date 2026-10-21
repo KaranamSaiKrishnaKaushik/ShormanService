@@ -39,6 +39,13 @@
   margin: 0;
 }
 
+.auth-copy {
+  color: #5F6B63;
+  font-size: 0.94rem;
+  line-height: 1.55;
+  margin: 0 0 1.5rem;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -123,6 +130,29 @@
   border: 1px solid #a5d6a7;
 }
 
+.verification-block {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #dfe8df;
+}
+
+.verification-block h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1a1a1a;
+}
+
+.code-preview {
+  background: #FFF8E6;
+  border: 1px solid #FFE0A3;
+  color: #8A5A00;
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
 .btn-primary {
   width: 100%;
   background: #2E7D32;
@@ -147,6 +177,58 @@
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #7c887f;
+  font-size: 0.85rem;
+  margin: 1.2rem 0;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  height: 1px;
+  background: #d9e2da;
+  flex: 1;
+}
+
+.btn-google {
+  width: 100%;
+  background: #fff;
+  border: 1.5px solid #C9D7C9;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  transition: all 0.2s;
+  color: #333;
+}
+
+.btn-google:hover:not(:disabled) {
+  background: #f8f8f8;
+  border-color: #2E7D32;
+}
+
+.google-mark {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.google-mark svg {
+  width: 100%;
+  height: 100%;
 }
 
 .btn-spinner {

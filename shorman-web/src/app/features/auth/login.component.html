@@ -5,43 +5,103 @@
     <div class="auth-shell">
       <section class="auth-card auth-card-main">
         <div class="auth-header">
-          <p class="eyebrow">Customer Login</p>
-          <h1>Sign in to your Shorman account</h1>
-          <p>Browse freely, keep your cart, and continue to checkout when you're ready.</p>
+          <p class="eyebrow">{{ showResetPanel ? 'Password Recovery' : 'Account Access' }}</p>
+          <h1>{{ showResetPanel ? 'Reset your password' : 'Sign in or create your Shorman account' }}</h1>
+          <p>{{ showResetPanel ? 'Request a code, then enter the code and your new password. In this local setup the code is shown in the app because email delivery is not configured yet.' : 'Use your email and password for local accounts, or continue with Google for a social sign-in.' }}</p>
         </div>
 
-        <div class="form-preview" aria-hidden="true">
-          <div class="preview-field">Email address</div>
-          <div class="preview-field">Password</div>
-          <a class="preview-link" routerLink="/products">Back to products</a>
-        </div>
+        <form *ngIf="!showResetPanel" [formGroup]="loginForm" (ngSubmit)="submit()" class="auth-form">
+          <div class="form-group">
+            <label for="loginEmail">Email</label>
+            <input id="loginEmail" type="email" class="form-control" formControlName="email" autocomplete="email" [class.is-invalid]="hasLoginError('email', 'required') || hasLoginError('email', 'email')">
+            <div class="invalid-feedback" *ngIf="hasLoginError('email', 'required')">Email is required.</div>
+            <div class="invalid-feedback" *ngIf="hasLoginError('email', 'email')">Enter a valid email address.</div>
+          </div>
 
-        <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <div class="input-wrapper">
+              <input id="loginPassword" [type]="showPassword ? 'text' : 'password'" class="form-control" formControlName="password" autocomplete="current-password" [class.is-invalid]="hasLoginError('password', 'required') || hasLoginError('password', 'minlength')">
+              <button type="button" class="toggle-pwd" (click)="showPassword = !showPassword">{{ showPassword ? 'Hide' : 'Show' }}</button>
+            </div>
+            <div class="invalid-feedback" *ngIf="hasLoginError('password', 'required')">Password is required.</div>
+            <div class="invalid-feedback" *ngIf="hasLoginError('password', 'minlength')">Password must be at least 6 characters.</div>
+          </div>
 
-        <button class="btn-primary" (click)="submit()" [disabled]="loading">
-          <span class="btn-spinner" *ngIf="loading"></span>
-          {{ loading ? 'Redirecting…' : 'Sign In' }}
-        </button>
-
-        <div class="signup-block">
-          <h2>Create a new Shorman account</h2>
-          <button class="btn-secondary" (click)="signup()" [disabled]="loading">
-            Create Account
+          <button type="button" class="text-link" (click)="toggleResetPanel()">
+            {{ showResetPanel ? 'Back to sign in' : 'Forgot password?' }}
           </button>
+
+          <a class="preview-link" routerLink="/products">Back to products</a>
+
+          <div class="error-msg" *ngIf="combinedErrorMsg">{{ combinedErrorMsg }}</div>
+          <div class="success-msg" *ngIf="successMsg">{{ successMsg }}</div>
+
+          <button class="btn-primary" type="submit" [disabled]="loading">
+            <span class="btn-spinner" *ngIf="loading"></span>
+            {{ loading ? 'Signing in…' : 'Sign In' }}
+          </button>
+        </form>
+
+        <div class="signup-block" *ngIf="!showResetPanel">
+          <h2>Create a new customer account</h2>
+          <p class="signup-copy">Create an email/password account first, then verify the email code before signing in.</p>
+          <a class="btn-secondary btn-link" [routerLink]="['/register']" [queryParams]="returnUrl ? { returnUrl: returnUrl } : null">
+            Create Account
+          </a>
         </div>
+
+        <section class="reset-panel" *ngIf="showResetPanel">
+          <form [formGroup]="resetForm" (ngSubmit)="confirmPasswordReset()" class="auth-form">
+            <div class="form-group">
+              <label for="resetEmail">Email</label>
+              <input id="resetEmail" type="email" class="form-control" formControlName="email" autocomplete="email" [class.is-invalid]="hasResetError('email', 'required') || hasResetError('email', 'email')">
+              <div class="invalid-feedback" *ngIf="hasResetError('email', 'required')">Email is required.</div>
+              <div class="invalid-feedback" *ngIf="hasResetError('email', 'email')">Enter a valid email address.</div>
+            </div>
+
+            <div class="inline-actions">
+              <button type="button" class="btn-secondary" (click)="requestPasswordReset()" [disabled]="resetLoading">
+                {{ resetLoading ? 'Requesting…' : 'Send Reset Code' }}
+              </button>
+            </div>
+
+            <div class="code-preview" *ngIf="resetCodePreview">Development reset code: <strong>{{ resetCodePreview }}</strong></div>
+
+            <div class="form-group">
+              <label for="resetCode">Reset Code</label>
+              <input id="resetCode" type="text" class="form-control" formControlName="code" autocomplete="one-time-code" [class.is-invalid]="hasResetError('code', 'required') || hasResetError('code', 'minlength')">
+              <div class="invalid-feedback" *ngIf="hasResetError('code', 'required')">Reset code is required.</div>
+            </div>
+
+            <div class="form-group">
+              <label for="newPassword">New Password</label>
+              <input id="newPassword" type="password" class="form-control" formControlName="newPassword" autocomplete="new-password" [class.is-invalid]="hasResetError('newPassword', 'required') || hasResetError('newPassword', 'minlength')">
+              <div class="invalid-feedback" *ngIf="hasResetError('newPassword', 'required')">New password is required.</div>
+              <div class="invalid-feedback" *ngIf="hasResetError('newPassword', 'minlength')">Password must be at least 6 characters.</div>
+            </div>
+
+            <div class="error-msg compact" *ngIf="resetErrorMsg">{{ resetErrorMsg }}</div>
+            <div class="success-msg compact" *ngIf="resetMsg">{{ resetMsg }}</div>
+
+            <button class="btn-primary" type="submit" [disabled]="resetLoading">
+              {{ resetLoading ? 'Updating…' : 'Update Password' }}
+            </button>
+          </form>
+        </section>
       </section>
 
       <section class="auth-card auth-card-alt">
         <div class="auth-alt-copy">
-          <h2>Sign in with another account</h2>
+          <h2>Google account access</h2>
           <p>
-            Continue with Google for now. We’ll keep the broader visual redesign and theme work for a later pass.
+            Use your Google account to sign in as a returning user or to create a new Shorman customer account automatically.
           </p>
         </div>
 
-        <div class="error-msg compact" *ngIf="errorMsg">{{ errorMsg }}</div>
+        <div class="error-msg compact" *ngIf="combinedErrorMsg">{{ combinedErrorMsg }}</div>
 
-        <button class="btn-google" (click)="loginWithGoogle()" [disabled]="loading">
+        <button type="button" class="btn-google" (click)="loginWithGoogle()" [disabled]="loading">
           <span class="google-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
               <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.8-6-6.2s2.7-6.2 6-6.2c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 2.5 14.7 1.6 12 1.6 6.9 1.6 2.8 6.1 2.8 11.5S6.9 21.4 12 21.4c6.2 0 9.3-4.4 9.3-9.6 0-.6-.1-1.1-.2-1.6H12z"/>

@@ -4,10 +4,22 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, delay, firstValueFrom, of, tap, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { AppRole, User, AuthResponse, LoginRequest, RegisterRequest } from '../models/user.model';
+import {
+  AppRole,
+  User,
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  RegisterResponse,
+  UpdateCurrentUserProfileRequest,
+  VerifyEmailRequest,
+  PasswordResetRequest,
+  PasswordResetConfirmRequest,
+  PasswordResetRequestResponse
+} from '../models/user.model';
 
 // Mock user database for development
-const MOCK_USERS: Array<User & { password: string }> = [
+const MOCK_USERS: Array<User & { password: string; isEmailVerified: boolean; passwordResetCode?: string | null }> = [
   {
     id: 1,
     email: 'demo@shorman.com',
@@ -15,6 +27,7 @@ const MOCK_USERS: Array<User & { password: string }> = [
     firstName: 'Super',
     lastName: 'Admin',
     phone: '+49 123 456789',
+    isEmailVerified: true,
     roles: ['SuperAdmin']
   },
   {
@@ -24,6 +37,7 @@ const MOCK_USERS: Array<User & { password: string }> = [
     firstName: 'Customer',
     lastName: 'User',
     phone: '+49 987 654321',
+    isEmailVerified: true,
     roles: ['Customer']
   },
   {
@@ -33,6 +47,7 @@ const MOCK_USERS: Array<User & { password: string }> = [
     firstName: 'Admin',
     lastName: 'User',
     phone: '+49 222 333444',
+    isEmailVerified: true,
     roles: ['Admin']
   },
   {
@@ -42,6 +57,7 @@ const MOCK_USERS: Array<User & { password: string }> = [
     firstName: 'Rider',
     lastName: 'User',
     phone: '+49 555 123456',
+    isEmailVerified: true,
     roles: ['Rider']
   }
 ];
@@ -63,6 +79,7 @@ export class AuthService {
   private readonly TOKEN_KEY = 'shorman_token';
   private readonly USER_KEY = 'shorman_user';
   private readonly RETURN_URL_KEY = 'shorman_return_url';
+  private readonly LAST_LOGIN_EMAIL_KEY = 'shorman_last_login_email';
 
   private currentUserSubject = new BehaviorSubject<User | null>(this.loadUser());
   currentUser$ = this.currentUserSubject.asObservable();
@@ -90,6 +107,10 @@ export class AuthService {
     return this.normalizeUser(JSON.parse(raw) as Partial<User>);
   }
 
+  private loadLastLoginEmail(): string | null {
+    return localStorage.getItem(this.LAST_LOGIN_EMAIL_KEY);
+  }
+
   getToken(): string | null {
     return localStorage.getItem(this.TOKEN_KEY);
   }
@@ -106,21 +127,85 @@ export class AuthService {
     return this.authErrorSubject.value;
   }
 
+  clearAuthError(): void {
+    this.authErrorSubject.next(null);
+  }
+
+  getPreferredUserName(user: Partial<User> | null | undefined = this.currentUser, fallback = 'Account'): string {
+    const displayName = user?.displayName?.trim();
+    if (displayName) {
+      return displayName;
+    }
+
+    const firstName = user?.firstName?.trim();
+    if (firstName) {
+      return firstName;
+    }
+
+    const email = user?.email?.trim();
+    return email || fallback;
+  }
+
+  updateProfile(req: UpdateCurrentUserProfileRequest): Observable<User> {
+    const currentUser = this.currentUser;
+    if (!currentUser) {
+      return throwError(() => new Error('You must be signed in to update your profile.'));
+    }
+
+    if (this.useMock) {
+      const mockUser = MOCK_USERS.find(user => user.id === currentUser.id);
+      if (!mockUser) {
+        return throwError(() => new Error('Mock user was not found.'));
+      }
+
+      if (req.displayName !== undefined) {
+        const displayName = req.displayName?.trim() ?? '';
+        mockUser.displayName = displayName.length > 0 ? displayName : null;
+      }
+
+      if (req.themePreference !== undefined) {
+        const themePreference = req.themePreference?.trim() ?? '';
+        mockUser.themePreference = themePreference.length > 0 ? themePreference : null;
+      }
+
+      const normalizedUser = this.normalizeUser(mockUser);
+      if (!normalizedUser) {
+        return throwError(() => new Error('Mock profile update returned an invalid user.'));
+      }
+
+      this.persistAuthenticatedUser(normalizedUser);
+      return of(normalizedUser).pipe(delay(250));
+    }
+
+    return this.http.put<User>(`${environment.apiUrl}/auth/profile`, req).pipe(
+      tap(user => {
+        const normalizedUser = this.normalizeUser(user);
+        if (!normalizedUser) {
+          throw new Error('Profile update returned an invalid user payload.');
+        }
+
+        this.persistAuthenticatedUser(normalizedUser);
+      })
+    );
+  }
+
   private storeReturnUrl(returnUrl: string): void {
     const normalizedUrl = returnUrl.startsWith('/') ? returnUrl : `/${returnUrl}`;
     sessionStorage.setItem(this.RETURN_URL_KEY, normalizedUrl);
   }
 
-  private consumeReturnUrl(fallback = '/products'): string {
+  private consumeReturnUrl(fallback?: string): string {
     const storedValue = sessionStorage.getItem(this.RETURN_URL_KEY);
     sessionStorage.removeItem(this.RETURN_URL_KEY);
-    return storedValue && storedValue.startsWith('/') ? storedValue : fallback;
+    return storedValue && storedValue.startsWith('/') ? storedValue : (fallback ?? this.getDefaultPostLoginRoute());
   }
 
-  async redirectAfterLogin(target = '/products'): Promise<void> {
-    const normalizedTarget = target.startsWith('/') ? target : `/${target}`;
+  async redirectAfterLogin(target?: string): Promise<void> {
+    const defaultTarget = this.getDefaultPostLoginRoute();
+    const requestedTarget = target && target.trim().length > 0 ? target : defaultTarget;
+    const normalizedTarget = requestedTarget.startsWith('/') ? requestedTarget : `/${requestedTarget}`;
     const resolvedTarget = normalizedTarget === '/login' || normalizedTarget === '/register'
-      ? '/products'
+      ? defaultTarget
       : normalizedTarget;
 
     const navigationAttempt = this.ngZone.run(() => this.router.navigateByUrl(resolvedTarget, { replaceUrl: true }));
@@ -159,43 +244,52 @@ export class AuthService {
     return false;
   }
 
-  async startLogin(returnUrl = '/products'): Promise<void> {
+  async startLogin(returnUrl?: string): Promise<void> {
     await this.startGoogleLogin(returnUrl);
   }
 
-  async startGoogleLogin(returnUrl = '/products'): Promise<void> {
+  async startGoogleLogin(returnUrl?: string): Promise<void> {
     this.authErrorSubject.next(null);
-    this.storeReturnUrl(returnUrl);
+    const resolvedReturnUrl = returnUrl && returnUrl.trim().length > 0
+      ? returnUrl
+      : this.getDefaultPostLoginRoute();
+    const lastLoginEmail = this.loadLastLoginEmail();
+
+    this.storeReturnUrl(resolvedReturnUrl);
 
     if (!this.auth0Enabled) {
-      await this.router.navigate(['/login'], { queryParams: { returnUrl } });
+      await this.router.navigate(['/login'], { queryParams: { returnUrl: resolvedReturnUrl } });
       return;
     }
 
     const client = await this.getAuth0Client();
     await client.loginWithRedirect({
-      appState: { target: returnUrl },
+      appState: { target: resolvedReturnUrl },
       authorizationParams: {
         audience: environment.auth0.audience,
         scope: 'openid profile email',
-        prompt: 'login',
-        connection: this.googleConnection
+        connection: this.googleConnection,
+        ...(lastLoginEmail ? { login_hint: lastLoginEmail } : {})
       }
     });
   }
 
-  async startSignup(returnUrl = '/products'): Promise<void> {
+  async startSignup(returnUrl?: string): Promise<void> {
     this.authErrorSubject.next(null);
-    this.storeReturnUrl(returnUrl);
+    const resolvedReturnUrl = returnUrl && returnUrl.trim().length > 0
+      ? returnUrl
+      : this.getDefaultPostLoginRoute();
+
+    this.storeReturnUrl(resolvedReturnUrl);
 
     if (!this.auth0Enabled) {
-      await this.router.navigate(['/register'], { queryParams: { returnUrl } });
+      await this.router.navigate(['/register'], { queryParams: { returnUrl: resolvedReturnUrl } });
       return;
     }
 
     const client = await this.getAuth0Client();
     await client.loginWithRedirect({
-      appState: { target: returnUrl },
+      appState: { target: resolvedReturnUrl },
       authorizationParams: {
         audience: environment.auth0.audience,
         scope: 'openid profile email',
@@ -213,8 +307,12 @@ export class AuthService {
         return throwError(() => new Error('Invalid email or password'));
       }
 
+      if (!user.isEmailVerified) {
+        return throwError(() => new Error('Email not verified. Verify your email before signing in.'));
+      }
+
       // Create mock auth response
-      const { password, ...userWithoutPassword } = user;
+      const { password, isEmailVerified, passwordResetCode, ...userWithoutPassword } = user;
       const mockResponse: AuthResponse = {
         token: `mock-token-${Date.now()}`,
         user: userWithoutPassword
@@ -231,7 +329,7 @@ export class AuthService {
     );
   }
 
-  register(req: RegisterRequest): Observable<AuthResponse> {
+  register(req: RegisterRequest): Observable<RegisterResponse> {
     if (this.useMock) {
       // Check if user already exists
       const existingUser = MOCK_USERS.find(u => u.email === req.email);
@@ -247,35 +345,98 @@ export class AuthService {
         firstName: req.firstName,
         lastName: req.lastName,
         phone: req.phone,
+        isEmailVerified: false,
+        passwordResetCode: null,
         roles: ['Customer'] as AppRole[]
       };
 
       MOCK_USERS.push(newUser);
 
-      // Create mock auth response
-      const { password, ...userWithoutPassword } = newUser;
-      const mockResponse: AuthResponse = {
-        token: `mock-token-${Date.now()}`,
-        user: userWithoutPassword
+      const mockResponse: RegisterResponse = {
+        email: req.email,
+        message: 'Account created. Verify your email using the code before signing in.',
+        verificationRequired: true,
+        verificationCode: '123456'
       };
 
       return of(mockResponse).pipe(
-        delay(500), // Simulate network delay
+        delay(500)
+      );
+    }
+
+    return this.http.post<RegisterResponse>(`${environment.apiUrl}/auth/register`, req);
+  }
+
+  verifyEmail(req: VerifyEmailRequest): Observable<AuthResponse> {
+    if (this.useMock) {
+      const user = MOCK_USERS.find(u => u.email === req.email);
+      if (!user || req.code.trim() !== '123456') {
+        return throwError(() => new Error('Verification code is invalid or expired.'));
+      }
+
+      user.isEmailVerified = true;
+      const { password, isEmailVerified, passwordResetCode, ...userWithoutPassword } = user;
+      return of({
+        token: `mock-token-${Date.now()}`,
+        user: userWithoutPassword
+      }).pipe(
+        delay(500),
         tap(res => this.handleAuth(res))
       );
     }
 
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/register`, req).pipe(
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/verify-email`, req).pipe(
       tap(res => this.handleAuth(res))
     );
   }
 
+  requestPasswordReset(req: PasswordResetRequest): Observable<PasswordResetRequestResponse> {
+    if (this.useMock) {
+      const user = MOCK_USERS.find(u => u.email === req.email);
+      if (user && user.isEmailVerified) {
+        user.passwordResetCode = '654321';
+      }
+
+      return of({
+        message: 'If an account exists for that email, a reset code has been issued.',
+        resetCode: user?.isEmailVerified ? user.passwordResetCode : null
+      }).pipe(delay(500));
+    }
+
+    return this.http.post<PasswordResetRequestResponse>(`${environment.apiUrl}/auth/password-reset/request`, req);
+  }
+
+  resetPassword(req: PasswordResetConfirmRequest): Observable<{ message: string }> {
+    if (this.useMock) {
+      const user = MOCK_USERS.find(u => u.email === req.email);
+      if (!user || user.passwordResetCode !== req.code.trim()) {
+        return throwError(() => new Error('Reset code is invalid or expired.'));
+      }
+
+      user.password = req.newPassword;
+      user.passwordResetCode = null;
+      return of({ message: 'Password reset successfully. You can now sign in with the new password.' }).pipe(delay(500));
+    }
+
+    return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/password-reset/confirm`, req);
+  }
+
   private handleAuth(res: AuthResponse): void {
     const normalizedUser = this.normalizeUser(res.user);
+
+    if (!normalizedUser) {
+      throw new Error('Authentication response did not include a valid user payload.');
+    }
+
     this.authErrorSubject.next(null);
     localStorage.setItem(this.TOKEN_KEY, res.token);
-    localStorage.setItem(this.USER_KEY, JSON.stringify(normalizedUser));
-    this.currentUserSubject.next(normalizedUser);
+    this.persistAuthenticatedUser(normalizedUser);
+    localStorage.setItem(this.LAST_LOGIN_EMAIL_KEY, normalizedUser.email);
+  }
+
+  private persistAuthenticatedUser(user: User): void {
+    localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+    this.currentUserSubject.next(user);
     this.isLoggedInSubject.next(true);
   }
 
@@ -331,10 +492,16 @@ export class AuthService {
         const target =
           typeof callbackResult.appState?.target === 'string' && callbackResult.appState.target.length > 0
             ? callbackResult.appState.target
-            : this.consumeReturnUrl('/products');
+            : this.consumeReturnUrl();
 
         await this.redirectAfterLogin(target);
         return;
+      }
+
+      try {
+        await client.checkSession();
+      } catch {
+        // Silent SSO depends on the browser's cookie policy and existing Auth0 session.
       }
 
       if (await client.isAuthenticated()) {
@@ -343,7 +510,7 @@ export class AuthService {
         }
 
         if (window.location.pathname === this.authCallbackPath) {
-          await this.redirectAfterLogin(this.consumeReturnUrl('/products'));
+          await this.redirectAfterLogin(this.consumeReturnUrl());
         }
       }
     } catch (error) {
@@ -408,6 +575,22 @@ export class AuthService {
     this.handleAuth(authResponse);
   }
 
+  private getDefaultPostLoginRoute(): string {
+    if (this.hasRole('SuperAdmin')) {
+      return '/user-management';
+    }
+
+    if (this.hasRole('Admin')) {
+      return '/product-management';
+    }
+
+    if (this.hasRole('Rider')) {
+      return '/rider';
+    }
+
+    return '/products';
+  }
+
   private async logoutFromAuth0(): Promise<void> {
     try {
       const client = await this.getAuth0Client();
@@ -463,6 +646,8 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName ?? '',
       lastName: user.lastName ?? '',
+      displayName: typeof user.displayName === 'string' ? user.displayName : null,
+      themePreference: typeof user.themePreference === 'string' ? user.themePreference : null,
       phone: user.phone,
       createdAt: user.createdAt,
       roles: Array.isArray(user.roles) ? user.roles.filter((role): role is AppRole => typeof role === 'string') : []

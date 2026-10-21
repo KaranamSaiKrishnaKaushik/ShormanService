@@ -3,19 +3,94 @@
     <div class="auth-header">
       <div class="auth-logo">🛒</div>
       <h1>Create Account</h1>
-      <p>Use Auth0 Universal Login to create or connect your account</p>
+      <p>Create a Shorman customer account with email, password, and optional phone number</p>
     </div>
 
     <p class="auth-copy">
-      This route now hands account creation off to Auth0. If you later enable an Auth0 database connection, this entry point will also support password reset without another frontend rewrite.
+      You can register directly here, or continue with Google if you prefer automatic account creation from your Google email.
     </p>
 
-    <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+    <form [formGroup]="registerForm" (ngSubmit)="submit()">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name</label>
+          <input id="firstName" type="text" class="form-control" formControlName="firstName" [class.is-invalid]="hasError('firstName', 'required')" />
+          <div class="invalid-feedback" *ngIf="hasError('firstName', 'required')">First name is required.</div>
+        </div>
 
-    <button type="button" class="btn-primary" [disabled]="loading" (click)="submit()">
-      <span *ngIf="loading" class="btn-spinner"></span>
-      {{ loading ? 'Redirecting…' : 'Continue to Auth0 Sign-up' }}
+        <div class="form-group">
+          <label for="lastName">Last Name</label>
+          <input id="lastName" type="text" class="form-control" formControlName="lastName" [class.is-invalid]="hasError('lastName', 'required')" />
+          <div class="invalid-feedback" *ngIf="hasError('lastName', 'required')">Last name is required.</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input id="email" type="email" class="form-control" formControlName="email" [class.is-invalid]="hasError('email', 'required') || hasError('email', 'email')" />
+        <div class="invalid-feedback" *ngIf="hasError('email', 'required')">Email is required.</div>
+        <div class="invalid-feedback" *ngIf="hasError('email', 'email')">Enter a valid email address.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="phone">Phone Number</label>
+        <input id="phone" type="tel" class="form-control" formControlName="phone" placeholder="Optional" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-wrapper">
+          <input id="password" [type]="showPassword ? 'text' : 'password'" class="form-control" formControlName="password" [class.is-invalid]="hasError('password', 'required') || hasError('password', 'minlength')" />
+          <button type="button" class="toggle-pwd" (click)="showPassword = !showPassword">{{ showPassword ? '🙈' : '👁️' }}</button>
+        </div>
+        <div class="invalid-feedback" *ngIf="hasError('password', 'required')">Password is required.</div>
+        <div class="invalid-feedback" *ngIf="hasError('password', 'minlength')">Password must be at least 6 characters.</div>
+      </div>
+
+      <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+      <div class="success-msg" *ngIf="successMsg">{{ successMsg }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading">
+        <span *ngIf="loading" class="btn-spinner"></span>
+        {{ loading ? 'Creating Account…' : 'Create Account' }}
+      </button>
+    </form>
+
+    <section class="verification-block" *ngIf="verificationPending">
+      <h2>Verify your email</h2>
+      <p class="auth-copy">Enter the 6-digit code to activate your account and continue. In this local setup the code is shown below because email delivery is not configured yet.</p>
+      <div class="code-preview" *ngIf="verificationCodePreview">Development verification code: <strong>{{ verificationCodePreview }}</strong></div>
+
+      <form [formGroup]="verificationForm" (ngSubmit)="verifyEmail()">
+        <div class="form-group">
+          <label for="verificationCode">Verification Code</label>
+          <input id="verificationCode" type="text" class="form-control" formControlName="code" [class.is-invalid]="hasVerificationError('required') || hasVerificationError('minlength')" />
+          <div class="invalid-feedback" *ngIf="hasVerificationError('required')">Verification code is required.</div>
+          <div class="invalid-feedback" *ngIf="hasVerificationError('minlength')">Enter the 6-digit code.</div>
+        </div>
+
+        <button type="submit" class="btn-primary" [disabled]="loading">
+          <span *ngIf="loading" class="btn-spinner"></span>
+          {{ loading ? 'Verifying…' : 'Verify Email' }}
+        </button>
+      </form>
+    </section>
+
+    <div class="divider"><span>or</span></div>
+
+    <button type="button" class="btn-google" [disabled]="loading" (click)="continueWithGoogle()">
+      <span class="google-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.8-6-6.2s2.7-6.2 6-6.2c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 2.5 14.7 1.6 12 1.6 6.9 1.6 2.8 6.1 2.8 11.5S6.9 21.4 12 21.4c6.2 0 9.3-4.4 9.3-9.6 0-.6-.1-1.1-.2-1.6H12z"/>
+          <path fill="#4285F4" d="M21.1 11.8c0-.6-.1-1.1-.2-1.6H12v3.9h5.5c-.3 1.4-1.1 2.6-2.3 3.4l3.5 2.7c2-1.9 3.4-4.8 3.4-8.4z"/>
+          <path fill="#FBBC05" d="M6 13.3c-.2-.6-.4-1.2-.4-1.8s.1-1.3.4-1.8L2.4 7C1.5 8.7 1 10 1 11.5s.5 2.8 1.4 4.5L6 13.3z"/>
+          <path fill="#34A853" d="M12 21.4c2.7 0 5-.9 6.7-2.5l-3.5-2.7c-.9.7-2.1 1.2-3.2 1.2-2.6 0-4.8-1.8-5.6-4.2l-3.6 2.8c1.6 3.2 4.9 5.4 9.2 5.4z"/>
+        </svg>
+      </span>
+      {{ loading ? 'Redirecting…' : 'Continue with Google Instead' }}
     </button>
+
+    <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
 
     <div class="auth-footer">
       Already have an account? <a routerLink="/login">Sign in</a>

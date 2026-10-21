@@ -35,6 +35,8 @@ export interface ProductPage {
   pageSize: number;
 }
 
+export type ProductSortOption = 'default' | 'priceLowToHigh' | 'priceHighToLow';
+
 export interface UpdateProductRequest {
   name: string;
   description?: string;
@@ -51,6 +53,8 @@ export interface ProductFilters {
   search?: string;
   categoryId?: number;
   supermarketId?: number;
+  supermarketIds?: number[];
+  sort?: ProductSortOption;
   supermarketSlug?: string;
   categorySlug?: string;
   page?: number;

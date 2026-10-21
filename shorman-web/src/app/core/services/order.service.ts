@@ -1,16 +1,17 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, of, delay, throwError, map } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable, of, delay, throwError, map, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Order, CreateOrderRequest } from '../models/order.model';
+import { Order, CreateOrderRequest, CheckoutSessionResponse, GetOrdersParams, PagedResult } from '../models/order.model';
 
 // Mock data for development
 let MOCK_ORDERS: Order[] = [
   {
     id: 1,
     userId: 1,
-    status: 'DELIVERED',
-    paymentMethod: 'PAYPAL',
+    status: 'COMPLETED',
+    paymentMethod: 'STRIPE_CARD',
+    paymentStatus: 'PAID',
     addressId: 1,
     deliveryAddress: 'Hauptstraße 123, 10115 Berlin, Germany',
     items: [
@@ -36,14 +37,22 @@ let MOCK_ORDERS: Order[] = [
     subtotal: 5.27,
     deliveryFee: 3.99,
     total: 9.26,
+    assignedRiderId: 4,
+    assignedRiderName: 'Rider User',
     createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-    updatedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
+    updatedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+    acceptedAt: new Date(Date.now() - 6.8 * 24 * 60 * 60 * 1000).toISOString(),
+    pickedUpAt: new Date(Date.now() - 6.7 * 24 * 60 * 60 * 1000).toISOString(),
+    outForDeliveryAt: new Date(Date.now() - 6.6 * 24 * 60 * 60 * 1000).toISOString(),
+    deliveredAt: new Date(Date.now() - 6.5 * 24 * 60 * 60 * 1000).toISOString(),
+    completedAt: new Date(Date.now() - 6.4 * 24 * 60 * 60 * 1000).toISOString()
   },
   {
     id: 2,
     userId: 1,
-    status: 'PROCESSING',
-    paymentMethod: 'BANK_TRANSFER',
+    status: 'AWAITING_PICKUP',
+    paymentMethod: 'CASH_ON_DELIVERY',
+    paymentStatus: 'CASH_PENDING',
     addressId: 1,
     deliveryAddress: 'Hauptstraße 123, 10115 Berlin, Germany',
     items: [
@@ -69,7 +78,7 @@ let MOCK_ORDERS: Order[] = [
     subtotal: 5.98,
     deliveryFee: 3.99,
     total: 9.97,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
   }
 ];
@@ -81,6 +90,23 @@ export class OrderService {
   private http = inject(HttpClient);
   private useMock = environment.useMockOrders;
 
+  createCheckoutSession(req: CreateOrderRequest): Observable<CheckoutSessionResponse> {
+    if (this.useMock) {
+      const orderId = nextOrderId++;
+      return of({
+        orderId,
+        paymentMethod: req.paymentMethod,
+        paymentStatus: 'PENDING' as const,
+        checkoutUrl: `${window.location.origin}/checkout?payment=success&orderId=${orderId}&session_id=mock_session`,
+        sessionId: 'mock_session'
+      }).pipe(delay(300));
+    }
+
+    return this.http.post<CheckoutSessionResponse>(`${environment.apiUrl}/orders/checkout-session`, req).pipe(
+      timeout(15000)
+    );
+  }
+
   createOrder(req: CreateOrderRequest): Observable<Order> {
     if (this.useMock) {
       // In a real app, you'd fetch product details from ProductService
@@ -88,8 +114,9 @@ export class OrderService {
       const newOrder: Order = {
         id: nextOrderId++,
         userId: 1,
-        status: 'PENDING',
+        status: 'AWAITING_PICKUP',
         paymentMethod: req.paymentMethod,
+        paymentStatus: req.paymentMethod === 'CASH_ON_DELIVERY' ? 'CASH_PENDING' : 'PAID',
         addressId: req.addressId,
         deliveryAddress: 'Mock Address',
         items: req.items.map((item, index) => ({
@@ -108,17 +135,86 @@ export class OrderService {
       MOCK_ORDERS.push(newOrder);
       return of(newOrder).pipe(delay(500));
     }
-    return this.http.post<Order>(`${environment.apiUrl}/orders`, req);
+    return this.http.post<Order>(`${environment.apiUrl}/orders`, req).pipe(
+      timeout(15000)
+    );
   }
 
-  getOrders(): Observable<Order[]> {
+  cancelPendingPayment(orderId: number): Observable<Order> {
+    if (this.useMock) {
+      return this.applyMockTransition(orderId, order => ({
+        ...order,
+        status: 'CANCELLED',
+        paymentStatus: 'FAILED',
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    return this.http.post<Order>(`${environment.apiUrl}/orders/${orderId}/payment-cancelled`, {});
+  }
+
+  confirmStripePayment(orderId: number, sessionId: string): Observable<void> {
+    if (this.useMock) {
+      return of(void 0).pipe(delay(150));
+    }
+
+    return this.http.post<void>(
+      `${environment.apiUrl}/payments/stripe/checkout/${orderId}/confirm`,
+      {},
+      { params: { sessionId } }
+    );
+  }
+
+  getOrders(params?: GetOrdersParams): Observable<PagedResult<Order>> {
     console.log('OrderService.getOrders called, useMock:', this.useMock);
     if (this.useMock) {
-      console.log('Returning mock orders:', MOCK_ORDERS);
-      return of([...MOCK_ORDERS]).pipe(delay(300));
+      const page = Math.max(1, params?.page ?? 1);
+      const pageSize = Math.max(1, params?.pageSize ?? 20);
+      const search = params?.search?.trim().toLowerCase() ?? '';
+      const sort = params?.sort ?? 'desc';
+
+      const filteredOrders = [...MOCK_ORDERS]
+        .filter(order => {
+          if (!search) {
+            return true;
+          }
+
+          const matchesId = order.id.toString() === search;
+          const matchesItem = order.items.some(item => item.productName.toLowerCase().includes(search));
+          return matchesId || matchesItem;
+        })
+        .sort((left, right) => {
+          const leftTime = new Date(left.createdAt).getTime();
+          const rightTime = new Date(right.createdAt).getTime();
+          return sort === 'asc' ? leftTime - rightTime : rightTime - leftTime;
+        });
+
+      const start = (page - 1) * pageSize;
+
+      return of({
+        items: filteredOrders.slice(start, start + pageSize),
+        totalCount: filteredOrders.length,
+        page,
+        pageSize
+      }).pipe(delay(300));
     }
-    return this.http.get<unknown>(`${environment.apiUrl}/orders`).pipe(
-      map((response) => this.toOrderArray(response))
+
+    let httpParams = new HttpParams()
+      .set('page', String(params?.page ?? 1))
+      .set('pageSize', String(params?.pageSize ?? 20))
+      .set('sort', params?.sort ?? 'desc');
+
+    if (params?.search?.trim()) {
+      httpParams = httpParams.set('search', params.search.trim());
+    }
+
+    return this.http.get<PagedResult<Order>>(`${environment.apiUrl}/orders`, { params: httpParams }).pipe(
+      map(response => ({
+        items: this.toOrderArray(response.items),
+        totalCount: Number(response.totalCount ?? 0),
+        page: Number(response.page ?? params?.page ?? 1),
+        pageSize: Number(response.pageSize ?? params?.pageSize ?? 20)
+      }))
     );
   }
 
@@ -131,6 +227,102 @@ export class OrderService {
       return of({ ...order }).pipe(delay(300));
     }
     return this.http.get<Order>(`${environment.apiUrl}/orders/${id}`);
+  }
+
+  getAvailableRiderOrders(): Observable<Order[]> {
+    if (this.useMock) {
+      return of(MOCK_ORDERS.filter(order => order.status === 'AWAITING_PICKUP')).pipe(delay(200));
+    }
+
+    return this.http.get<Order[]>(`${environment.apiUrl}/rider/orders/available`);
+  }
+
+  getMyRiderOrders(): Observable<Order[]> {
+    if (this.useMock) {
+      return of(MOCK_ORDERS.filter(order => order.assignedRiderId === 4 && order.status !== 'CANCELLED')).pipe(delay(200));
+    }
+
+    return this.http.get<Order[]>(`${environment.apiUrl}/rider/orders/mine`);
+  }
+
+  acceptRiderOrder(orderId: number): Observable<Order> {
+    if (this.useMock) {
+      return this.applyMockTransition(orderId, order => ({
+        ...order,
+        status: 'ASSIGNED_TO_RIDER',
+        assignedRiderId: 4,
+        assignedRiderName: 'Rider User',
+        acceptedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    return this.http.post<Order>(`${environment.apiUrl}/rider/orders/${orderId}/accept`, {});
+  }
+
+  markRiderOrderPickedUp(orderId: number): Observable<Order> {
+    if (this.useMock) {
+      return this.applyMockTransition(orderId, order => ({
+        ...order,
+        status: 'PICKED_UP',
+        pickedUpAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    return this.http.post<Order>(`${environment.apiUrl}/rider/orders/${orderId}/picked-up`, {});
+  }
+
+  markRiderOrderOutForDelivery(orderId: number): Observable<Order> {
+    if (this.useMock) {
+      return this.applyMockTransition(orderId, order => ({
+        ...order,
+        status: 'OUT_FOR_DELIVERY',
+        outForDeliveryAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    return this.http.post<Order>(`${environment.apiUrl}/rider/orders/${orderId}/out-for-delivery`, {});
+  }
+
+  markRiderOrderDelivered(orderId: number): Observable<Order> {
+    if (this.useMock) {
+      return this.applyMockTransition(orderId, order => ({
+        ...order,
+        status: 'DELIVERED',
+        deliveredAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    return this.http.post<Order>(`${environment.apiUrl}/rider/orders/${orderId}/delivered`, {});
+  }
+
+  markRiderOrderCashCollected(orderId: number): Observable<Order> {
+    if (this.useMock) {
+      return this.applyMockTransition(orderId, order => ({
+        ...order,
+        paymentStatus: 'CASH_COLLECTED',
+        cashCollectedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    return this.http.post<Order>(`${environment.apiUrl}/rider/orders/${orderId}/cash-collected`, {});
+  }
+
+  completeRiderOrder(orderId: number): Observable<Order> {
+    if (this.useMock) {
+      return this.applyMockTransition(orderId, order => ({
+        ...order,
+        status: 'COMPLETED',
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    return this.http.post<Order>(`${environment.apiUrl}/rider/orders/${orderId}/complete`, {});
   }
 
   private toOrderArray(response: unknown): Order[] {
@@ -147,5 +339,16 @@ export class OrderService {
     }
 
     return [];
+  }
+
+  private applyMockTransition(orderId: number, update: (order: Order) => Order): Observable<Order> {
+    const existing = MOCK_ORDERS.find(order => order.id === orderId);
+    if (!existing) {
+      return throwError(() => new Error('Order not found'));
+    }
+
+    const updated = update(existing);
+    MOCK_ORDERS = MOCK_ORDERS.map(order => order.id === orderId ? updated : order);
+    return of(updated).pipe(delay(200));
   }
 }
