@@ -278,7 +278,7 @@ public sealed class ProductManagementImportService(ApiDbContext dbContext, IOpti
             run.StoreSlug = storeSlugs[0];
             run.TotalRows = rows.Count;
 
-            var categories = await dbContext.Categories.AsNoTracking().ToDictionaryAsync(x => x.Slug, StringComparer.OrdinalIgnoreCase, cancellationToken);
+            var categories = await dbContext.Categories.ToDictionaryAsync(x => x.Slug, StringComparer.OrdinalIgnoreCase, cancellationToken);
             var supermarkets = await dbContext.Supermarkets.AsNoTracking().ToDictionaryAsync(x => x.Slug, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
             if (!supermarkets.TryGetValue(run.StoreSlug, out var supermarket))
@@ -286,10 +286,29 @@ public sealed class ProductManagementImportService(ApiDbContext dbContext, IOpti
                 throw new InvalidOperationException($"Unknown store_slug '{run.StoreSlug}'. Add the supermarket first.");
             }
 
-            var missingCategory = rows.Select(x => x.CategorySlug).Distinct(StringComparer.OrdinalIgnoreCase).FirstOrDefault(slug => !categories.ContainsKey(slug));
-            if (missingCategory != null)
+            var missingCategorySlugs = rows
+                .Select(x => x.CategorySlug)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(slug => !categories.ContainsKey(slug))
+                .ToArray();
+
+            if (missingCategorySlugs.Length > 0)
             {
-                throw new InvalidOperationException($"Unknown category_slug '{missingCategory}'.");
+                var missingCategories = missingCategorySlugs
+                    .Select(slug => new ApiCategory
+                    {
+                        Slug = slug,
+                        Name = BuildCategoryNameFromSlug(slug)
+                    })
+                    .ToArray();
+
+                dbContext.Categories.AddRange(missingCategories);
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                foreach (var category in missingCategories)
+                {
+                    categories[category.Slug] = category;
+                }
             }
 
             var existingProducts = (await dbContext.Products
@@ -436,6 +455,18 @@ public sealed class ProductManagementImportService(ApiDbContext dbContext, IOpti
             ChangedByUserId = userId,
             ImportRunId = runId
         };
+
+    private static string BuildCategoryNameFromSlug(string slug)
+    {
+        var tokens = slug
+            .Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(token => token.Length == 0
+                ? token
+                : char.ToUpperInvariant(token[0]) + token[1..]);
+
+        var displayName = string.Join(' ', tokens);
+        return string.IsNullOrWhiteSpace(displayName) ? slug : displayName;
+    }
 
     private async Task<List<ProductImportRow>> ParseWorkbookAsync(string filePath, CancellationToken cancellationToken)
     {
