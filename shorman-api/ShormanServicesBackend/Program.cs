@@ -1,4 +1,4 @@
-using Azure.Identity;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using ShormanServicesBackend.Api;
@@ -15,7 +15,7 @@ var keyVaultUri = builder.Configuration["KeyVault:VaultUri"]
 
 if (!string.IsNullOrWhiteSpace(keyVaultUri))
 {
-    builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), new DefaultAzureCredential());
+    ConfigureKeyVault(builder.Configuration, keyVaultUri);
 }
 
 var dbProvider = builder.Configuration["Database:Provider"];
@@ -44,6 +44,13 @@ builder.Services.AddCors(options =>
     });
 });
 
+var otel = builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t.AddSource("MySqlConnector"));
+
+if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+{
+    otel.UseAzureMonitor();   // only in Azure, where the env var is set
+}
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(options =>
@@ -133,4 +140,40 @@ static bool IsAllowedOrigin(string origin, IReadOnlyCollection<string> allowedOr
     }
 
     return uri.Host.EndsWith(".azurestaticapps.net", StringComparison.OrdinalIgnoreCase);
+}
+
+static void ConfigureKeyVault(IConfigurationBuilder configuration, string keyVaultUri)
+{
+    var credential = CreateDefaultAzureCredential();
+    var addAzureKeyVault = typeof(Microsoft.Extensions.Configuration.AzureKeyVaultConfigurationExtensions)
+        .GetMethods()
+        .Single(method =>
+        {
+            if (method.Name != nameof(Microsoft.Extensions.Configuration.AzureKeyVaultConfigurationExtensions.AddAzureKeyVault))
+            {
+                return false;
+            }
+
+            var parameters = method.GetParameters();
+            return parameters.Length == 3
+                   && parameters[0].ParameterType == typeof(IConfigurationBuilder)
+                   && parameters[1].ParameterType == typeof(Uri)
+                   && parameters[2].ParameterType.FullName == "Azure.Core.TokenCredential";
+        });
+
+    addAzureKeyVault.Invoke(null, [configuration, new Uri(keyVaultUri), credential]);
+}
+
+static object CreateDefaultAzureCredential()
+{
+    var credentialType = Type.GetType("Azure.Identity.DefaultAzureCredential, Azure.Core")
+        ?? Type.GetType("Azure.Identity.DefaultAzureCredential, Azure.Identity");
+
+    if (credentialType is null)
+    {
+        throw new InvalidOperationException("DefaultAzureCredential type was not found in loaded Azure assemblies.");
+    }
+
+    return Activator.CreateInstance(credentialType)
+           ?? throw new InvalidOperationException("Failed to create DefaultAzureCredential instance.");
 }
