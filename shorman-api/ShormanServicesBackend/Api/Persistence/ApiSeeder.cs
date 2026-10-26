@@ -429,8 +429,8 @@ public static class ApiSeeder
         var supermarkets = new[]
         {
             new ApiSupermarket { Name = "REWE", Slug = "rewe", Color = "#CC0000" },
-            new ApiSupermarket { Name = "ALDI", Slug = "aldi", Color = "#00519C" },
-            new ApiSupermarket { Name = "EDEKA", Slug = "edeka", Color = "#003A70" },
+            new ApiSupermarket { Name = "ALDI", Slug = "aldi", Color = "#8f009c" },
+            new ApiSupermarket { Name = "EDEKA", Slug = "edeka", Color = "#f8f403" },
             new ApiSupermarket { Name = "PENNY", Slug = "penny", Color = "#CC0000" },
             new ApiSupermarket { Name = "LIDL", Slug = "lidl", Color = "#0050AA" },
             new ApiSupermarket { Name = "dm", Slug = "dm", Color = "#003E91" },

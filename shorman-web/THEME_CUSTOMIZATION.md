@@ -96,3 +96,20 @@ This already drives the global body, navbar, footer, and shared shell styling.
 Some feature pages still use local hardcoded colors inside their own component SCSS files, especially larger screens like products and checkout.
 
 That means the theme system is now in place, but a full app-wide theme rollout would still involve gradually replacing page-level hardcoded colors with the shared variables.
+
+## 6. Change supermarket button and badge styles together
+
+Edit `src/app/core/config/supermarket-brand-styles.ts`. Each store entry controls the same button and product badge:
+
+```ts
+aldi: {
+  name: 'ALDI',
+  backgroundColor: '#001E5A',
+  textColor: '#FFFFFF',
+  borderColor: '#001E5A',
+  fontWeight: 900,
+  textStrokeWidth: '0.5px'
+}
+```
+
+Use the store slug as the entry key (`rewe`, `aldi`, `edeka`, `penny`, `lidl`, `dm`, or `rossmann`). The `all` entry styles the all-stores button. `fontWeight` is a CSS font weight from 100 to 1000. To make text visually thicker than the font supports, increase `textStrokeWidth` (for example, `'0.5px'`); this setting applies to both the button and product badge. Product badge and store-button styles are taken from this frontend configuration, not the supermarket color stored in the API/database.

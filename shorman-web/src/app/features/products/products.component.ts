@@ -7,14 +7,12 @@ import { ProductService } from '../../core/services/product.service';
 import { CartService } from '../../core/services/cart.service';
 import { DeliveryCheckResult, DeliveryService } from '../../core/services/delivery.service';
 import { Product, Category, ProductPage, ProductSortOption, Supermarket } from '../../core/models/product.model';
+import { DEFAULT_SUPERMARKET_BRAND_STYLE, SUPERMARKET_BRAND_STYLES, SupermarketBrandStyle } from '../../core/config/supermarket-brand-styles';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { LanguageService } from '../../core/services/language.service';
 
-interface SupermarketTab {
+interface SupermarketTab extends SupermarketBrandStyle {
   slug: string;
-  name: string;
-  color: string;
-  bgColor: string;
 }
 
 type ProductMode = 'groceries' | 'beauty';
@@ -36,13 +34,8 @@ interface SortMenuOption {
   translationKey: string;
 }
 
-const SUPERMARKET_TABS: SupermarketTab[] = [
-  { slug: 'all', name: 'ALL', color: '#2E7D32', bgColor: '#E8F5E9' },
-  { slug: 'rewe', name: 'REWE', color: '#fff', bgColor: '#CC0000' },
-  { slug: 'aldi', name: 'ALDI', color: '#fff', bgColor: '#00519C' },
-  { slug: 'penny', name: 'PENNY', color: '#FFD600', bgColor: '#CC0000' },
-  { slug: 'lidl', name: 'LIDL', color: '#FFD600', bgColor: '#0050AA' },
-];
+const SUPERMARKET_TABS: SupermarketTab[] = Object.entries(SUPERMARKET_BRAND_STYLES)
+  .map(([slug, style]) => ({ slug, ...style }));
 
 const MODE_OPTIONS: ProductModeOption[] = [
   {
@@ -79,32 +72,32 @@ const BEAUTY_CATEGORY_SLUGS = new Set([
 ]);
 
 const CATEGORY_ICON_MAP: Record<string, string> = {
-  'all': '🛍️',
-  'bakery': '🍞',
-  'beverages': '🥤',
-  'eggs-dairy': '🥚',
-  'fruits-vegetables': '🥦',
-  'meat': '🥩',
-  'snacks': '🍿',
-  'hair-care': '🧴',
-  'skin-care': '✨',
-  'body-bath': '🫧',
-  'makeup-fragrance': '💄',
-  'health-wellness': '🩹',
-  'baby-kids': '🧸',
-  'imported-products': '📦',
-  'sparkles': '✨',
-  'sun': '☀️',
-  'droplets': '🫧',
-  'palette': '🎨',
-  'heart-pulse': '🩹',
-  'baby': '🧸',
-  'box': '📦',
-  'egg': '🥚',
-  'leaf': '🥦',
-  'bread': '🍞',
-  'cup': '🥤',
-  'popcorn': '🍿'
+  'all': 'shopping_basket',
+  'bakery': 'bakery_dining',
+  'beverages': 'local_cafe',
+  'eggs-dairy': 'egg_alt',
+  'fruits-vegetables': 'nutrition',
+  'meat': 'set_meal',
+  'snacks': 'fastfood',
+  'hair-care': 'spa',
+  'skin-care': 'face_3',
+  'body-bath': 'shower',
+  'makeup-fragrance': 'brush',
+  'health-wellness': 'medical_services',
+  'baby-kids': 'child_care',
+  'imported-products': 'inventory_2',
+  'sparkles': 'auto_awesome',
+  'sun': 'wb_sunny',
+  'droplets': 'water_drop',
+  'palette': 'palette',
+  'heart-pulse': 'ecg_heart',
+  'baby': 'child_care',
+  'box': 'inventory_2',
+  'egg': 'egg_alt',
+  'leaf': 'nutrition',
+  'bread': 'bakery_dining',
+  'cup': 'local_cafe',
+  'popcorn': 'fastfood'
 };
 
 @Component({
@@ -164,7 +157,6 @@ export class ProductsComponent implements OnInit, OnDestroy {
 
   cartOpen$ = this.cartService.isOpen$;
 
-  private smColorMap: Record<number, string> = {};
   private requestSequence = 0;
   private languageSub?: Subscription;
   private productsLoadSub?: Subscription;
@@ -351,16 +343,12 @@ export class ProductsComponent implements OnInit, OnDestroy {
     this.cartService.updateItem(product.id, qty - 1);
   }
 
-  getSupermarketColor(smId: number): string {
-    return this.smColorMap[smId] || '#555';
-  }
-
   getCategoryGlyph(category: Category | 'all'): string {
     if (category === 'all') {
       return CATEGORY_ICON_MAP['all'];
     }
 
-    return CATEGORY_ICON_MAP[category.slug] || CATEGORY_ICON_MAP[category.icon ?? ''] || '•';
+    return CATEGORY_ICON_MAP[category.slug] || CATEGORY_ICON_MAP[category.icon ?? ''] || 'category';
   }
 
   getCategoryLabel(category: Category | undefined | null): string {
@@ -374,13 +362,17 @@ export class ProductsComponent implements OnInit, OnDestroy {
   }
 
   getStoreBadgeStyle(product: Product): Record<string, string> {
-    const supermarketColor = product.supermarket?.color || this.getSupermarketColor(product.supermarketId);
-    const mode = this.getModeForStore(product.supermarket?.slug ?? '');
-    const accent = this.productModes.find(option => option.slug === mode)?.accent ?? supermarketColor;
+    const slug = product.supermarket?.slug
+      ?? this.supermarkets.find(supermarket => supermarket.id === product.supermarketId)?.slug
+      ?? '';
+    const style = SUPERMARKET_BRAND_STYLES[slug] ?? DEFAULT_SUPERMARKET_BRAND_STYLE;
 
     return {
-      background: supermarketColor,
-      boxShadow: `0 0 0 2px ${accent}`
+      background: style.backgroundColor,
+      color: style.textColor,
+      borderColor: style.borderColor,
+      fontWeight: String(style.fontWeight),
+      '--store-text-stroke-width': style.textStrokeWidth
     };
   }
 
@@ -453,17 +445,14 @@ export class ProductsComponent implements OnInit, OnDestroy {
   private loadSupermarkets(): void {
     this.productService.getSupermarkets().subscribe(supermarkets => {
       this.supermarkets = supermarkets;
-      this.smColorMap = supermarkets.reduce<Record<number, string>>((map, supermarket) => {
-        map[supermarket.id] = supermarket.color || '#555';
-        return map;
-      }, {});
       const dynamicTabs = supermarkets.map(supermarket => ({
         slug: supermarket.slug,
-        name: supermarket.name,
-        color: this.getTabTextColor(supermarket.color),
-        bgColor: supermarket.color || '#2E7D32'
+        ...(SUPERMARKET_BRAND_STYLES[supermarket.slug] ?? {
+          ...DEFAULT_SUPERMARKET_BRAND_STYLE,
+          name: supermarket.name
+        })
       }));
-      this.supermarketTabs = [{ slug: 'all', name: 'ALL', color: '#2E7D32', bgColor: '#E8F5E9' }, ...dynamicTabs];
+      this.supermarketTabs = [SUPERMARKET_TABS[0], ...dynamicTabs];
       this.cdr.detectChanges();
     });
   }
@@ -601,14 +590,6 @@ export class ProductsComponent implements OnInit, OnDestroy {
         };
       })
     );
-  }
-
-  private getTabTextColor(backgroundColor?: string): string {
-    if (!backgroundColor) {
-      return '#fff';
-    }
-
-    return backgroundColor.toLowerCase() === '#ffd600' ? '#333' : '#fff';
   }
 
   private getModeForStore(storeSlug: string): ProductMode {
