@@ -87,8 +87,11 @@
         type="button"
         class="sm-tab"
         [class.active]="activeSupermarket === tab.slug"
-        [style.--store-border-color]="tab.bgColor"
-        [style.--store-text-color]="tab.color"
+        [style.--store-background-color]="tab.backgroundColor"
+        [style.--store-text-color]="tab.textColor"
+        [style.--store-border-color]="tab.borderColor"
+        [style.--store-font-weight]="tab.fontWeight"
+        [style.--store-text-stroke-width]="tab.textStrokeWidth"
         (click)="setSupermarket(tab.slug)"
       >
         {{ tab.name }}
@@ -113,13 +116,13 @@
           <label class="category-item" [class.active]="activeCategory === 'all'">
             <input type="radio" name="category" value="all" [(ngModel)]="activeCategory"
               (change)="applyFilters(); closeMobileFilters()" />
-            <span class="cat-icon">{{ getCategoryGlyph('all') }}</span>
+            <span class="cat-icon material-symbols-outlined" aria-hidden="true">{{ getCategoryGlyph('all') }}</span>
             <span class="cat-name">{{ allCategoriesLabel }}</span>
           </label>
           <label *ngFor="let cat of visibleCategories" class="category-item" [class.active]="activeCategory === cat.slug">
             <input type="radio" name="category" [value]="cat.slug" [(ngModel)]="activeCategory"
               (change)="applyFilters(); closeMobileFilters()" />
-            <span class="cat-icon">{{ getCategoryGlyph(cat) }}</span>
+            <span class="cat-icon material-symbols-outlined" aria-hidden="true">{{ getCategoryGlyph(cat) }}</span>
             <span class="cat-name">{{ getCategoryLabel(cat) }}</span>
           </label>
         </div>
