@@ -1,3 +1,5 @@
+using Azure.Core;
+using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
@@ -13,9 +15,14 @@ builder.Configuration
 var keyVaultUri = builder.Configuration["KeyVault:VaultUri"]
     ?? Environment.GetEnvironmentVariable("KEYVAULT_URI");
 
+// One Azure credential for the whole app (Key Vault, Blob Storage, ...).
+// In Azure it uses the user-assigned managed identity from AZURE_CLIENT_ID; locally your az login.
+var azureCredential = CreateDefaultAzureCredential(builder.Configuration);
+builder.Services.AddSingleton<TokenCredential>(azureCredential);
+
 if (!string.IsNullOrWhiteSpace(keyVaultUri))
 {
-    ConfigureKeyVault(builder.Configuration, keyVaultUri);
+    ConfigureKeyVault(builder.Configuration, keyVaultUri, azureCredential);
 }
 
 var dbProvider = builder.Configuration["Database:Provider"];
@@ -142,38 +149,17 @@ static bool IsAllowedOrigin(string origin, IReadOnlyCollection<string> allowedOr
     return uri.Host.EndsWith(".azurestaticapps.net", StringComparison.OrdinalIgnoreCase);
 }
 
-static void ConfigureKeyVault(IConfigurationBuilder configuration, string keyVaultUri)
+static void ConfigureKeyVault(IConfigurationBuilder configuration, string keyVaultUri, TokenCredential credential)
 {
-    var credential = CreateDefaultAzureCredential();
-    var addAzureKeyVault = typeof(Microsoft.Extensions.Configuration.AzureKeyVaultConfigurationExtensions)
-        .GetMethods()
-        .Single(method =>
-        {
-            if (method.Name != nameof(Microsoft.Extensions.Configuration.AzureKeyVaultConfigurationExtensions.AddAzureKeyVault))
-            {
-                return false;
-            }
-
-            var parameters = method.GetParameters();
-            return parameters.Length == 3
-                   && parameters[0].ParameterType == typeof(IConfigurationBuilder)
-                   && parameters[1].ParameterType == typeof(Uri)
-                   && parameters[2].ParameterType.FullName == "Azure.Core.TokenCredential";
-        });
-
-    addAzureKeyVault.Invoke(null, [configuration, new Uri(keyVaultUri), credential]);
+    configuration.AddAzureKeyVault(new Uri(keyVaultUri), credential);
 }
 
-static object CreateDefaultAzureCredential()
+static TokenCredential CreateDefaultAzureCredential(IConfiguration configuration)
 {
-    var credentialType = Type.GetType("Azure.Identity.DefaultAzureCredential, Azure.Core")
-        ?? Type.GetType("Azure.Identity.DefaultAzureCredential, Azure.Identity");
+    var clientId = configuration["AZURE_CLIENT_ID"];
 
-    if (credentialType is null)
+    return new DefaultAzureCredential(new DefaultAzureCredentialOptions
     {
-        throw new InvalidOperationException("DefaultAzureCredential type was not found in loaded Azure assemblies.");
-    }
-
-    return Activator.CreateInstance(credentialType)
-           ?? throw new InvalidOperationException("Failed to create DefaultAzureCredential instance.");
+        ManagedIdentityClientId = string.IsNullOrWhiteSpace(clientId) ? null : clientId
+    });
 }
