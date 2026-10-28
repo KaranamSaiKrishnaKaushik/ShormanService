@@ -2,7 +2,9 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Globalization;
+using System.Security.Cryptography;
 using ShormanServicesBackend.Api.Contracts;
+using ShormanServicesBackend.Api.Email;
 using ShormanServicesBackend.Api.Persistence;
 using ShormanServicesBackend.Api.Persistence.Entities;
 using ShormanServicesBackend.Api.Security;
@@ -10,8 +12,12 @@ using ShormanServicesBackend.Api.Security;
 namespace ShormanServicesBackend.Api.Features;
 
 public record LoginCommand(LoginRequest Request) : IRequest<AuthResponse>;
-public record RegisterCommand(RegisterRequest Request) : IRequest<AuthResponse>;
+public record RegisterCommand(RegisterRequest Request) : IRequest<RegisterResponse>;
+public record VerifyEmailCommand(VerifyEmailRequest Request) : IRequest<AuthResponse>;
+public record RequestPasswordResetCommand(PasswordResetRequest Request) : IRequest<PasswordResetRequestResponse>;
+public record ConfirmPasswordResetCommand(PasswordResetConfirmRequest Request) : IRequest<object>;
 public record Auth0ExchangeCommand(string Email, string? FirstName, string? LastName) : IRequest<AuthResponse>;
+public record UpdateCurrentUserProfileCommand(int UserId, UpdateCurrentUserProfileRequest Request) : IRequest<UserDto>;
 
 public class LoginCommandHandler(ApiDbContext dbContext, JwtTokenService jwtTokenService) : IRequestHandler<LoginCommand, AuthResponse>
 {
@@ -23,6 +29,11 @@ public class LoginCommandHandler(ApiDbContext dbContext, JwtTokenService jwtToke
             .SingleOrDefaultAsync(x => x.Email == request.Request.Email.Trim().ToLowerInvariant(), cancellationToken)
             ?? throw new InvalidOperationException("Invalid email or password.");
 
+        if (user.IsDeleted)
+        {
+            throw new InvalidOperationException("Invalid email or password.");
+        }
+
         if (string.IsNullOrWhiteSpace(user.PasswordHash))
         {
             throw new InvalidOperationException("Invalid email or password.");
@@ -33,49 +44,240 @@ public class LoginCommandHandler(ApiDbContext dbContext, JwtTokenService jwtToke
             throw new InvalidOperationException("Invalid email or password.");
         }
 
+        if (!user.IsEmailVerified)
+        {
+            throw new InvalidOperationException("Email not verified. Verify your email before signing in.");
+        }
+
         return ToAuthResponse(user, jwtTokenService);
     }
 
     internal static AuthResponse ToAuthResponse(ApiUser user, JwtTokenService jwtTokenService)
+    {
+        var userDto = ToUserDto(user);
+
+        return new AuthResponse(
+            jwtTokenService.CreateToken(user),
+            userDto);
+    }
+
+    internal static UserDto ToUserDto(ApiUser user)
     {
         var roles = user.UserRoles
             .Select(x => x.Role.Name)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return new AuthResponse(
-            jwtTokenService.CreateToken(user),
-            new UserDto(user.Id, user.Email, user.FirstName, user.LastName, user.Phone, user.CreatedAtUtc.ToString("O"), roles));
+        return new UserDto(
+            user.Id,
+            user.Email,
+            user.FirstName,
+            user.LastName,
+            user.DisplayName,
+            user.ThemePreference,
+            user.Phone,
+            user.CreatedAtUtc.ToString("O"),
+            roles);
     }
 }
 
-public class RegisterCommandHandler(ApiDbContext dbContext, JwtTokenService jwtTokenService) : IRequestHandler<RegisterCommand, AuthResponse>
+public class RegisterCommandHandler(
+    ApiDbContext dbContext,
+    IEmailSender emailSender,
+    IHostEnvironment environment) : IRequestHandler<RegisterCommand, RegisterResponse>
 {
-    public async Task<AuthResponse> Handle(RegisterCommand request, CancellationToken cancellationToken)
+    public async Task<RegisterResponse> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
         var email = request.Request.Email.Trim().ToLowerInvariant();
-        if (await dbContext.Users.AnyAsync(x => x.Email == email, cancellationToken))
+        var existingUser = await dbContext.Users.SingleOrDefaultAsync(x => x.Email == email, cancellationToken);
+        if (existingUser is not null && (existingUser.IsEmailVerified || existingUser.IsDeleted))
         {
             throw new InvalidOperationException("Email already registered.");
         }
 
-        var user = new ApiUser
+        var verificationCode = AuthFeatureShared.CreateOneTimeCode();
+        var user = existingUser;
+
+        if (user is null)
         {
-            Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Request.Password),
-            FirstName = request.Request.FirstName.Trim(),
-            LastName = request.Request.LastName.Trim(),
-            Phone = request.Request.Phone?.Trim(),
-            CreatedAtUtc = DateTime.UtcNow
-        };
+            user = new ApiUser { Email = email, CreatedAtUtc = DateTime.UtcNow };
+            dbContext.Users.Add(user);
+        }
 
-        dbContext.Users.Add(user);
+        // Registering again with an unverified address re-issues the code, which also acts as "resend".
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Request.Password);
+        user.FirstName = request.Request.FirstName.Trim();
+        user.LastName = request.Request.LastName.Trim();
+        user.Phone = request.Request.Phone?.Trim();
+        user.IsEmailVerified = false;
+        user.EmailVerificationCode = verificationCode;
+        user.EmailVerificationExpiresAtUtc = DateTime.UtcNow.AddMinutes(15);
+
         await dbContext.SaveChangesAsync(cancellationToken);
-        await AuthFeatureShared.AssignSingleRoleAsync(dbContext, user.Id, RoleNames.Customer, cancellationToken);
+        if (existingUser is null)
+        {
+            await AuthFeatureShared.AssignSingleRoleAsync(dbContext, user.Id, RoleNames.Customer, cancellationToken);
+        }
 
-        user = await AuthFeatureShared.LoadUserWithRolesAsync(dbContext, user.Id, cancellationToken);
+        var sent = await emailSender.SendAsync(
+            user.Email,
+            "Your Shorman verification code",
+            AuthEmailTemplates.VerificationCode(user.FirstName, verificationCode),
+            cancellationToken);
+
+        if (sent)
+        {
+            return new RegisterResponse(
+                user.Email,
+                $"Account created. We sent a verification code to {user.Email}. It is valid for 15 minutes.",
+                true,
+                null);
+        }
+
+        if (environment.IsDevelopment())
+        {
+            return new RegisterResponse(
+                user.Email,
+                "Account created. Email is not configured, so the verification code is shown below (development only).",
+                true,
+                verificationCode);
+        }
+
+        throw new InvalidOperationException("We could not send the verification email right now. Please try again in a few minutes.");
+    }
+}
+
+public class VerifyEmailCommandHandler(ApiDbContext dbContext, JwtTokenService jwtTokenService) : IRequestHandler<VerifyEmailCommand, AuthResponse>
+{
+    public async Task<AuthResponse> Handle(VerifyEmailCommand request, CancellationToken cancellationToken)
+    {
+        var email = request.Request.Email.Trim().ToLowerInvariant();
+        var code = request.Request.Code.Trim();
+        var user = await dbContext.Users
+            .Include(x => x.UserRoles)
+            .ThenInclude(x => x.Role)
+            .SingleOrDefaultAsync(x => x.Email == email, cancellationToken)
+            ?? throw new InvalidOperationException("Verification code is invalid or expired.");
+
+        if (user.IsEmailVerified)
+        {
+            return LoginCommandHandler.ToAuthResponse(user, jwtTokenService);
+        }
+
+        if (
+            string.IsNullOrWhiteSpace(user.EmailVerificationCode) ||
+            !string.Equals(user.EmailVerificationCode, code, StringComparison.Ordinal) ||
+            user.EmailVerificationExpiresAtUtc is null ||
+            user.EmailVerificationExpiresAtUtc < DateTime.UtcNow)
+        {
+            throw new InvalidOperationException("Verification code is invalid or expired.");
+        }
+
+        user.IsEmailVerified = true;
+        user.EmailVerificationCode = null;
+        user.EmailVerificationExpiresAtUtc = null;
+        user.PasswordResetCode = null;
+        user.PasswordResetExpiresAtUtc = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return LoginCommandHandler.ToAuthResponse(user, jwtTokenService);
+    }
+}
+
+public class RequestPasswordResetCommandHandler(
+    ApiDbContext dbContext,
+    IEmailSender emailSender,
+    IHostEnvironment environment) : IRequestHandler<RequestPasswordResetCommand, PasswordResetRequestResponse>
+{
+    private const string GenericMessage = "If an account exists for that email, we have sent a reset code to it.";
+
+    public async Task<PasswordResetRequestResponse> Handle(RequestPasswordResetCommand request, CancellationToken cancellationToken)
+    {
+        var email = request.Request.Email.Trim().ToLowerInvariant();
+        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Email == email, cancellationToken);
+
+        if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return new PasswordResetRequestResponse(GenericMessage, null);
+        }
+
+        if (!user.IsEmailVerified)
+        {
+            throw new InvalidOperationException("Verify your email before resetting the password.");
+        }
+
+        user.PasswordResetCode = AuthFeatureShared.CreateOneTimeCode();
+        user.PasswordResetExpiresAtUtc = DateTime.UtcNow.AddMinutes(15);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var sent = await emailSender.SendAsync(
+            user.Email,
+            "Your Shorman password reset code",
+            AuthEmailTemplates.PasswordResetCode(user.FirstName, user.PasswordResetCode),
+            cancellationToken);
+
+        if (!sent && environment.IsDevelopment())
+        {
+            return new PasswordResetRequestResponse(
+                "Email is not configured, so the reset code is shown below (development only).",
+                user.PasswordResetCode);
+        }
+
+        return new PasswordResetRequestResponse(GenericMessage, null);
+    }
+}
+
+internal static class AuthEmailTemplates
+{
+    internal static string VerificationCode(string firstName, string code) =>
+        Wrap($"Hi {System.Net.WebUtility.HtmlEncode(firstName)},", "Use this code to verify your email address and finish creating your Shorman account:", code);
+
+    internal static string PasswordResetCode(string firstName, string code) =>
+        Wrap($"Hi {System.Net.WebUtility.HtmlEncode(firstName)},", "Use this code to reset your Shorman password:", code);
+
+    private static string Wrap(string greeting, string intro, string code) =>
+        $"""
+        <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:auto;color:#17221E">
+          <h2 style="color:#0F7A5A;margin:0 0 16px">Shorman</h2>
+          <p>{greeting}</p>
+          <p>{intro}</p>
+          <p style="font-size:32px;letter-spacing:8px;font-weight:700;margin:24px 0">{code}</p>
+          <p style="color:#5B6A64;font-size:13px">The code is valid for 15 minutes. If you did not request it, you can ignore this email.</p>
+        </div>
+        """;
+}
+
+public class ConfirmPasswordResetCommandHandler(ApiDbContext dbContext) : IRequestHandler<ConfirmPasswordResetCommand, object>
+{
+    public async Task<object> Handle(ConfirmPasswordResetCommand request, CancellationToken cancellationToken)
+    {
+        var email = request.Request.Email.Trim().ToLowerInvariant();
+        var code = request.Request.Code.Trim();
+        var newPassword = request.Request.NewPassword.Trim();
+
+        if (newPassword.Length < 6)
+        {
+            throw new InvalidOperationException("Password must be at least 6 characters long.");
+        }
+
+        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Email == email, cancellationToken)
+            ?? throw new InvalidOperationException("Reset code is invalid or expired.");
+
+        if (
+            string.IsNullOrWhiteSpace(user.PasswordResetCode) ||
+            !string.Equals(user.PasswordResetCode, code, StringComparison.Ordinal) ||
+            user.PasswordResetExpiresAtUtc is null ||
+            user.PasswordResetExpiresAtUtc < DateTime.UtcNow)
+        {
+            throw new InvalidOperationException("Reset code is invalid or expired.");
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        user.PasswordResetCode = null;
+        user.PasswordResetExpiresAtUtc = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new { message = "Password reset successfully. You can now sign in with the new password." };
     }
 }
 
@@ -85,6 +287,11 @@ public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService
     {
         var email = request.Email.Trim().ToLowerInvariant();
         var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Email == email, cancellationToken);
+
+        if (user is not null && user.IsDeleted)
+        {
+            throw new InvalidOperationException("This account has been deleted.");
+        }
 
         if (user is null)
         {
@@ -101,6 +308,7 @@ public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService
                 PasswordHash = string.Empty,
                 FirstName = fallbackFirstName,
                 LastName = fallbackLastName,
+                IsEmailVerified = true,
                 CreatedAtUtc = DateTime.UtcNow
             };
 
@@ -117,16 +325,23 @@ public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService
             {
                 user.LastName = request.LastName.Trim();
             }
+
+            user.IsEmailVerified = true;
+            user.EmailVerificationCode = null;
+            user.EmailVerificationExpiresAtUtc = null;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         var bootstrapSuperAdminEmails = AuthFeatureShared.GetBootstrapSuperAdminEmails(configuration);
 
-        var desiredRole = bootstrapSuperAdminEmails.Contains(email)
-            ? RoleNames.SuperAdmin
-            : RoleNames.Customer;
-
-        await AuthFeatureShared.AssignRoleIfMissingOrDifferentAsync(dbContext, user.Id, desiredRole, cancellationToken);
+        if (bootstrapSuperAdminEmails.Contains(email))
+        {
+            await AuthFeatureShared.AssignRoleIfMissingOrDifferentAsync(dbContext, user.Id, RoleNames.SuperAdmin, cancellationToken);
+        }
+        else
+        {
+            await AuthFeatureShared.AssignDefaultRoleIfMissingAsync(dbContext, user.Id, cancellationToken);
+        }
 
         user = await AuthFeatureShared.LoadUserWithRolesAsync(dbContext, user.Id, cancellationToken);
 
@@ -134,8 +349,58 @@ public class Auth0ExchangeCommandHandler(ApiDbContext dbContext, JwtTokenService
     }
 }
 
+public class UpdateCurrentUserProfileCommandHandler(ApiDbContext dbContext) : IRequestHandler<UpdateCurrentUserProfileCommand, UserDto>
+{
+    public async Task<UserDto> Handle(UpdateCurrentUserProfileCommand request, CancellationToken cancellationToken)
+    {
+        var user = await AuthFeatureShared.LoadUserWithRolesAsync(dbContext, request.UserId, cancellationToken);
+
+        if (request.Request.DisplayName is not null)
+        {
+            var displayName = request.Request.DisplayName.Trim();
+            if (displayName.Length > 80)
+            {
+                throw new InvalidOperationException("Display name must be 80 characters or fewer.");
+            }
+
+            user.DisplayName = displayName.Length == 0 ? null : displayName;
+        }
+
+        if (request.Request.ThemePreference is not null)
+        {
+            var themePreference = request.Request.ThemePreference.Trim();
+            if (themePreference.Length == 0)
+            {
+                user.ThemePreference = null;
+            }
+            else if (AuthFeatureShared.IsSupportedTheme(themePreference))
+            {
+                user.ThemePreference = themePreference;
+            }
+            else
+            {
+                throw new InvalidOperationException("Theme preference is not supported.");
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return LoginCommandHandler.ToUserDto(user);
+    }
+}
+
 internal static class AuthFeatureShared
 {
+    private static readonly HashSet<string> SupportedThemes =
+    [
+        "fresh-market",
+        "terracotta",
+        "coastal"
+    ];
+
+    public static string CreateOneTimeCode() => RandomNumberGenerator.GetInt32(100000, 1000000).ToString(CultureInfo.InvariantCulture);
+
+    public static bool IsSupportedTheme(string themePreference) => SupportedThemes.Contains(themePreference);
+
     public static HashSet<string> GetBootstrapSuperAdminEmails(IConfiguration configuration)
     {
         var fromArraySection = configuration

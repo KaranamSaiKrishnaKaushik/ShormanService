@@ -20,6 +20,10 @@ export const homeRedirectGuard: CanActivateFn = async () => {
     return router.createUrlTree(['/user-management']);
   }
 
+  if (auth.hasRole('Admin')) {
+    return router.createUrlTree(['/product-management']);
+  }
+
   if (auth.hasRole('Rider')) {
     return router.createUrlTree(['/rider']);
   }

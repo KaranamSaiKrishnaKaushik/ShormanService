@@ -1,6 +1,6 @@
 # Web Scraper
 
-This project now uses the official Open Food Facts bulk export as the first source for store-linked product data.
+This project now uses the official Open Food Facts and Open Beauty Facts bulk exports as the first source for store-linked product data.
 
 ## Why this approach
 
@@ -10,8 +10,8 @@ This project now uses the official Open Food Facts bulk export as the first sour
 
 ## What it does
 
-- streams the official compressed Open Food Facts CSV export
-- filters rows whose `stores` field contains one of: `rewe`, `aldi`, `edeka`, `penny`, `lidl`
+- streams the official Open Food Facts or Open Beauty Facts compressed CSV export
+- filters rows whose `stores` field contains grocery store slugs such as `rewe`, `aldi`, `edeka`, `penny`, `lidl` or beauty store slugs such as `dm`, `rossmann`
 - keeps only the requested fields in the output
 - writes the filtered rows to JSON, JSONL, or CSV
 
@@ -20,6 +20,12 @@ This project now uses the official Open Food Facts bulk export as the first sour
 ```powershell
 cd web-scraper
 python main.py off-store --store rewe --max-matches 20 --format all
+```
+
+For beauty products:
+
+```powershell
+python main.py off-store --catalog beauty --store dm --max-matches 20 --format all
 ```
 
 ## Example commands
@@ -56,6 +62,13 @@ python main.py off-store --store penny --max-matches 100 --format all
 python main.py off-store --store lidl --max-matches 100 --format all
 ```
 
+Beauty stores:
+
+```powershell
+python main.py off-store --catalog beauty --store dm --max-matches 100 --format all
+python main.py off-store --catalog beauty --store rossmann --max-matches 100 --format all
+```
+
 ## Output
 
 Files are written under store-specific folders in `web-scraper/data/`.
@@ -69,6 +82,10 @@ Generated filenames look like:
 - `data/edeka/openfoodfacts_edeka_YYYYMMDD_HHMMSS.json`
 - `data/penny/openfoodfacts_penny_YYYYMMDD_HHMMSS.json`
 - `data/lidl/openfoodfacts_lidl_YYYYMMDD_HHMMSS.json`
+- `data/dm/openbeautyfacts_dm_YYYYMMDD_HHMMSS.json`
+- `data/dm/openbeautyfacts_dm_latest.json`
+- `data/rossmann/openbeautyfacts_rossmann_YYYYMMDD_HHMMSS.json`
+- `data/rossmann/openbeautyfacts_rossmann_latest.json`
 
 The `latest` files are intended to be the stable handoff point for your later SQL Server or Azure MySQL import jobs, while the timestamped files keep a historical snapshot.
 
@@ -80,6 +97,8 @@ The importer loads a store's `latest.json` into two database tables:
 - `off_store_products`: the latest imported snapshot for each store
 
 Imported rows currently get a default `Price` value of `0.00` in the database staging table because Open Food Facts does not provide the store price data you want yet.
+
+The same `Price = 0.00` default is applied to Open Beauty Facts imports for `dm` and `rossmann`.
 
 ## Sync all stores
 
@@ -93,6 +112,12 @@ To do the same and also promote the staged rows into the app `products` table:
 
 ```powershell
 python main.py sync-all-stores --promote-to-app --verbose
+```
+
+Beauty catalog variant:
+
+```powershell
+python main.py sync-all-stores --catalog beauty --promote-to-app --verbose
 ```
 
 ## Promote staged rows into app products
@@ -136,12 +161,24 @@ To inspect a single store:
 python main.py status --store rewe --verbose
 ```
 
+Beauty catalog status:
+
+```powershell
+python main.py status --catalog beauty --store dm --verbose
+```
+
 By default it reads your backend database config from `../shorman-api/ShormanServicesBackend/appsettings.Development.Local.json`.
 
 Dry run against the configured local database settings:
 
 ```powershell
 python main.py import-store-json --store rewe --dry-run --verbose
+```
+
+Beauty catalog dry run:
+
+```powershell
+python main.py import-store-json --catalog beauty --store dm --dry-run --verbose
 ```
 
 Run the real import for the current REWE latest file:
@@ -159,6 +196,13 @@ python main.py import-store-json --store lidl --verbose
 python main.py import-store-json --store penny --verbose
 ```
 
+Import beauty products the same way:
+
+```powershell
+python main.py import-store-json --catalog beauty --store dm --verbose
+python main.py import-store-json --catalog beauty --store rossmann --verbose
+```
+
 ```
 python main.py off-store --store rewe --format json --verbose
 python main.py import-store-json --store rewe --verbose
@@ -174,12 +218,24 @@ python main.py import-store-json --store lidl --verbose
 
 python main.py off-store --store penny --format json --verbose
 python main.py import-store-json --store penny --verbose
+
+python main.py off-store --catalog beauty --store dm --format json --verbose
+python main.py import-store-json --catalog beauty --store dm --verbose
+
+python main.py off-store --catalog beauty --store rossmann --format json --verbose
+python main.py import-store-json --catalog beauty --store rossmann --verbose
 ```
 
 You can also override the source JSON or database settings explicitly:
 
 ```powershell
 python main.py import-store-json --store rewe --input-file data/rewe/openfoodfacts_rewe_latest.json --provider sqlserver --connection-string "Server=localhost,1433;Database=HS_DB_DELIVERY_SERVICE;User ID=sa;Password=YourStrong!Passw0rd;Encrypt=False;"
+```
+
+Beauty catalog override example:
+
+```powershell
+python main.py import-store-json --catalog beauty --store dm --input-file data/dm/openbeautyfacts_dm_latest.json --provider sqlserver --connection-string "Server=localhost,1433;Database=HS_DB_DELIVERY_SERVICE;User ID=sa;Password=YourStrong!Passw0rd;Encrypt=False;"
 ```
 
 ## Azure plan
@@ -205,10 +261,22 @@ Run it locally against MySQL the same way Azure would run it:
 docker run --rm shorman-web-scraper sync-all-stores --provider mysql --connection-string "Server=<host>;Port=3306;Database=<db>;User ID=<user>;Password=<password>;SslMode=Required;" --promote-to-app --verbose
 ```
 
+Beauty catalog variant:
+
+```powershell
+docker run --rm shorman-web-scraper sync-all-stores --catalog beauty --provider mysql --connection-string "Server=<host>;Port=3306;Database=<db>;User ID=<user>;Password=<password>;SslMode=Required;" --promote-to-app --verbose
+```
+
 Example scheduled job command inside Azure:
 
 ```powershell
 python main.py sync-all-stores --provider mysql --connection-string "Server=<host>;Port=3306;Database=<db>;User ID=<user>;Password=<password>;SslMode=Required;" --promote-to-app --verbose
+```
+
+Beauty catalog variant:
+
+```powershell
+python main.py sync-all-stores --catalog beauty --provider mysql --connection-string "Server=<host>;Port=3306;Database=<db>;User ID=<user>;Password=<password>;SslMode=Required;" --promote-to-app --verbose
 ```
 
 Example Azure CLI flow:
@@ -238,7 +306,7 @@ python main.py status --store all --provider mysql --connection-string secretref
 
 That gives you one scheduled pipeline on Azure:
 
-- pull from Open Food Facts
+- pull from Open Food Facts or Open Beauty Facts
 - write store JSON snapshots
 - import into `off_store_products`
 - promote into the app `products` table

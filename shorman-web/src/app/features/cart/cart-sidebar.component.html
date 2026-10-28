@@ -9,12 +9,12 @@
       <span class="item-count" *ngIf="(cartService.cart$ | async)?.itemCount as cnt">
         {{ cnt }} item{{ cnt !== 1 ? 's' : '' }}
       </span>
-      <button class="close-btn" (click)="cartService.closeCart()">✕</button>
+      <button class="close-btn" (click)="cartService.closeCart()" aria-label="Close"><span class="msi">close</span></button>
     </div>
 
     <ng-container *ngIf="cartService.cart$ | async as cart">
       <div class="cart-empty" *ngIf="cart.items.length === 0">
-        <div class="empty-icon">🛒</div>
+        <div class="empty-icon msi">shopping_cart</div>
         <p>Your cart is empty</p>
         <a routerLink="/products" class="btn-shop" (click)="cartService.closeCart()">Start Shopping</a>
       </div>
@@ -41,7 +41,7 @@
               <button class="qty-btn plus" (click)="increase(item)">+</button>
             </div>
             <div class="item-total">{{ item.product.price * item.quantity | currency:'EUR':'symbol':'1.2-2' }}</div>
-            <button class="remove-btn" (click)="remove(item)" title="Remove">🗑️</button>
+            <button class="remove-btn" (click)="remove(item)" title="Remove"><span class="msi">delete</span></button>
           </div>
         </div>
       </div>
@@ -51,7 +51,7 @@
           <span>Subtotal</span>
           <strong>{{ cart.total | currency:'EUR':'symbol':'1.2-2' }}</strong>
         </div>
-        <div class="delivery-note">🚚 Delivery fee calculated at checkout</div>
+        <div class="delivery-note"><span class="msi">local_shipping</span> Delivery fee calculated at checkout</div>
         <div class="auth-note" *ngIf="!isLoggedIn">
           Your cart is saved locally. Sign in when you're ready to place the order.
         </div>

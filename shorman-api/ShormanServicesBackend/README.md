@@ -28,11 +28,45 @@ Existing SQL Server databases can be renamed in place with `rename-api-tables.sq
 
 ## Configuration
 
-Required settings are in `appsettings.json` / `appsettings.Development.json`:
+Required settings are split between non-secret app settings and vault-backed secrets.
 
-- `Database:Provider`: `SqlServer` or `MySql`
-- `ConnectionStrings:ApiConnection`
-- `Jwt:*`
+Expected file set:
+
+- `appsettings.json` - shared defaults for every environment
+- `appsettings.Development.json` - development-only defaults such as verbose logging
+- `appsettings.Local.json` - optional machine-specific local overrides and secrets, ignored by git
+- `appsettings.Local.example.json` - tracked template for local setup
+
+`appsettings.Development.Local.json` is no longer used.
+
+Keep these as App Service settings or local JSON values:
+
+- `KeyVault:VaultUri`
+- `Database:Provider`
+- `Cors:AllowedOrigins:*`
+- `Jwt:Issuer`
+- `Jwt:Audience`
+- `Auth0:Domain`
+- `Auth0:Audience`
+- `RoleBootstrap:SuperAdminEmails`
+- `Stripe:FrontendBaseUrl`
+- `Stripe:CheckoutSuccessPath`
+- `Stripe:CheckoutCancelPath`
+- `Stripe:Currency`
+
+Move these to Azure Key Vault for production:
+
+- `ConnectionStrings--ApiConnection`
+- `Jwt--SigningKey`
+- `Stripe--SecretKey`
+- `Stripe--WebhookSecret`
+
+Notes:
+
+- Azure Key Vault secret names use `--` to represent `:` in configuration keys.
+- `ConnectionStrings--DefaultConnection` is also supported, but `ConnectionStrings--ApiConnection` is the primary key used by this app.
+- `Stripe:PublishableKey` is not currently consumed by the backend and should be treated as public client configuration if you expose it to the frontend.
+- The Angular frontend should keep only public configuration values. Frontend Auth0 identifiers, API base URLs, and feature flags are not secrets once bundled into browser JavaScript.
 
 ## Build
 

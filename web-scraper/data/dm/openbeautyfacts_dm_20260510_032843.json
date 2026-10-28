@@ -1,0 +1,42 @@
+[
+  {
+    "code": "0401035531864",
+    "url": "http://world-en.openbeautyfacts.org/product/0401035531864/fresh-duschgel-balea-men",
+    "creator": "hangy",
+    "created_datetime": "2018-07-07T10:32:13Z",
+    "last_modified_datetime": "2020-02-08T22:50:23Z",
+    "last_updated_datetime": "2025-03-28T12:39:46Z",
+    "product_name": "Fresh Duschgel",
+    "brands": "Balea Men",
+    "origins": "",
+    "stores": "dm",
+    "countries": "Deutschland",
+    "countries_tags": "en:germany",
+    "countries_en": "Germany",
+    "ingredients_text": "AQUA - SODIUM LAURETH SULFATE GLYCERIN COCAMIDOPRO - PYL BETAINE - MARIS SAL TOCOPHEROL - ASCORBYL PALMITATE PARFUM GLYCERYL OLEATE - PROPYL GUAR HYDROXYPROPYLTRIMONIUM CHLORIDE HYDROGENATED PALM GLYCE - RIDES CITRATE· LECITHIN SODIUM BEN - ZOATE - POTASSIUM SORBATE CHLORIDE · CITRIC ACID LACTIC ACID SODIUM SULFATE - CI 42051. COCO-GLUCOSIDE HYDROXY - SODIUM",
+    "ingredients_tags": "en:water,de:sodium-laureth-sulfate-glycerin-cocamidopro,de:pyl-betaine,de:maris-sal-tocopherol,de:ascorbyl-palmitate-parfum-glyceryl-oleate,de:propyl-guar-hydroxypropyltrimonium-chloride-hydrogenated-palm-glyce,de:rides-citrate,de:lecithin-sodium-ben,de:zoate,de:potassium-sorbate-chloride,de:citric-acid-lactic-acid-sodium-sulfate,de:ci-42051,de:coco-glucoside-hydroxy,en:sodium,en:minerals",
+    "ingredients_analysis_tags": "en:palm-oil-content-unknown,en:vegan-status-unknown,en:vegetarian-status-unknown",
+    "image_url": "https://images.openbeautyfacts.org/images/products/040/103/553/1864/front_de.7.400.jpg",
+    "image_small_url": "https://images.openbeautyfacts.org/images/products/040/103/553/1864/front_de.7.200.jpg"
+  },
+  {
+    "code": "0884486514691",
+    "url": "http://world-en.openbeautyfacts.org/product/0884486514691/strength-recovery-strength-repairing-spray-biolage",
+    "creator": "bentren",
+    "created_datetime": "2024-04-21T11:40:35Z",
+    "last_modified_datetime": "2024-04-21T12:54:36Z",
+    "last_updated_datetime": "2025-03-28T13:01:02Z",
+    "product_name": "Strength Recovery Strength Repairing Spray",
+    "brands": "Biolage",
+    "origins": "",
+    "stores": "dm",
+    "countries": "Österreich",
+    "countries_tags": "en:austria",
+    "countries_en": "Austria",
+    "ingredients_text": "Aqua / Wasser / Eau, Cetearylalkohol, Dimethicon, Behentrimoniumchlorid, Quaternium-80, Phenoxyethanol, Propylenglykol, Isopropylalkohol, Parfum / Duft, Squalan, Butyrospermum Parkii Butter / Sheabutter, Limonen, Chlorhexidindihydrochlorid, Zitronensäure, Hexylzimt, Cumarin, Benzylalkohol, Linalool, Amylzimt, Geraniol, Isoeugenol, Alpha-Isomethylionon, Hydroxycitronellal, Benzylbenzoat, Zimtalkohol",
+    "ingredients_tags": "en:water,de:eau,de:cetearylalkohol,de:dimethicon,de:behentrimoniumchlorid,de:quaternium-80,de:phenoxyethanol,de:propylenglykol,de:isopropylalkohol,de:parfum,de:duft,de:squalan,de:butyrospermum-parkii-butter,en:shea-butter,en:oil-and-fat,en:vegetable-oil-and-fat,en:vegetable-fat,de:limonen,de:chlorhexidindihydrochlorid,en:e330,de:hexylzimt,de:cumarin,en:e1519,de:linalool,de:amylzimt,de:geraniol,de:isoeugenol,de:alpha-isomethylionon,de:hydroxycitronellal,de:benzylbenzoat,de:zimtalkohol",
+    "ingredients_analysis_tags": "en:palm-oil-content-unknown,en:vegan-status-unknown,en:vegetarian-status-unknown",
+    "image_url": "https://images.openbeautyfacts.org/images/products/088/448/651/4691/front_de.7.400.jpg",
+    "image_small_url": "https://images.openbeautyfacts.org/images/products/088/448/651/4691/front_de.7.200.jpg"
+  }
+]

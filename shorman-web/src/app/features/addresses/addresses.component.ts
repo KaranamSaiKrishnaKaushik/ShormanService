@@ -3,11 +3,12 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgFor, NgIf } from '@angular/common';
 import { AddressService } from '../../core/services/address.service';
 import { Address } from '../../core/models/address.model';
+import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-addresses',
   standalone: true,
-  imports: [ReactiveFormsModule, NgFor, NgIf],
+  imports: [ReactiveFormsModule, NgFor, NgIf, TranslateModule],
   templateUrl: './addresses.component.html',
   styleUrls: ['./addresses.component.scss']
 })
@@ -25,6 +26,7 @@ export class AddressesComponent implements OnInit {
   deleteConfirm: Address | null = null;
 
   form = this.fb.nonNullable.group({
+    displayName: ['', [Validators.maxLength(80)]],
     label: [''],
     street: ['', [Validators.required, Validators.minLength(2)]],
     houseNumber: ['', [Validators.required]],
@@ -60,6 +62,7 @@ export class AddressesComponent implements OnInit {
     this.editingId = null;
     this.showForm = true;
     this.form.reset({
+      displayName: '',
       label: '',
       street: '',
       houseNumber: '',
@@ -74,6 +77,7 @@ export class AddressesComponent implements OnInit {
     this.editingId = address.id;
     this.showForm = true;
     this.form.patchValue({
+      displayName: address.displayName || '',
       label: address.label || '',
       street: address.street,
       houseNumber: address.houseNumber,
@@ -92,6 +96,7 @@ export class AddressesComponent implements OnInit {
     this.showForm = false;
     this.editingId = null;
     this.form.reset({
+      displayName: '',
       label: '',
       street: '',
       houseNumber: '',
@@ -141,6 +146,7 @@ export class AddressesComponent implements OnInit {
         this.editingId = null;
         this.saving = false;
         this.form.reset({
+          displayName: '',
           label: '',
           street: '',
           houseNumber: '',

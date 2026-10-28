@@ -49,7 +49,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<RegisterResponse>> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         try
         {
@@ -58,6 +58,56 @@ public class AuthController(IMediator mediator) : ControllerBase
         catch (InvalidOperationException exception)
         {
             return Conflict(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("verify-email")]
+    public async Task<ActionResult<AuthResponse>> VerifyEmail([FromBody] VerifyEmailRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await mediator.Send(new VerifyEmailCommand(request), cancellationToken));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("password-reset/request")]
+    public Task<PasswordResetRequestResponse> RequestPasswordReset([FromBody] PasswordResetRequest request, CancellationToken cancellationToken) =>
+        mediator.Send(new RequestPasswordResetCommand(request), cancellationToken);
+
+    [HttpPost("password-reset/confirm")]
+    public async Task<ActionResult<object>> ConfirmPasswordReset([FromBody] PasswordResetConfirmRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await mediator.Send(new ConfirmPasswordResetCommand(request), cancellationToken));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<ActionResult<UserDto>> UpdateProfile([FromBody] UpdateCurrentUserProfileRequest request, CancellationToken cancellationToken)
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdValue, out var userId))
+        {
+            return Unauthorized(new { message = "The current user could not be resolved." });
+        }
+
+        try
+        {
+            return Ok(await mediator.Send(new UpdateCurrentUserProfileCommand(userId, request), cancellationToken));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
         }
     }
 }
