@@ -13,7 +13,7 @@
 
     <!-- Error State -->
     <div *ngIf="error && !loading" class="error-state">
-      <span class="error-icon">⚠️</span>
+      <span class="error-icon msi">warning</span>
       <p>{{ error }}</p>
       <button class="btn-retry" (click)="loadAddresses()">{{ 'common.retry' | translate }}</button>
     </div>
@@ -22,7 +22,7 @@
     <div *ngIf="!loading && !error" class="content-wrapper">
       <!-- Empty State -->
       <div *ngIf="addresses.length === 0" class="empty-state">
-        <div class="empty-icon">📍</div>
+        <div class="empty-icon msi">location_on</div>
         <h3>{{ 'addresses.empty.title' | translate }}</h3>
         <p>{{ 'addresses.empty.subtitle' | translate }}</p>
         <button class="btn-primary" (click)="startAdd()">+ {{ 'addresses.actions.addAddress' | translate }}</button>
@@ -58,7 +58,7 @@
                 <div class="addr-label-row">
                   <strong class="addr-label">{{ addr.label || ('addresses.addressFallback' | translate) }}</strong>
                   <span class="default-badge" *ngIf="addr.isDefault">
-                    <span class="badge-icon">✓</span>
+                    <span class="badge-icon msi">check</span>
                     {{ 'addresses.default' | translate }}
                   </span>
                 </div>
@@ -77,14 +77,14 @@
                 class="btn-icon btn-edit"
                 (click)="startEdit(addr)"
                 title="{{ 'addresses.actions.editAddress' | translate }}">
-                ✏️
+                <span class="msi">edit</span>
               </button>
               <button
                 class="btn-icon btn-delete"
                 (click)="confirmDelete(addr)"
                 [disabled]="addresses.length === 1"
                 [title]="addresses.length === 1 ? ('addresses.actions.cannotDeleteLast' | translate) : ('addresses.actions.deleteAddress' | translate)">
-                🗑️
+                <span class="msi">delete</span>
               </button>
             </div>
           </div>
@@ -95,10 +95,26 @@
       <div class="form-section" *ngIf="showForm">
         <div class="form-header">
           <h3>{{ editingId ? ('addresses.form.editTitle' | translate) : ('addresses.form.addTitle' | translate) }}</h3>
-          <button class="btn-close" (click)="cancelForm()">✕</button>
+          <button class="btn-close" (click)="cancelForm()" aria-label="Close"><span class="msi">close</span></button>
         </div>
 
         <form [formGroup]="form" (ngSubmit)="save()" class="addr-form">
+          <!-- Display name -->
+          <div class="form-group">
+            <label class="form-label">
+              Display name
+              <span class="optional">({{ 'addresses.form.optional' | translate }})</span>
+            </label>
+            <input
+              type="text"
+              formControlName="displayName"
+              maxlength="80"
+              class="form-control"
+              placeholder="e.g. Sai"
+            />
+            <small class="form-hint">Shown in the header greeting when this is your default address.</small>
+          </div>
+
           <!-- Label -->
           <div class="form-group">
             <label class="form-label">
@@ -229,7 +245,7 @@
 <!-- Delete Confirmation Modal -->
 <div class="modal-overlay" *ngIf="deleteConfirm" (click)="deleteConfirm = null">
   <div class="modal-content" (click)="$event.stopPropagation()">
-    <div class="modal-icon">🗑️</div>
+    <div class="modal-icon msi">delete</div>
     <h3>{{ 'addresses.deleteModal.title' | translate }}</h3>
     <p>{{ 'addresses.deleteModal.confirm' | translate }} <strong>{{ deleteConfirm.label || ('addresses.deleteModal.thisAddress' | translate) }}</strong>?</p>
     <p class="modal-address">{{ deleteConfirm.street }} {{ deleteConfirm.houseNumber }}, {{ deleteConfirm.city }}</p>

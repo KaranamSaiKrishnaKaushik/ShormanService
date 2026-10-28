@@ -1,8 +1,11 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { CookieConsentService } from '../../../core/services/cookie-consent.service';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
+  imports: [RouterLink],
   template: `
     <footer class="footer">
       <div class="footer-container">
@@ -12,7 +15,10 @@ import { Component } from '@angular/core';
           <span class="footer-tagline">Fresh groceries, delivered fast.</span>
         </div>
         <div class="footer-links">
-          <span>© {{ year }} Shorman Service. All rights reserved.</span>
+          <a routerLink="/impressum">Impressum</a>
+          <a routerLink="/datenschutz">Datenschutz</a>
+          <a href="#" (click)="openCookies($event)">Cookie-Einstellungen</a>
+          <span>© {{ year }} Shorman Service</span>
         </div>
       </div>
     </footer>
@@ -53,9 +59,19 @@ import { Component } from '@angular/core';
       font-size: 0.85rem;
       color: color-mix(in srgb, white 74%, var(--color-accent) 26%);
       font-family: var(--font-ui);
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
+    .footer-links a { color: inherit; text-decoration: underline; }
   `]
 })
 export class FooterComponent {
+  private readonly cookies = inject(CookieConsentService);
   year = new Date().getFullYear();
+
+  openCookies(event: Event): void {
+    event.preventDefault();
+    this.cookies.openPreferences();
+  }
 }

@@ -10,9 +10,9 @@ export interface SupermarketBrandStyle {
 export const SUPERMARKET_BRAND_STYLES: Record<string, SupermarketBrandStyle> = {
   all: {
     name: 'ALL',
-    backgroundColor: '#E8F5E9',
-    textColor: '#2E7D32',
-    borderColor: '#2E7D32',
+    backgroundColor: 'var(--color-primary-soft)',
+    textColor: 'var(--color-primary-strong)',
+    borderColor: 'var(--color-primary)',
     fontWeight: 900,
     textStrokeWidth: '0.5px'
   },

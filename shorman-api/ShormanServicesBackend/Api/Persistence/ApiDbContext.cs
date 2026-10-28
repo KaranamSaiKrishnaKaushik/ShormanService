@@ -24,6 +24,7 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
     public DbSet<ApiPaymentMethod> PaymentMethods => Set<ApiPaymentMethod>();
     public DbSet<ApiPaymentTransaction> PaymentTransactions => Set<ApiPaymentTransaction>();
     public DbSet<ApiOrderStatusHistory> OrderStatusHistory => Set<ApiOrderStatusHistory>();
+    public DbSet<ApiInvoice> Invoices => Set<ApiInvoice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +71,7 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.ToTable("addresses");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Label).HasMaxLength(100);
+            entity.Property(x => x.DisplayName).HasMaxLength(80);
             entity.Property(x => x.Street).HasMaxLength(150).IsRequired();
             entity.Property(x => x.HouseNumber).HasMaxLength(30).IsRequired();
             entity.Property(x => x.PostalCode).HasMaxLength(20).IsRequired();
@@ -267,6 +269,17 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
             entity.HasIndex(x => x.ProviderSessionRef);
             entity.HasOne(x => x.Order).WithMany(x => x.PaymentTransactions).HasForeignKey(x => x.OrderId);
             entity.HasOne(x => x.PaymentMethod).WithMany(x => x.PaymentTransactions).HasForeignKey(x => x.PaymentMethodId);
+        });
+
+        modelBuilder.Entity<ApiInvoice>(entity =>
+        {
+            entity.ToTable("invoices");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.InvoiceNumber).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.StoragePath).HasMaxLength(500).IsRequired();
+            entity.HasIndex(x => x.OrderId).IsUnique();
+            entity.HasIndex(x => x.SequenceNumber).IsUnique();
+            entity.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ApiOrderStatusHistory>(entity =>

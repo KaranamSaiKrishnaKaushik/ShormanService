@@ -28,6 +28,8 @@ export const routes: Routes = [
       { path: 'order-summary', loadComponent: () => import('./features/user-management/order-summary-management.component').then(m => m.OrderSummaryManagementComponent), canActivate: [roleGuard], data: { roles: ['SuperAdmin', 'Admin', 'Rider'], menuKey: 'user-management.order-summary' } }
     ]
   },
+  { path: 'impressum', loadComponent: () => import('./features/legal/legal.component').then(m => m.LegalComponent), data: { page: 'impressum' } },
+  { path: 'datenschutz', loadComponent: () => import('./features/legal/legal.component').then(m => m.LegalComponent), data: { page: 'datenschutz' } },
   { path: 'unauthorized', loadComponent: () => import('./features/unauthorized/unauthorized.component').then(m => m.UnauthorizedComponent), canActivate: [authGuard] },
   { path: '**', redirectTo: '' }
 ];

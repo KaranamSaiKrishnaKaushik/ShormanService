@@ -59,6 +59,7 @@ public class ApiAddress
     public int Id { get; set; }
     public int UserId { get; set; }
     public string? Label { get; set; }
+    public string? DisplayName { get; set; }
     public string Street { get; set; } = string.Empty;
     public string HouseNumber { get; set; } = string.Empty;
     public string PostalCode { get; set; } = string.Empty;
@@ -307,6 +308,19 @@ public class ApiOrderStatusHistory
     public string Status { get; set; } = string.Empty;
     public string? Note { get; set; }
     public DateTime ChangedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public ApiOrder Order { get; set; } = null!;
+}
+
+public class ApiInvoice
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public long SequenceNumber { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public DateTime InvoiceDateUtc { get; set; }
+    public string StoragePath { get; set; } = string.Empty;
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public ApiOrder Order { get; set; } = null!;
 }

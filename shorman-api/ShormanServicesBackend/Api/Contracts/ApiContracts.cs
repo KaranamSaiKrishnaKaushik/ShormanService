@@ -44,9 +44,9 @@ public record RoleMenuPermissionsDto(string Role, IReadOnlyCollection<RoleMenuPe
 public record UpdateRoleMenuPermissionsRequest(string Role, IReadOnlyCollection<string> EnabledMenuKeys);
 public record CurrentMenuPermissionsDto(IReadOnlyCollection<string> EnabledMenuKeys);
 
-public record AddressDto(int Id, int UserId, string? Label, string Street, string HouseNumber, string PostalCode, string City, string Country, bool IsDefault);
-public record CreateAddressRequest(string? Label, string Street, string HouseNumber, string PostalCode, string City, string Country, bool IsDefault = false);
-public record UpdateAddressRequest(string? Label, string Street, string HouseNumber, string PostalCode, string City, string Country, bool IsDefault = false);
+public record AddressDto(int Id, int UserId, string? Label, string Street, string HouseNumber, string PostalCode, string City, string Country, bool IsDefault, string? DisplayName = null);
+public record CreateAddressRequest(string? Label, string Street, string HouseNumber, string PostalCode, string City, string Country, bool IsDefault = false, string? DisplayName = null);
+public record UpdateAddressRequest(string? Label, string Street, string HouseNumber, string PostalCode, string City, string Country, bool IsDefault = false, string? DisplayName = null);
 
 public record CategoryDto(int Id, string Name, string Slug, string? Icon);
 public record SupermarketDto(int Id, string Name, string Slug, string? LogoUrl, string? Color);

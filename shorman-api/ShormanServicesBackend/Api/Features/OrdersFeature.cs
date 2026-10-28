@@ -409,10 +409,11 @@ public class MarkRiderOrderOutForDeliveryCommandHandler(ApiDbContext dbContext) 
             cancellationToken);
 }
 
-public class MarkRiderOrderDeliveredCommandHandler(ApiDbContext dbContext) : IRequestHandler<MarkRiderOrderDeliveredCommand, OrderDto>
+public class MarkRiderOrderDeliveredCommandHandler(ApiDbContext dbContext, ShormanServicesBackend.Api.Invoicing.IInvoiceService invoiceService, ILogger<MarkRiderOrderDeliveredCommandHandler> logger) : IRequestHandler<MarkRiderOrderDeliveredCommand, OrderDto>
 {
-    public Task<OrderDto> Handle(MarkRiderOrderDeliveredCommand request, CancellationToken cancellationToken) =>
-        RiderOrderStateTransitions.UpdateAssignedOrderAsync(
+    public async Task<OrderDto> Handle(MarkRiderOrderDeliveredCommand request, CancellationToken cancellationToken)
+    {
+        var result = await RiderOrderStateTransitions.UpdateAssignedOrderAsync(
             dbContext,
             request.RiderUserId,
             request.OrderId,
@@ -423,6 +424,19 @@ public class MarkRiderOrderDeliveredCommandHandler(ApiDbContext dbContext) : IRe
                 order.DeliveredAtUtc = now;
             },
             cancellationToken);
+
+        try
+        {
+            await invoiceService.EnsureInvoiceAsync(request.OrderId, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            // Invoice is regenerated lazily on download, so never block delivery.
+            logger.LogError(exception, "Invoice generation failed for order {OrderId}.", request.OrderId);
+        }
+
+        return result;
+    }
 }
 
 public class MarkRiderOrderCashCollectedCommandHandler(ApiDbContext dbContext) : IRequestHandler<MarkRiderOrderCashCollectedCommand, OrderDto>

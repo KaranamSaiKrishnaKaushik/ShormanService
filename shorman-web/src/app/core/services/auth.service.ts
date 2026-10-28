@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, delay, firstValueFrom, of, tap, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { AddressService } from './address.service';
 import {
   AppRole,
   User,
@@ -69,6 +70,7 @@ export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
   private ngZone = inject(NgZone);
+  private addressService = inject(AddressService);
   private useMock = environment.useMockAuth;
   private auth0Enabled = !!environment.auth0?.domain && !!environment.auth0?.clientId && !!environment.auth0?.audience;
   private readonly googleConnection = 'google-oauth2';
@@ -91,6 +93,13 @@ export class AuthService {
   authError$ = this.authErrorSubject.asObservable();
 
   constructor() {
+    this.isLoggedIn$.subscribe(loggedIn => {
+      if (loggedIn) {
+        this.addressService.refreshDefaultDisplayName();
+      } else {
+        this.addressService.clearDefaultDisplayName();
+      }
+    });
     this.initializationPromise = this.initializeAuth();
   }
 
@@ -132,9 +141,19 @@ export class AuthService {
   }
 
   getPreferredUserName(user: Partial<User> | null | undefined = this.currentUser, fallback = 'Account'): string {
+    const addressName = this.addressService.defaultDisplayName?.trim();
+    if (addressName) {
+      return addressName;
+    }
+
     const displayName = user?.displayName?.trim();
     if (displayName) {
       return displayName;
+    }
+
+    const lastName = user?.lastName?.trim();
+    if (lastName) {
+      return lastName;
     }
 
     const firstName = user?.firstName?.trim();

@@ -54,6 +54,10 @@ public class OrdersController(IMediator mediator) : ControllerBase
         {
             return BadRequest(new { message = exception.Message });
         }
+        catch (Stripe.StripeException exception)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = $"Stripe error: {exception.StripeError?.Message ?? exception.Message}" });
+        }
     }
 
     [HttpPost("{id:int}/payment-cancelled")]
@@ -67,6 +71,14 @@ public class OrdersController(IMediator mediator) : ControllerBase
         {
             return BadRequest(new { message = exception.Message });
         }
+    }
+
+    [HttpGet("{id:int}/invoice")]
+    public async Task<IActionResult> DownloadInvoice(int id, [FromServices] ShormanServicesBackend.Api.Invoicing.IInvoiceService invoiceService, CancellationToken cancellationToken)
+    {
+        var isAdmin = User.IsInRole(RoleNames.SuperAdmin) || User.IsInRole(RoleNames.Admin);
+        var file = await invoiceService.GetInvoiceFileAsync(id, GetUserId(), isAdmin, cancellationToken);
+        return file is null ? NotFound(new { message = "Invoice not available." }) : File(file.Content, "application/pdf", file.FileName);
     }
 
     private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

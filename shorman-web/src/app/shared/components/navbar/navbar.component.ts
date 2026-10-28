@@ -129,29 +129,6 @@ import { ThemeOption, ThemeService } from '../../../core/services/theme.service'
           <ng-container *ngIf="auth.isLoggedIn$ | async; else loginBtn">
             <div class="user-menu desktop-user-menu profile-editor">
               <span class="user-name">Hi {{ currentUserLabel() }}</span>
-              <button type="button" class="profile-action-btn" (click)="toggleDisplayNameEditor()" title="Set display name">
-                <span class="app-icon">edit</span>
-                <span>Display name</span>
-              </button>
-              <form *ngIf="displayNameEditorOpen" class="display-name-popover" (ngSubmit)="saveDisplayName()">
-                <label class="display-name-label" for="navbar-display-name">Display name</label>
-                <input
-                  id="navbar-display-name"
-                  type="text"
-                  class="display-name-input"
-                  [(ngModel)]="displayNameDraft"
-                  name="displayName"
-                  maxlength="80"
-                  autocomplete="nickname"
-                  placeholder="Enter display name" />
-                <p *ngIf="displayNameError" class="display-name-error">{{ displayNameError }}</p>
-                <div class="display-name-actions">
-                  <button type="button" class="display-name-secondary" (click)="closeDisplayNameEditor()">Cancel</button>
-                  <button type="submit" class="display-name-primary" [disabled]="displayNameSaving">
-                    {{ displayNameSaving ? 'Saving...' : 'Save' }}
-                  </button>
-                </div>
-              </form>
               <button class="btn-logout" (click)="auth.logout()">{{ 'navbar.logout' | translate }}</button>
             </div>
           </ng-container>
@@ -166,7 +143,6 @@ import { ThemeOption, ThemeService } from '../../../core/services/theme.service'
         <div *ngIf="auth.isLoggedIn$ | async" class="mobile-account-card">
           <p class="mobile-account-kicker">Signed in as</p>
           <p class="mobile-account-name">{{ currentUserLabel() }}</p>
-          <button type="button" class="mobile-account-action" (click)="toggleDisplayNameEditorFromMobileMenu()">Set display name</button>
           <div class="mobile-theme-panel">
             <span class="mobile-theme-title">Theme</span>
             <div class="mobile-theme-options">
@@ -191,23 +167,6 @@ import { ThemeOption, ThemeService } from '../../../core/services/theme.service'
           <a *ngIf="auth.hasAnyRole(riderRoles) && menuPermissions.hasPermission('rider-dashboard')" routerLink="/rider" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.riderDashboard' | translate }}</a>
           <a *ngIf="showProductManagement()" routerLink="/product-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.productManagement' | translate }}</a>
           <a *ngIf="showUserManagement()" routerLink="/user-management" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">{{ 'navbar.userManagement' | translate }}</a>
-          <form *ngIf="displayNameEditorOpen" class="mobile-display-name-form" (ngSubmit)="saveDisplayName()">
-            <input
-              type="text"
-              class="mobile-display-name-input"
-              [(ngModel)]="displayNameDraft"
-              name="mobileDisplayName"
-              maxlength="80"
-              autocomplete="nickname"
-              placeholder="Enter display name" />
-            <p *ngIf="displayNameError" class="display-name-error mobile-display-name-error">{{ displayNameError }}</p>
-            <div class="mobile-display-name-actions">
-              <button type="button" class="mobile-display-name-btn secondary" (click)="closeDisplayNameEditor()">Cancel</button>
-              <button type="submit" class="mobile-display-name-btn primary" [disabled]="displayNameSaving">
-                {{ displayNameSaving ? 'Saving...' : 'Save' }}
-              </button>
-            </div>
-          </form>
           <button type="button" class="mobile-nav-link mobile-logout-btn" (click)="logoutFromMobileMenu()">{{ 'navbar.logout' | translate }}</button>
         </ng-container>
       </div>
@@ -909,10 +868,6 @@ export class NavbarComponent {
   orderDropdownOpen = false;
   desktopMenuOpen = false;
   themeDropdownOpen = false;
-  displayNameEditorOpen = false;
-  displayNameSaving = false;
-  displayNameDraft = '';
-  displayNameError = '';
   currentLanguage = 'en';
   currentThemeId = this.themeService.getCurrentThemeId();
   themeOptions: ThemeOption[] = this.themeService.themeOptions;
@@ -979,7 +934,6 @@ export class NavbarComponent {
       this.closeOrderDropdown();
       this.closeDesktopMenu();
       this.themeDropdownOpen = false;
-      this.closeDisplayNameEditor();
       return;
     }
 
@@ -993,10 +947,6 @@ export class NavbarComponent {
 
     if (this.themeDropdownOpen && !target.closest('.theme-switch')) {
       this.themeDropdownOpen = false;
-    }
-
-    if (this.displayNameEditorOpen && !target.closest('.profile-editor') && !target.closest('.mobile-display-name-form')) {
-      this.closeDisplayNameEditor();
     }
   }
 
@@ -1106,52 +1056,6 @@ export class NavbarComponent {
   currentUserLabel(): string {
     return this.auth.getPreferredUserName(this.auth.currentUser, 'Account');
   }
-
-  toggleDisplayNameEditor(): void {
-    const user = this.auth.currentUser;
-    if (!user) {
-      return;
-    }
-
-    this.displayNameEditorOpen = !this.displayNameEditorOpen;
-    this.displayNameError = '';
-    this.displayNameDraft = user.displayName?.trim() || user.firstName || '';
-  }
-
-  closeDisplayNameEditor(): void {
-    this.displayNameEditorOpen = false;
-    this.displayNameError = '';
-    this.displayNameDraft = '';
-    this.displayNameSaving = false;
-  }
-
-  saveDisplayName(): void {
-    const user = this.auth.currentUser;
-    if (!user || this.displayNameSaving) {
-      return;
-    }
-
-    const nextDisplayName = this.displayNameDraft.trim();
-    if (nextDisplayName.length > 80) {
-      this.displayNameError = 'Display name must be 80 characters or fewer.';
-      return;
-    }
-
-    this.displayNameSaving = true;
-    this.displayNameError = '';
-
-    this.auth.updateProfile({ displayName: nextDisplayName }).subscribe({
-      next: () => {
-        this.closeDisplayNameEditor();
-      },
-      error: error => {
-        this.displayNameSaving = false;
-        console.error('Failed to update display name.', error);
-        this.displayNameError = 'Display name could not be updated right now.';
-      }
-    });
-  }
-
   ordersNavLabelKey(): string {
     return this.auth.hasRole('Rider')
       ? 'navbar.orders'
@@ -1173,11 +1077,5 @@ export class NavbarComponent {
   logoutFromMobileMenu(): void {
     this.closeMobileMenu();
     this.auth.logout();
-  }
-
-  toggleDisplayNameEditorFromMobileMenu(): void {
-    this.displayNameEditorOpen = !this.displayNameEditorOpen;
-    this.displayNameError = '';
-    this.displayNameDraft = this.auth.currentUser?.displayName?.trim() || this.auth.currentUser?.firstName || '';
   }
 }

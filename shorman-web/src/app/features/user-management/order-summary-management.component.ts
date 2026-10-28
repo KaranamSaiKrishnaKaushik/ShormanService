@@ -24,13 +24,13 @@ import { UserManagementService } from '../../core/services/user-management.servi
         </div>
 
         <div *ngIf="errorMsg && !loading" class="error-state">
-          <div class="error-icon">⚠️</div>
+          <div class="error-icon msi">warning</div>
           <p>{{ errorMsg }}</p>
           <button class="btn-retry" (click)="loadOrders()">Retry</button>
         </div>
 
         <div *ngIf="!loading && !errorMsg && orders.length === 0" class="empty-state">
-          <div class="empty-icon">📦</div>
+          <div class="empty-icon msi">inventory_2</div>
           <h3>No orders available</h3>
           <p>All customer and rider order history will appear here.</p>
         </div>
@@ -81,7 +81,7 @@ import { UserManagementService } from '../../core/services/user-management.servi
 
             <div class="order-footer">
               <span class="delivery-address" *ngIf="order.deliveryAddress">
-                📍 {{ order.deliveryAddress }}
+                <span class="msi">location_on</span> {{ order.deliveryAddress }}
               </span>
               <div class="order-total">
                 Total: <strong>{{ order.total | currency:'EUR' }}</strong>
