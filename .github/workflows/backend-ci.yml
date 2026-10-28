@@ -108,4 +108,4 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         run: |
           az containerapp update -n ca-shorman-api -g rg-shorman-app-prod-gwc \
-            --image ${{ env.DOCKERHUB_NAMESPACE }}/${{ env.BACKEND_IMAGE_NAME }}:develop-${GITHUB_SHA::7}
+            --image registry.hub.docker.com/${{ env.DOCKERHUB_NAMESPACE }}/${{ env.BACKEND_IMAGE_NAME }}:develop-${GITHUB_SHA::7}
