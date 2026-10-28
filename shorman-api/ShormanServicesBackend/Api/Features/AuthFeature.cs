@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using System.Globalization;
 using System.Security.Cryptography;
 using ShormanServicesBackend.Api.Contracts;
+using ShormanServicesBackend.Api.Email;
 using ShormanServicesBackend.Api.Persistence;
 using ShormanServicesBackend.Api.Persistence.Entities;
 using ShormanServicesBackend.Api.Security;
@@ -80,40 +81,69 @@ public class LoginCommandHandler(ApiDbContext dbContext, JwtTokenService jwtToke
     }
 }
 
-public class RegisterCommandHandler(ApiDbContext dbContext) : IRequestHandler<RegisterCommand, RegisterResponse>
+public class RegisterCommandHandler(
+    ApiDbContext dbContext,
+    IEmailSender emailSender,
+    IHostEnvironment environment) : IRequestHandler<RegisterCommand, RegisterResponse>
 {
     public async Task<RegisterResponse> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
         var email = request.Request.Email.Trim().ToLowerInvariant();
-        if (await dbContext.Users.AnyAsync(x => x.Email == email, cancellationToken))
+        var existingUser = await dbContext.Users.SingleOrDefaultAsync(x => x.Email == email, cancellationToken);
+        if (existingUser is not null && (existingUser.IsEmailVerified || existingUser.IsDeleted))
         {
             throw new InvalidOperationException("Email already registered.");
         }
 
         var verificationCode = AuthFeatureShared.CreateOneTimeCode();
+        var user = existingUser;
 
-        var user = new ApiUser
+        if (user is null)
         {
-            Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Request.Password),
-            FirstName = request.Request.FirstName.Trim(),
-            LastName = request.Request.LastName.Trim(),
-            Phone = request.Request.Phone?.Trim(),
-            IsEmailVerified = false,
-            EmailVerificationCode = verificationCode,
-            EmailVerificationExpiresAtUtc = DateTime.UtcNow.AddMinutes(15),
-            CreatedAtUtc = DateTime.UtcNow
-        };
+            user = new ApiUser { Email = email, CreatedAtUtc = DateTime.UtcNow };
+            dbContext.Users.Add(user);
+        }
 
-        dbContext.Users.Add(user);
+        // Registering again with an unverified address re-issues the code, which also acts as "resend".
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Request.Password);
+        user.FirstName = request.Request.FirstName.Trim();
+        user.LastName = request.Request.LastName.Trim();
+        user.Phone = request.Request.Phone?.Trim();
+        user.IsEmailVerified = false;
+        user.EmailVerificationCode = verificationCode;
+        user.EmailVerificationExpiresAtUtc = DateTime.UtcNow.AddMinutes(15);
+
         await dbContext.SaveChangesAsync(cancellationToken);
-        await AuthFeatureShared.AssignSingleRoleAsync(dbContext, user.Id, RoleNames.Customer, cancellationToken);
+        if (existingUser is null)
+        {
+            await AuthFeatureShared.AssignSingleRoleAsync(dbContext, user.Id, RoleNames.Customer, cancellationToken);
+        }
 
-        return new RegisterResponse(
+        var sent = await emailSender.SendAsync(
             user.Email,
-            "Account created. Use the verification code returned by the app to verify your email before signing in.",
-            true,
-            verificationCode);
+            "Your Shorman verification code",
+            AuthEmailTemplates.VerificationCode(user.FirstName, verificationCode),
+            cancellationToken);
+
+        if (sent)
+        {
+            return new RegisterResponse(
+                user.Email,
+                $"Account created. We sent a verification code to {user.Email}. It is valid for 15 minutes.",
+                true,
+                null);
+        }
+
+        if (environment.IsDevelopment())
+        {
+            return new RegisterResponse(
+                user.Email,
+                "Account created. Email is not configured, so the verification code is shown below (development only).",
+                true,
+                verificationCode);
+        }
+
+        throw new InvalidOperationException("We could not send the verification email right now. Please try again in a few minutes.");
     }
 }
 
@@ -154,8 +184,13 @@ public class VerifyEmailCommandHandler(ApiDbContext dbContext, JwtTokenService j
     }
 }
 
-public class RequestPasswordResetCommandHandler(ApiDbContext dbContext) : IRequestHandler<RequestPasswordResetCommand, PasswordResetRequestResponse>
+public class RequestPasswordResetCommandHandler(
+    ApiDbContext dbContext,
+    IEmailSender emailSender,
+    IHostEnvironment environment) : IRequestHandler<RequestPasswordResetCommand, PasswordResetRequestResponse>
 {
+    private const string GenericMessage = "If an account exists for that email, we have sent a reset code to it.";
+
     public async Task<PasswordResetRequestResponse> Handle(RequestPasswordResetCommand request, CancellationToken cancellationToken)
     {
         var email = request.Request.Email.Trim().ToLowerInvariant();
@@ -163,9 +198,7 @@ public class RequestPasswordResetCommandHandler(ApiDbContext dbContext) : IReque
 
         if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash))
         {
-            return new PasswordResetRequestResponse(
-                "If an account exists for that email, a reset code has been generated. In local development the app shows it on screen.",
-                null);
+            return new PasswordResetRequestResponse(GenericMessage, null);
         }
 
         if (!user.IsEmailVerified)
@@ -177,10 +210,41 @@ public class RequestPasswordResetCommandHandler(ApiDbContext dbContext) : IReque
         user.PasswordResetExpiresAtUtc = DateTime.UtcNow.AddMinutes(15);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new PasswordResetRequestResponse(
-            "If an account exists for that email, a reset code has been generated. In local development the app shows it on screen.",
-            user.PasswordResetCode);
+        var sent = await emailSender.SendAsync(
+            user.Email,
+            "Your Shorman password reset code",
+            AuthEmailTemplates.PasswordResetCode(user.FirstName, user.PasswordResetCode),
+            cancellationToken);
+
+        if (!sent && environment.IsDevelopment())
+        {
+            return new PasswordResetRequestResponse(
+                "Email is not configured, so the reset code is shown below (development only).",
+                user.PasswordResetCode);
+        }
+
+        return new PasswordResetRequestResponse(GenericMessage, null);
     }
+}
+
+internal static class AuthEmailTemplates
+{
+    internal static string VerificationCode(string firstName, string code) =>
+        Wrap($"Hi {System.Net.WebUtility.HtmlEncode(firstName)},", "Use this code to verify your email address and finish creating your Shorman account:", code);
+
+    internal static string PasswordResetCode(string firstName, string code) =>
+        Wrap($"Hi {System.Net.WebUtility.HtmlEncode(firstName)},", "Use this code to reset your Shorman password:", code);
+
+    private static string Wrap(string greeting, string intro, string code) =>
+        $"""
+        <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:auto;color:#17221E">
+          <h2 style="color:#0F7A5A;margin:0 0 16px">Shorman</h2>
+          <p>{greeting}</p>
+          <p>{intro}</p>
+          <p style="font-size:32px;letter-spacing:8px;font-weight:700;margin:24px 0">{code}</p>
+          <p style="color:#5B6A64;font-size:13px">The code is valid for 15 minutes. If you did not request it, you can ignore this email.</p>
+        </div>
+        """;
 }
 
 public class ConfirmPasswordResetCommandHandler(ApiDbContext dbContext) : IRequestHandler<ConfirmPasswordResetCommand, object>

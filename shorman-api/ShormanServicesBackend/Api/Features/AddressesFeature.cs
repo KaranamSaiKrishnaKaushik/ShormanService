@@ -27,7 +27,7 @@ public class GetAddressesQueryHandler(ApiDbContext dbContext) : IRequestHandler<
     }
 
     internal static AddressDto Map(ApiAddress address) =>
-        new(address.Id, address.UserId, address.Label, address.Street, address.HouseNumber, address.PostalCode, address.City, address.Country, address.IsDefault);
+        new(address.Id, address.UserId, address.Label, address.Street, address.HouseNumber, address.PostalCode, address.City, address.Country, address.IsDefault, address.DisplayName);
 }
 
 public class AddAddressCommandHandler(ApiDbContext dbContext) : IRequestHandler<AddAddressCommand, AddressDto>
@@ -43,6 +43,7 @@ public class AddAddressCommandHandler(ApiDbContext dbContext) : IRequestHandler<
         {
             UserId = request.UserId,
             Label = request.Request.Label?.Trim(),
+            DisplayName = NormalizeDisplayName(request.Request.DisplayName),
             Street = request.Request.Street.Trim(),
             HouseNumber = request.Request.HouseNumber.Trim(),
             PostalCode = request.Request.PostalCode.Trim(),
@@ -54,6 +55,17 @@ public class AddAddressCommandHandler(ApiDbContext dbContext) : IRequestHandler<
         dbContext.Addresses.Add(address);
         await dbContext.SaveChangesAsync(cancellationToken);
         return GetAddressesQueryHandler.Map(address);
+    }
+
+    internal static string? NormalizeDisplayName(string? value)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length > 80 ? trimmed[..80] : trimmed;
     }
 
     private Task UnsetDefaultAddressesAsync(int userId, CancellationToken cancellationToken) =>
@@ -80,6 +92,7 @@ public class UpdateAddressCommandHandler(ApiDbContext dbContext) : IRequestHandl
         }
 
         address.Label = request.Request.Label?.Trim();
+        address.DisplayName = AddAddressCommandHandler.NormalizeDisplayName(request.Request.DisplayName);
         address.Street = request.Request.Street.Trim();
         address.HouseNumber = request.Request.HouseNumber.Trim();
         address.PostalCode = request.Request.PostalCode.Trim();

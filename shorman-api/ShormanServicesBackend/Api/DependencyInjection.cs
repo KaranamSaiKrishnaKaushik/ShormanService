@@ -67,6 +67,18 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddMemoryCache();
         services.AddScoped<JwtTokenService>();
+        services.Configure<ShormanServicesBackend.Api.Email.EmailOptions>(configuration.GetSection(ShormanServicesBackend.Api.Email.EmailOptions.SectionName));
+        services.AddSingleton<ShormanServicesBackend.Api.Email.IEmailSender, ShormanServicesBackend.Api.Email.SmtpEmailSender>();
+        services.Configure<ShormanServicesBackend.Api.Invoicing.InvoiceOptions>(configuration.GetSection(ShormanServicesBackend.Api.Invoicing.InvoiceOptions.SectionName));
+        if (string.Equals(configuration["Invoice:StorageProvider"], "AzureBlob", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<ShormanServicesBackend.Api.Invoicing.IInvoiceStorage, ShormanServicesBackend.Api.Invoicing.BlobInvoiceStorage>();
+        }
+        else
+        {
+            services.AddSingleton<ShormanServicesBackend.Api.Invoicing.IInvoiceStorage, ShormanServicesBackend.Api.Invoicing.LocalInvoiceStorage>();
+        }
+        services.AddScoped<ShormanServicesBackend.Api.Invoicing.IInvoiceService, ShormanServicesBackend.Api.Invoicing.InvoiceService>();
         services.AddScoped<IDeliveryGeocodingService, DeliveryGeocodingService>();
         services.AddScoped<IProductManagementImportService, ProductManagementImportService>();
         services.AddScoped<IPricingPolicyProvider, PricingPolicyProvider>();
@@ -441,6 +453,10 @@ public static class DependencyInjection
         );
         """,
         """
+        IF COL_LENGTH('addresses', 'DisplayName') IS NULL
+        ALTER TABLE addresses ADD DisplayName NVARCHAR(80) NULL;
+        """,
+        """
         IF OBJECT_ID('orders', 'U') IS NULL
         CREATE TABLE orders (
             Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
@@ -792,6 +808,21 @@ public static class DependencyInjection
             ChangedAtUtc DATETIME2 NOT NULL,
             CONSTRAINT FK_order_status_history_Order FOREIGN KEY (OrderId) REFERENCES orders(Id) ON DELETE CASCADE
         );
+        """,
+        """
+        IF OBJECT_ID('invoices', 'U') IS NULL
+        CREATE TABLE invoices (
+            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            OrderId INT NOT NULL,
+            SequenceNumber BIGINT NOT NULL,
+            InvoiceNumber NVARCHAR(50) NOT NULL,
+            InvoiceDateUtc DATETIME2 NOT NULL,
+            StoragePath NVARCHAR(500) NOT NULL,
+            CreatedAtUtc DATETIME2 NOT NULL,
+            CONSTRAINT UX_invoices_OrderId UNIQUE (OrderId),
+            CONSTRAINT UX_invoices_SequenceNumber UNIQUE (SequenceNumber),
+            CONSTRAINT FK_invoices_Order FOREIGN KEY (OrderId) REFERENCES orders(Id) ON DELETE CASCADE
+        );
         """
     ];
 
@@ -877,6 +908,7 @@ public static class DependencyInjection
         MySqlAddColumnIfMissing("users", "PasswordResetCode", "VARCHAR(20) NULL"),
         MySqlAddColumnIfMissing("users", "PasswordResetExpiresAtUtc", "DATETIME NULL"),
         MySqlAddColumnIfMissing("users", "DisplayName", "VARCHAR(80) NULL"),
+        MySqlAddColumnIfMissing("addresses", "DisplayName", "VARCHAR(80) NULL"),
         MySqlAddColumnIfMissing("users", "ThemePreference", "VARCHAR(40) NULL"),
         MySqlAddColumnIfMissing("users", "IsDeleted", "TINYINT(1) NOT NULL DEFAULT 0"),
         MySqlAddColumnIfMissing("users", "DeletedAtUtc", "DATETIME NULL"),
@@ -1351,6 +1383,20 @@ public static class DependencyInjection
             `Note` VARCHAR(500) NULL,
             `ChangedAtUtc` DATETIME NOT NULL,
             CONSTRAINT `FK_order_status_history_Order` FOREIGN KEY (`OrderId`) REFERENCES `orders` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS `invoices` (
+            `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `OrderId` INT NOT NULL,
+            `SequenceNumber` BIGINT NOT NULL,
+            `InvoiceNumber` VARCHAR(50) NOT NULL,
+            `InvoiceDateUtc` DATETIME NOT NULL,
+            `StoragePath` VARCHAR(500) NOT NULL,
+            `CreatedAtUtc` DATETIME NOT NULL,
+            UNIQUE KEY `UX_invoices_OrderId` (`OrderId`),
+            UNIQUE KEY `UX_invoices_SequenceNumber` (`SequenceNumber`),
+            CONSTRAINT `FK_invoices_Order` FOREIGN KEY (`OrderId`) REFERENCES `orders` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """
     ];

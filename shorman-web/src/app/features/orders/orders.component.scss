@@ -319,6 +319,24 @@ h1 {
   color: #9CA3AF;
 }
 
+.invoice-link,
+.invoice-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #30332f;
+  border: 1.5px solid #30332f;
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.invoice-btn {
+  margin: 12px 0;
+}
+
 .order-total {
   font-size: 0.95rem;
   color: #333;

@@ -75,7 +75,7 @@
           placeholder="{{ 'products.searchPlaceholder' | translate }}"
           class="search-input"
         />
-        <button type="button" *ngIf="searchQuery" class="search-clear" (click)="searchQuery = ''; applyFilters()">✕</button>
+        <button type="button" *ngIf="searchQuery" class="search-clear" (click)="searchQuery = ''; applyFilters()"><span class="msi">close</span></button>
       </div>
     </div>
   </div>
@@ -107,7 +107,7 @@
     <aside class="sidebar" [class.mobile-open]="mobileFiltersOpen">
       <div class="mobile-filter-header">
         <h3>{{ 'products.filters' | translate }}</h3>
-        <button type="button" class="close-btn" (click)="closeMobileFilters()">✕</button>
+        <button type="button" class="close-btn" (click)="closeMobileFilters()"><span class="msi">close</span></button>
       </div>
 
       <div class="sidebar-section">
@@ -157,7 +157,7 @@
                 [class.active]="activeSort === option.value"
                 (click)="setSort(option.value)">
                 <span>{{ option.translationKey | translate }}</span>
-                <span class="sort-option-check" *ngIf="activeSort === option.value">✓</span>
+                <span class="sort-option-check msi" *ngIf="activeSort === option.value">check</span>
               </button>
             </div>
           </div>

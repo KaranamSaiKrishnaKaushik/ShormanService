@@ -194,6 +194,29 @@ export class OrdersComponent implements OnInit {
       });
   }
 
+  hasInvoice(order: Order): boolean {
+    return !!order.deliveredAt || order.status === 'DELIVERED' || order.status === 'COMPLETED';
+  }
+
+  downloadInvoice(order: Order, event?: Event): void {
+    event?.stopPropagation();
+    event?.preventDefault();
+    this.orderService.downloadInvoice(order.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Rechnung-${order.id}.pdf`;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => {
+        this.errorMsg = 'Invoice could not be downloaded. Please try again later.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
   loadOrders(): void {
     this.loading = true;
     this.errorMsg = '';

@@ -26,6 +26,7 @@ export class AddressesComponent implements OnInit {
   deleteConfirm: Address | null = null;
 
   form = this.fb.nonNullable.group({
+    displayName: ['', [Validators.maxLength(80)]],
     label: [''],
     street: ['', [Validators.required, Validators.minLength(2)]],
     houseNumber: ['', [Validators.required]],
@@ -61,6 +62,7 @@ export class AddressesComponent implements OnInit {
     this.editingId = null;
     this.showForm = true;
     this.form.reset({
+      displayName: '',
       label: '',
       street: '',
       houseNumber: '',
@@ -75,6 +77,7 @@ export class AddressesComponent implements OnInit {
     this.editingId = address.id;
     this.showForm = true;
     this.form.patchValue({
+      displayName: address.displayName || '',
       label: address.label || '',
       street: address.street,
       houseNumber: address.houseNumber,
@@ -93,6 +96,7 @@ export class AddressesComponent implements OnInit {
     this.showForm = false;
     this.editingId = null;
     this.form.reset({
+      displayName: '',
       label: '',
       street: '',
       houseNumber: '',
@@ -142,6 +146,7 @@ export class AddressesComponent implements OnInit {
         this.editingId = null;
         this.saving = false;
         this.form.reset({
+          displayName: '',
           label: '',
           street: '',
           houseNumber: '',

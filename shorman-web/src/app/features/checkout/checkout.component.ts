@@ -18,11 +18,11 @@ interface PaymentOption {
 }
 
 const PAYMENT_OPTIONS: PaymentOption[] = [
-  { value: 'STRIPE_CARD', labelKey: 'checkout.payment.stripeCardLabel', icon: '💳', descKey: 'checkout.payment.stripeCardDesc' },
-  { value: 'STRIPE_SEPA_DEBIT', labelKey: 'checkout.payment.stripeSepaLabel', icon: '🏦', descKey: 'checkout.payment.stripeSepaDesc' },
-  { value: 'STRIPE_KLARNA', labelKey: 'checkout.payment.stripeKlarnaLabel', icon: '🧾', descKey: 'checkout.payment.stripeKlarnaDesc' },
-  { value: 'STRIPE_PAYPAL', labelKey: 'checkout.payment.paypalLabel', icon: '🅿️', descKey: 'checkout.payment.paypalDesc' },
-  { value: 'CASH_ON_DELIVERY', labelKey: 'checkout.payment.codLabel', icon: '💵', descKey: 'checkout.payment.codDesc' },
+  { value: 'STRIPE_CARD', labelKey: 'checkout.payment.stripeCardLabel', icon: 'credit_card', descKey: 'checkout.payment.stripeCardDesc' },
+  { value: 'STRIPE_SEPA_DEBIT', labelKey: 'checkout.payment.stripeSepaLabel', icon: 'account_balance', descKey: 'checkout.payment.stripeSepaDesc' },
+  { value: 'STRIPE_KLARNA', labelKey: 'checkout.payment.stripeKlarnaLabel', icon: 'receipt_long', descKey: 'checkout.payment.stripeKlarnaDesc' },
+  { value: 'STRIPE_PAYPAL', labelKey: 'checkout.payment.paypalLabel', icon: 'account_balance_wallet', descKey: 'checkout.payment.paypalDesc' },
+  { value: 'CASH_ON_DELIVERY', labelKey: 'checkout.payment.codLabel', icon: 'payments', descKey: 'checkout.payment.codDesc' },
 ];
 
 @Component({

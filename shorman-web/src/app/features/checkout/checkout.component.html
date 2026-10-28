@@ -27,7 +27,7 @@
                 </div>
                 <div class="delivery-check" *ngIf="deliveryChecks[deliveryCheckKey(addr.id)] as check">
                   <span [class.eligible]="check.eligible" [class.ineligible]="!check.eligible">
-                    {{ check.eligible ? '✅ ' : '❌ ' }}{{ check.message }}
+                    <span class="msi">{{ check.eligible ? 'check_circle' : 'cancel' }}</span> {{ check.message }}
                     <span *ngIf="check.eligible"> ({{ 'checkout.fee' | translate }}: {{ check.deliveryFee | currency:'EUR' }})</span>
                   </span>
                 </div>
@@ -102,12 +102,12 @@
             <label *ngFor="let opt of paymentOptions" class="payment-option"
               [class.selected]="selectedPayment === opt.value">
               <input type="radio" name="payment" [value]="opt.value" [(ngModel)]="selectedPayment" />
-              <span class="pay-icon">{{ opt.icon }}</span>
+              <span class="pay-icon msi">{{ opt.icon }}</span>
               <div class="pay-details">
                 <div class="pay-label">{{ opt.labelKey | translate }}</div>
                 <div class="pay-desc">{{ opt.descKey | translate }}</div>
               </div>
-              <span class="pay-check" *ngIf="selectedPayment === opt.value">✓</span>
+              <span class="pay-check msi" *ngIf="selectedPayment === opt.value">check</span>
             </label>
           </div>
         </div>
@@ -156,7 +156,7 @@
               {{ placing ? ('checkout.placingOrder' | translate) : (submitLabelKey() | translate) }}
             </button>
 
-            <p class="secure-note">🔒 {{ 'checkout.securePayment' | translate }}</p>
+            <p class="secure-note"><span class="msi">lock</span> {{ 'checkout.securePayment' | translate }}</p>
           </ng-container>
         </div>
       </div>

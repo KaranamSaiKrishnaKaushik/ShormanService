@@ -1,55 +1,80 @@
-.auth-page {
-  min-height: calc(100vh - 64px);
-  background:
-    radial-gradient(circle at 18% 24%, rgba(255, 111, 0, 0.22) 0, rgba(255, 111, 0, 0.22) 6%, transparent 7%),
-    radial-gradient(circle at 76% 18%, rgba(76, 175, 80, 0.25) 0, rgba(76, 175, 80, 0.25) 7%, transparent 8%),
-    radial-gradient(circle at 84% 70%, rgba(255, 193, 7, 0.24) 0, rgba(255, 193, 7, 0.24) 6%, transparent 7%),
-    radial-gradient(circle at 12% 78%, rgba(244, 67, 54, 0.22) 0, rgba(244, 67, 54, 0.22) 7%, transparent 8%),
-    linear-gradient(135deg, #1f5a3c 0%, #2E7D32 45%, #3c8e58 100%);
-  padding: 2.5rem 1rem;
-}
-
-.auth-hero {
-  min-height: 100%;
+:host {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 1rem;
 }
 
-.brand-badge {
-  align-self: flex-start;
-  margin-left: max(0rem, calc((100vw - 880px) / 2));
-  background: #FF6F00;
-  color: #fff;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  padding: 0.85rem 1rem;
-  border-radius: 0 0 14px 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+.auth-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: #fff;
+}
+
+.auth-frame {
+  width: 100%;
+  min-height: inherit;
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(360px, 1fr);
+  background: #fff;
+}
+
+.auth-visual {
+  position: relative;
+  overflow: hidden;
+  background: #d9edf2;
+
+  img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 100%;
+  }
 }
 
 .auth-shell {
-  width: 100%;
-  max-width: 880px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
+  justify-content: center;
+  padding: 2rem 1.5rem;
 }
 
 .auth-card {
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 18px;
-  padding: 1.7rem 1.5rem;
-  width: min(100%, 470px);
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(5px);
+  width: min(100%, 380px);
 }
 
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0 0 1rem;
+  color: #444;
+  font-size: 0.95rem;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #dcdcdc;
+  }
+}
+
+.social-block {
+  margin-bottom: 1.5rem;
+}
+
+.register-link {
+  color: #111;
+  font-weight: 800;
+  text-decoration: none;
+  width: auto;
+}
 .auth-header {
   margin-bottom: 1.35rem;
+  text-align: center;
 }
 
 .eyebrow {
@@ -92,8 +117,8 @@
 .form-control {
   width: 100%;
   border: 1.5px solid #B7C4B7;
-  border-radius: 10px;
-  padding: 0.9rem 1rem;
+  border-radius: 999px;
+  padding: 0.85rem 1.25rem;
   background: #fff;
   color: #1a1a1a;
   font-size: 0.95rem;
@@ -102,8 +127,8 @@
 
 .form-control:focus {
   outline: none;
-  border-color: #2E7D32;
-  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+  border-color: #111;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
 }
 
 .form-control.is-invalid {
@@ -132,12 +157,12 @@
   border: none;
   background: transparent;
   font-weight: 700;
-  color: #2E7D32;
+  color: #111;
   cursor: pointer;
 }
 
 .preview-link {
-  color: #2E7D32;
+  color: #111;
   font-weight: 700;
   text-decoration: none;
   width: fit-content;
@@ -159,7 +184,7 @@
 
 .success-msg {
   background: #F1F8F1;
-  color: #2E7D32;
+  color: #111;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   margin-bottom: 1rem;
@@ -173,11 +198,11 @@
 
 .btn-primary {
   width: 100%;
-  background: #2E7D32;
+  background: #111;
   color: #fff;
   border: none;
-  padding: 0.75rem;
-  border-radius: 8px;
+  padding: 0.85rem;
+  border-radius: 999px;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
@@ -189,7 +214,7 @@
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #1B5E20;
+  background: #333;
 }
 
 .btn-secondary {
@@ -198,7 +223,7 @@
   color: #1a1a1a;
   border: 1.5px solid #C9D7C9;
   padding: 0.8rem;
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: 0.98rem;
   font-weight: 700;
   cursor: pointer;
@@ -206,8 +231,8 @@
 }
 
 .btn-secondary:hover:not(:disabled) {
-  border-color: #2E7D32;
-  background: #F8FCF8;
+  border-color: #111;
+  background: #f7f7f7;
 }
 
 .btn-link {
@@ -227,7 +252,7 @@
   background: transparent;
   border: none;
   padding: 0;
-  color: #2E7D32;
+  color: #111;
   font-weight: 700;
   cursor: pointer;
 }
@@ -246,9 +271,8 @@
 }
 
 .signup-block {
-  margin-top: 1.5rem;
-  padding-top: 1.4rem;
-  border-top: 1px solid #E4EAE3;
+  margin-top: 1.25rem;
+  text-align: center;
 }
 
 .reset-panel {
@@ -280,7 +304,8 @@
 }
 
 .signup-copy {
-  margin: 0 0 0.85rem;
+  display: inline;
+  margin: 0 0.35rem 0 0;
   color: #5F6B63;
   line-height: 1.5;
   font-size: 0.92rem;
@@ -302,7 +327,7 @@
   background: #fff;
   border: 1.5px solid #C9D7C9;
   padding: 0.8rem 1rem;
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
@@ -316,7 +341,7 @@
 
 .btn-google:hover:not(:disabled) {
   background: #f8f8f8;
-  border-color: #2E7D32;
+  border-color: #111;
 }
 
 .google-mark {
@@ -332,21 +357,12 @@
   height: 100%;
 }
 
-@media (max-width: 640px) {
-  .auth-page {
-    padding: 1rem 0.75rem 1.5rem;
+@media (max-width: 860px) {
+  .auth-frame {
+    grid-template-columns: 1fr;
   }
 
-  .brand-badge {
-    margin-left: 0;
-    border-radius: 12px;
-  }
-
-  .auth-card {
-    padding: 1.35rem 1.1rem;
-  }
-
-  .auth-header h1 {
-    font-size: 1.9rem;
+  .auth-visual {
+    height: 220px;
   }
 }

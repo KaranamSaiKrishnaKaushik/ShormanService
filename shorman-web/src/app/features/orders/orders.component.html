@@ -34,14 +34,14 @@
 
     <!-- Error State -->
     <div *ngIf="errorMsg && !loading" class="error-state">
-      <div class="error-icon">⚠️</div>
+      <div class="error-icon msi">warning</div>
       <p>{{ errorMsg }}</p>
       <button type="button" class="btn-retry" (click)="loadOrders()">Retry</button>
     </div>
 
     <!-- Empty State -->
     <div *ngIf="!loading && !errorMsg && orders.length === 0" class="empty-state">
-      <div class="empty-icon">📦</div>
+      <div class="empty-icon msi">inventory_2</div>
       <h3>{{ emptyTitle }}</h3>
       <p>{{ emptyMessage }}</p>
     </div>
@@ -81,14 +81,18 @@
 
           <div class="order-footer">
             <span class="delivery-address" *ngIf="order.deliveryAddress">
-              📍 {{ order.deliveryAddress }}
+              <span class="msi">location_on</span> {{ order.deliveryAddress }}
             </span>
             <span class="delivery-address">
-              💳 {{ formatPaymentMethod(order.paymentMethod) }} · {{ formatPaymentStatus(order.paymentStatus) }}
+              <span class="msi">credit_card</span> {{ formatPaymentMethod(order.paymentMethod) }} · {{ formatPaymentStatus(order.paymentStatus) }}
             </span>
             <div class="order-total">
               Total: <strong>{{ order.total | currency:'EUR' }}</strong>
             </div>
+            <span *ngIf="hasInvoice(order) && !isRider" class="invoice-link" role="button" tabindex="0"
+              (click)="downloadInvoice(order, $event)" (keydown.enter)="downloadInvoice(order, $event)">
+              <span class="msi">download</span> Invoice (PDF)
+            </span>
           </div>
         </button>
 
@@ -135,6 +139,10 @@
             <small>{{ selectedOrder.items.length }} items</small>
           </div>
         </div>
+
+        <button *ngIf="hasInvoice(selectedOrder) && !isRider" type="button" class="invoice-btn" (click)="downloadInvoice(selectedOrder, $event)">
+          <span class="msi">download</span> Download invoice (PDF)
+        </button>
 
         <section *ngFor="let group of selectedOrderStoreGroups; trackBy: trackByStoreName" class="store-group">
           <div class="store-group-header">

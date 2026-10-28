@@ -229,6 +229,13 @@ export class OrderService {
     return this.http.get<Order>(`${environment.apiUrl}/orders/${id}`);
   }
 
+  downloadInvoice(orderId: number): Observable<Blob> {
+    if (this.useMock) {
+      return throwError(() => new Error('Invoices are not available in mock mode.'));
+    }
+    return this.http.get(`${environment.apiUrl}/orders/${orderId}/invoice`, { responseType: 'blob' });
+  }
+
   getAvailableRiderOrders(): Observable<Order[]> {
     if (this.useMock) {
       return of(MOCK_ORDERS.filter(order => order.status === 'AWAITING_PICKUP')).pipe(delay(200));

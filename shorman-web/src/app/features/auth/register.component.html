@@ -1,14 +1,14 @@
 <div class="auth-page">
+  <div class="auth-frame">
+  <div class="auth-visual" aria-hidden="true">
+    <img src="shorman-login-bg.png" alt="" />
+  </div>
+  <div class="auth-shell">
   <div class="auth-card">
     <div class="auth-header">
-      <div class="auth-logo">🛒</div>
-      <h1>Create Account</h1>
-      <p>Create a Shorman customer account with email, password, and optional phone number</p>
+      <h1>Create account</h1>
+      <p>Join Shorman with your email, or continue with Google.</p>
     </div>
-
-    <p class="auth-copy">
-      You can register directly here, or continue with Google if you prefer automatic account creation from your Google email.
-    </p>
 
     <form [formGroup]="registerForm" (ngSubmit)="submit()">
       <div class="form-row">
@@ -41,7 +41,7 @@
         <label for="password">Password</label>
         <div class="input-wrapper">
           <input id="password" [type]="showPassword ? 'text' : 'password'" class="form-control" formControlName="password" [class.is-invalid]="hasError('password', 'required') || hasError('password', 'minlength')" />
-          <button type="button" class="toggle-pwd" (click)="showPassword = !showPassword">{{ showPassword ? '🙈' : '👁️' }}</button>
+          <button type="button" class="toggle-pwd" (click)="showPassword = !showPassword"><span class="msi">{{ showPassword ? 'visibility_off' : 'visibility' }}</span></button>
         </div>
         <div class="invalid-feedback" *ngIf="hasError('password', 'required')">Password is required.</div>
         <div class="invalid-feedback" *ngIf="hasError('password', 'minlength')">Password must be at least 6 characters.</div>
@@ -52,13 +52,13 @@
 
       <button type="submit" class="btn-primary" [disabled]="loading">
         <span *ngIf="loading" class="btn-spinner"></span>
-        {{ loading ? 'Creating Account…' : 'Create Account' }}
+        {{ loading ? 'Creating Accountâ€¦' : 'Create Account' }}
       </button>
     </form>
 
     <section class="verification-block" *ngIf="verificationPending">
       <h2>Verify your email</h2>
-      <p class="auth-copy">Enter the 6-digit code to activate your account and continue. In this local setup the code is shown below because email delivery is not configured yet.</p>
+      <p class="auth-copy">We sent a 6-digit code to your email. Enter it to activate your account.</p>
       <div class="code-preview" *ngIf="verificationCodePreview">Development verification code: <strong>{{ verificationCodePreview }}</strong></div>
 
       <form [formGroup]="verificationForm" (ngSubmit)="verifyEmail()">
@@ -71,12 +71,12 @@
 
         <button type="submit" class="btn-primary" [disabled]="loading">
           <span *ngIf="loading" class="btn-spinner"></span>
-          {{ loading ? 'Verifying…' : 'Verify Email' }}
+          {{ loading ? 'Verifyingâ€¦' : 'Verify Email' }}
         </button>
       </form>
     </section>
 
-    <div class="divider"><span>or</span></div>
+    <div class="divider"><span>or sign up with</span></div>
 
     <button type="button" class="btn-google" [disabled]="loading" (click)="continueWithGoogle()">
       <span class="google-mark" aria-hidden="true">
@@ -87,7 +87,7 @@
           <path fill="#34A853" d="M12 21.4c2.7 0 5-.9 6.7-2.5l-3.5-2.7c-.9.7-2.1 1.2-3.2 1.2-2.6 0-4.8-1.8-5.6-4.2l-3.6 2.8c1.6 3.2 4.9 5.4 9.2 5.4z"/>
         </svg>
       </span>
-      {{ loading ? 'Redirecting…' : 'Continue with Google Instead' }}
+      {{ loading ? 'Redirectingâ€¦' : 'Continue with Google' }}
     </button>
 
     <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
@@ -95,5 +95,7 @@
     <div class="auth-footer">
       Already have an account? <a routerLink="/login">Sign in</a>
     </div>
+  </div>
+  </div>
   </div>
 </div>
